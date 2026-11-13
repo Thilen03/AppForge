@@ -107,10 +107,12 @@ def stylesheet(t: Tokens) -> str:
     QPushButton#ghost:hover {{ background: {t.accent_soft}; }}
 
     QComboBox {{ background: {t.surface}; border: 1px solid {t.border_strong}; border-radius: 8px;
-                padding: 6px 10px; min-height: 18px; }}
+                padding: 6px 28px 6px 10px; min-height: 18px; }}
     QComboBox:focus {{ border: 1px solid {t.accent}; }}
     QComboBox:disabled {{ color: {t.muted}; }}
-    QComboBoxPrivateContainer {{ background: transparent; border: none; margin: 0; padding: 0; }}
+    QComboBox::drop-down {{ width: 0; border: none; background: transparent; }}
+    QComboBox::down-arrow {{ image: none; width: 0; height: 0; }}
+    QComboBoxPrivateContainer {{ background: {t.surface}; border: none; margin: 0; padding: 0; }}
     QComboBox QAbstractItemView {{ background: {t.surface}; border: 1px solid {t.border_strong};
                                   border-radius: 10px; padding: 4px; outline: none;
                                   selection-background-color: {t.accent_soft}; selection-color: {t.text}; }}

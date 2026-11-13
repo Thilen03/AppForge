@@ -1,12 +1,16 @@
-"""Update sources: GitHub, GitLab.com and Codeberg (Forgejo), all through their public release APIs.
+"""Update sources: GitHub, GitLab.com, Codeberg and any self-hosted Forgejo/Gitea/GitLab server.
 
-``parse_source`` understands repository URLs of the three hosts (plus ``owner/repo`` shorthand,
-which means GitHub, as in earlier versions). Each client returns the same ``Release``/``Asset``
-objects, so version comparison, asset choice and installation are provider-independent.
+``parse_source`` understands repository URLs of the well-known hosts (plus ``owner/repo`` shorthand,
+which means GitHub, as in earlier versions) and, since 0.5.4, ``https://`` URLs of *any other host*
+such as ``https://git.example.dev/owner/repo``.  For those, ``SelfHostedClient`` works out at check
+time which API the server speaks (Forgejo/Gitea, then GitLab) and remembers the answer.
+Each client returns the same ``Release``/``Asset`` objects, so version comparison, asset choice and
+installation are provider-independent.
 
 Safety:
 * a client only talks to its own API host, and a token is only ever sent to that host;
-* asset links that are not ``https://`` are dropped (GitLab release links can point anywhere).
+* asset links that are not ``https://`` are dropped (GitLab release links can point anywhere);
+* repository URLs on hosts other than the three well-known ones must be ``https://``.
 """
 from __future__ import annotations
 
@@ -22,14 +26,18 @@ from posixpath import basename
 from .github import Asset, GitHubClient, GitHubError, Release, user_agent
 from .net import urlopen as _urlopen
 
-GITHUB, GITLAB, CODEBERG = "github", "gitlab", "codeberg"
+GITHUB, GITLAB, CODEBERG, CUSTOM = "github", "gitlab", "codeberg", "custom"
 HOSTS = {"github.com": GITHUB, "gitlab.com": GITLAB, "codeberg.org": CODEBERG}
-PROVIDER_NAMES = {GITHUB: "GitHub", GITLAB: "GitLab", CODEBERG: "Codeberg"}
-SUPPORTED_HINT = "https://github.com/owner/repo  (GitHub, GitLab and Codeberg are supported)"
+PROVIDER_NAMES = {GITHUB: "GitHub", GITLAB: "GitLab", CODEBERG: "Codeberg", CUSTOM: "Git server"}
+SUPPORTED_HINT = ("https://github.com/owner/repo  (GitHub, GitLab, Codeberg and self-hosted "
+                  "Forgejo/Gitea/GitLab servers such as https://git.example.dev/owner/repo are supported)")
 
 _SEGMENT = re.compile(r"^[A-Za-z0-9._-]+$")
 _GITLAB_STOP = {"-", "releases", "tags", "blob", "tree", "issues", "merge_requests", "commits",
                 "pipelines", "wikis", "raw", "archive"}
+_HOSTNAME = re.compile(r"^(?=.{1,253}$)[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*$")
+_CUSTOM_PAGES = {"src", "releases", "tags", "commit", "pulls", "pull", "actions", "wiki", "projects",
+                 "activity", "branches", "compare", "settings", "packages", "labels", "milestones"}
 _PRERELEASE_TAG = re.compile(r"(?i)(?:^|[-._])(alpha|beta|rc|pre|preview)(?:[-._\d]|$)")
 
 
@@ -38,10 +46,12 @@ class SourceRef:
     provider: str
     owner: str          # GitLab: the whole namespace, e.g. "group/subgroup"
     name: str
+    host: str = ""      # filled in for the well-known providers; required for ``custom``
 
-    @property
-    def host(self) -> str:
-        return next(h for h, p in HOSTS.items() if p == self.provider)
+    def __post_init__(self):
+        if not self.host:
+            host = next((h for h, p in HOSTS.items() if p == self.provider), "")
+            object.__setattr__(self, "host", host)
 
     @property
     def url(self) -> str:
@@ -69,12 +79,23 @@ def parse_source(text: str | None) -> SourceRef | None:
         return None
     host = parts.hostname.lower().removeprefix("www.")
     provider = HOSTS.get(host)
-    if provider is None:
-        return None
+    if provider is None:                           # any other server: Forgejo/Gitea/GitLab/...
+        if parts.scheme != "https" or not _HOSTNAME.match(host) or parts.username or parts.password:
+            return None
+        try:
+            port = parts.port
+        except ValueError:
+            return None
+        provider = CUSTOM
+        host = f"{host}:{port}" if port and port != 443 else host
     segs = [urllib.parse.unquote(p) for p in parts.path.split("/") if p]
-    if provider == GITLAB:
+    if provider in (GITLAB, CUSTOM):               # both may use nested namespaces (group/sub/project)
         cut = next((i for i, p in enumerate(segs) if p in _GITLAB_STOP), len(segs))
         segs = segs[:cut]
+        if provider == CUSTOM:
+            # Forgejo/Gitea pages look like owner/repo/releases/tag/v1 or owner/repo/src/branch/main;
+            # without a recognisable stop word we can't tell a subgroup from a page, so use two.
+            segs = _custom_segments(segs)
     else:
         segs = segs[:2]
     if len(segs) < 2 or not all(_SEGMENT.match(p) and p not in (".", "..") for p in segs):
@@ -84,7 +105,17 @@ def parse_source(text: str | None) -> SourceRef | None:
         name = name[:-4]
     if not name:
         return None
-    return SourceRef(provider, "/".join(segs[:-1]), name)
+    return SourceRef(provider, "/".join(segs[:-1]), name, host)
+
+
+def _custom_segments(segs: list[str]) -> list[str]:
+    """Namespace/project of a repository URL on an unknown host.
+
+    Everything up to the first well-known page name (``releases``, ``src``, …) is kept, so both
+    ``owner/repo`` (Forgejo, Gitea) and nested ``group/sub/project`` (GitLab) work.
+    """
+    cut = next((i for i, p in enumerate(segs) if p in _CUSTOM_PAGES), len(segs))
+    return segs[:cut]
 
 
 # -- shared HTTP/JSON plumbing ----------------------------------------------------------------
@@ -116,8 +147,11 @@ class ForgejoClient:
 
     provider = "Codeberg"
 
-    def __init__(self, host: str = "codeberg.org", timeout: float = 20, opener=None):
+    def __init__(self, host: str = "codeberg.org", timeout: float = 20, opener=None,
+                 label: str | None = None):
         self.host, self.timeout, self._open = host, timeout, opener or _urlopen
+        if label:
+            self.provider = label
 
     def releases(self, owner: str, name: str, per_page: int = 30) -> list[Release]:
         url = (f"https://{self.host}/api/v1/repos/{urllib.parse.quote(owner)}/"
@@ -145,8 +179,11 @@ class GitLabClient:
 
     provider = "GitLab"
 
-    def __init__(self, host: str = "gitlab.com", timeout: float = 20, opener=None):
+    def __init__(self, host: str = "gitlab.com", timeout: float = 20, opener=None,
+                 label: str | None = None):
         self.host, self.timeout, self._open = host, timeout, opener or _urlopen
+        if label:
+            self.provider = label
 
     def releases(self, owner: str, name: str, per_page: int = 30) -> list[Release]:
         project = urllib.parse.quote(f"{owner}/{name}", safe="")
@@ -178,14 +215,52 @@ class GitLabClient:
         return out
 
 
+class SelfHostedClient:
+    """A server we only know by its host name (e.g. ``git.example.dev``).
+
+    Tries the Forgejo/Gitea API first, then GitLab's, and keeps whichever one answered so later
+    checks go straight to it.  Network and rate-limit problems are reported immediately: they say
+    nothing about which software the server runs.
+    """
+
+    def __init__(self, host: str, timeout: float = 20, opener=None):
+        self.host = host
+        label = host
+        self._clients = [ForgejoClient(host, timeout, opener, label),
+                         GitLabClient(host, timeout, opener, label)]
+        self._working = None
+
+    def releases(self, owner: str, name: str, per_page: int = 30) -> list[Release]:
+        if self._working is not None:
+            return self._working.releases(owner, name, per_page)
+        first_error: GitHubError | None = None
+        for client in self._clients:
+            try:
+                out = client.releases(owner, name, per_page)
+            except GitHubError as exc:
+                if exc.kind in ("network", "rate_limit"):
+                    raise
+                first_error = first_error or exc
+                continue
+            self._working = client
+            return out
+        raise GitHubError(
+            f"{self.host} has no releases for {owner}/{name}: the repository wasn't found, it has no "
+            f"public releases, or the server isn't a Forgejo, Gitea or GitLab server.",
+            first_error.kind if first_error else "not_found")
+
+
 def client_for(ref: SourceRef, github_token: str | None = None):
     """The release client for ``ref``. ``github_token`` is only ever given to GitHub."""
     if ref.provider == GITLAB:
         return GitLabClient()
     if ref.provider == CODEBERG:
         return ForgejoClient()
+    if ref.provider == CUSTOM:
+        return SelfHostedClient(ref.host)
     return GitHubClient(token=github_token)
 
 
 __all__ = ["SourceRef", "parse_source", "client_for", "GitLabClient", "ForgejoClient",
-           "PROVIDER_NAMES", "SUPPORTED_HINT", "GITHUB", "GITLAB", "CODEBERG"]
+           "SelfHostedClient", "PROVIDER_NAMES", "SUPPORTED_HINT", "GITHUB", "GITLAB", "CODEBERG",
+           "CUSTOM"]

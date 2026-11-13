@@ -76,7 +76,7 @@ class AppCard(QFrame):
         info = e.metadata.get("update") or {}
         msg = info.get("message") or ""
         if not e.github_repo:
-            return "No update source", "muted", "Add a GitHub repository in Edit to enable updates."
+            return "No update source", "muted", "Add a repository URL as update source in Edit to enable updates."
         return {
             UpdateStatus.UP_TO_DATE: ("Up to date", "ok", ""),
             UpdateStatus.UPDATE_AVAILABLE: ("Update available", "update", msg),

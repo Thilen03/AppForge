@@ -7,11 +7,12 @@ import subprocess
 import time
 from pathlib import Path
 
-from PySide6.QtCore import QRunnable, QSettings, QThreadPool, QTimer, QUrl, Qt
+from PySide6.QtCore import QEvent, QRunnable, QSettings, QSize, QThreadPool, QTimer, QUrl, Qt
 from PySide6.QtGui import QDesktopServices, QGuiApplication
 from PySide6.QtWidgets import (
     QApplication, QFileDialog, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QMainWindow,
-    QMessageBox, QProgressDialog, QPushButton, QScrollArea, QStackedWidget, QVBoxLayout, QWidget,
+    QMessageBox, QProgressDialog, QPushButton, QScrollArea, QStackedWidget, QToolButton, QVBoxLayout,
+    QWidget,
 )
 
 from .. import APP_DISPLAY_NAME, __version__
@@ -31,7 +32,8 @@ from .app_card import AppCard
 from .backups_dialog import BackupsDialog
 from .dialogs import FILE_FILTER, AddApplicationDialog, AssetPickerDialog, EditApplicationDialog
 from .flow_layout import FlowLayout
-from .icons import placeholder_pixmap
+from .icons import gear_icon, placeholder_pixmap
+from . import theme
 from .popups import RoundedComboBox
 from .settings_dialog import SettingsDialog
 from .tray import TrayController, tray_available
@@ -108,6 +110,7 @@ class MainWindow(QMainWindow):
         self.install_pool.setMaxThreadCount(1)   # one download/replace at a time
         self._build()
         self.statusBar().setSizeGripEnabled(False)
+        self._build_settings_gear()
         geo = QSettings().value("geometry")
         if geo:
             self.restoreGeometry(geo)
@@ -121,6 +124,28 @@ class MainWindow(QMainWindow):
             self._timer = QTimer(self)
             self._timer.timeout.connect(self._scheduled_check)
             self._timer.start(BACKGROUND_TICK_MS)
+
+    def _build_settings_gear(self):
+        """Settings cog in the bottom-right corner (the status bar's permanent, right-aligned slot)."""
+        self.settings_btn = QToolButton(objectName="gear")
+        self.settings_btn.setToolTip("Settings")
+        self.settings_btn.setAccessibleName("Settings")
+        self.settings_btn.setCursor(Qt.PointingHandCursor)
+        self.settings_btn.setAutoRaise(True)
+        self.settings_btn.setFixedSize(32, 32)
+        self.settings_btn.setIconSize(QSize(20, 20))
+        self.settings_btn.clicked.connect(self.open_settings)
+        self.statusBar().addPermanentWidget(self.settings_btn)
+        self._refresh_gear()
+
+    def _refresh_gear(self):
+        """Same blue as the primary buttons (the theme's accent); re-tinted when the theme flips."""
+        self.settings_btn.setIcon(gear_icon(theme.tokens().accent, 20))
+
+    def changeEvent(self, ev):
+        super().changeEvent(ev)
+        if ev.type() in (QEvent.PaletteChange, QEvent.StyleChange) and hasattr(self, "settings_btn"):
+            self._refresh_gear()
 
     # -- layout -------------------------------------------------------------------------
     def _build(self):
@@ -155,10 +180,6 @@ class MainWindow(QMainWindow):
         self.update_all_btn = QPushButton("Update All")
         self.update_all_btn.clicked.connect(self.update_all)
         header.addWidget(self.update_all_btn)
-        self.settings_btn = QPushButton("Settings", objectName="ghost")
-        self.settings_btn.setCursor(Qt.PointingHandCursor)
-        self.settings_btn.clicked.connect(self.open_settings)
-        header.addWidget(self.settings_btn)
         self.add_btn = QPushButton("Add Application", objectName="primary")
         self.add_btn.clicked.connect(self.add_application)
         self.add_btn.setCursor(Qt.PointingHandCursor)
@@ -374,7 +395,7 @@ class MainWindow(QMainWindow):
             targets.append(e)
         if not targets:
             if user_initiated:
-                self.statusBar().showMessage("Nothing to check: link a GitHub repository first.", 4000)
+                self.statusBar().showMessage("Nothing to check: add an update source (a repository URL) first.", 4000)
             return
         self._user_check = self._user_check or user_initiated
         for e in targets:

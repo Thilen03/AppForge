@@ -24,7 +24,7 @@ from .icons import app_pixmap, placeholder_pixmap
 from .popups import RoundedComboBox
 
 FILE_FILTER = "AppImage (*.AppImage *.appimage);;All files (*)"   # programs and scripts: pick "All files"
-SOURCE_HINT = "GitHub, GitLab or Codeberg repository, used for update checks."
+SOURCE_HINT = "Repository URL (GitHub, GitLab, Codeberg or a self-hosted Forgejo/Gitea/GitLab), used for update checks."
 ICON_FILTER = "Images (*.png *.svg *.jpg *.jpeg *.webp *.bmp *.ico *.xpm);;All files (*)"
 
 
@@ -173,7 +173,7 @@ class AddApplicationDialog(QDialog):
 
         lay.addSpacing(4)
         lay.addWidget(_field_label("Update source (optional)"))
-        self.repo_edit = QLineEdit(placeholderText="https://github.com/owner/repo")
+        self.repo_edit = QLineEdit(placeholderText="https://github.com/owner/repo  or  https://git.example.dev/owner/repo")
         self.repo_edit.textChanged.connect(self._validate)
         lay.addWidget(self.repo_edit)
         self.repo_msg = QLabel(SOURCE_HINT, objectName="hint")
@@ -456,7 +456,7 @@ class EditApplicationDialog(QDialog):
 
         lay.addWidget(_field_label("Update source (optional)"))
         self.repo_edit = QLineEdit(entry.github_repo or "")
-        self.repo_edit.setPlaceholderText("https://github.com/owner/repo")
+        self.repo_edit.setPlaceholderText("https://github.com/owner/repo  or  https://git.example.dev/owner/repo")
         self.repo_edit.textChanged.connect(self._repo_changed)
         lay.addWidget(self.repo_edit)
         self.repo_msg = QLabel(objectName="error")
