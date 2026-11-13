@@ -4,7 +4,7 @@ from __future__ import annotations
 from PySide6.QtCore import QEasingCurve, QEvent, QPoint, QPropertyAnimation, Qt, Signal
 from PySide6.QtGui import QColor, QFontMetrics, QPainter
 from PySide6.QtWidgets import (
-    QFrame, QGraphicsOpacityEffect, QHBoxLayout, QLabel, QMenu, QProgressBar, QPushButton,
+    QFrame, QGraphicsOpacityEffect, QHBoxLayout, QLabel, QProgressBar, QPushButton,
     QToolButton, QVBoxLayout, QWidget,
 )
 
@@ -14,6 +14,7 @@ from ..core.models import AppEntry, UpdateStatus
 from ..core.updates.service import can_update
 from . import theme
 from .icons import app_pixmap
+from .popups import RoundedMenu
 
 CARD_W, CARD_H, ICON = 340, 168, 64
 
@@ -207,10 +208,10 @@ class AppCard(QFrame):
             c.setToolTip(tip)
         return c
 
-    def _build_menu(self) -> QMenu:
+    def _build_menu(self) -> RoundedMenu:
         e = self.entry
         info = e.metadata.get("update") or {}
-        m = QMenu(self)
+        m = RoundedMenu(self)
         m.setToolTipsVisible(True)
         m.addAction("Edit information…", lambda: self.editRequested.emit(e.id))
         if e.github_repo:

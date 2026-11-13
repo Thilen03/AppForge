@@ -3,9 +3,10 @@ from __future__ import annotations
 
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtGui import QIcon
-from PySide6.QtWidgets import QMenu, QSystemTrayIcon
+from PySide6.QtWidgets import QSystemTrayIcon
 
 from .. import APP_DISPLAY_NAME
+from .popups import RoundedMenu
 
 
 def tray_available() -> bool:
@@ -21,7 +22,7 @@ class TrayController(QObject):
         super().__init__(parent)
         self.tray = QSystemTrayIcon(icon, self)
         self.tray.setToolTip(APP_DISPLAY_NAME)
-        menu = QMenu()
+        menu = RoundedMenu()
         menu.addAction(f"Open {APP_DISPLAY_NAME}", self.showRequested.emit)
         menu.addAction("Check for updates now", self.checkRequested.emit)
         menu.addSeparator()

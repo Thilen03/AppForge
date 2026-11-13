@@ -2,10 +2,11 @@
 from __future__ import annotations
 
 from PySide6.QtWidgets import (
-    QCheckBox, QComboBox, QDialog, QHBoxLayout, QLabel, QLineEdit, QPushButton, QVBoxLayout,
+    QCheckBox, QDialog, QHBoxLayout, QLabel, QLineEdit, QPushButton, QVBoxLayout,
 )
 
 from ..core.settings import INTERVAL_CHOICES, AppSettings
+from .popups import RoundedComboBox
 
 
 def _label(text: str) -> QLabel:
@@ -36,7 +37,7 @@ class SettingsDialog(QDialog):
         lay.addWidget(self.auto_cb)
         row = QHBoxLayout()
         row.addWidget(QLabel("Check every"))
-        self.interval = QComboBox()
+        self.interval = RoundedComboBox()
         for h in INTERVAL_CHOICES:
             self.interval.addItem("1 hour" if h == 1 else f"{h} hours", h)
         cur = settings.check_interval_hours

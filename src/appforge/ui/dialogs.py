@@ -8,7 +8,7 @@ from pathlib import Path
 from PySide6.QtCore import QObject, QRunnable, QThreadPool, Qt, Signal
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
-    QCheckBox, QComboBox, QDialog, QFileDialog, QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem,
+    QCheckBox, QDialog, QFileDialog, QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem,
     QPlainTextEdit, QPushButton, QVBoxLayout, QWidget,
 )
 
@@ -21,6 +21,7 @@ from ..core.library import (
 from ..core.models import AppEntry
 from ..core.organize import CATEGORY_KEY, category_suggestions
 from .icons import app_pixmap, placeholder_pixmap
+from .popups import RoundedComboBox
 
 FILE_FILTER = "AppImage (*.AppImage *.appimage);;All files (*)"   # programs and scripts: pick "All files"
 SOURCE_HINT = "GitHub, GitLab or Codeberg repository, used for update checks."
@@ -60,9 +61,9 @@ ENV_HINT = "One per line, NAME=value. Used in the menu launcher and when you pre
 ENV_PLACEHOLDER = "QT_QPA_PLATFORM=xcb\nDRI_PRIME=1"
 
 
-def _menu_category_combo(current: str | None) -> QComboBox:
+def _menu_category_combo(current: str | None) -> RoundedComboBox:
     """Combo with \"Automatic\" plus the KDE/freedesktop main categories (item data = desktop key)."""
-    combo = QComboBox()
+    combo = RoundedComboBox()
     combo.addItem("Automatic (from the application)", None)
     for key, label in MENU_CATEGORIES:
         combo.addItem(label, key)
@@ -415,7 +416,7 @@ class EditApplicationDialog(QDialog):
         lay.addWidget(self.name_edit)
 
         lay.addWidget(_field_label("Category"))
-        self.category_edit = QComboBox()
+        self.category_edit = RoundedComboBox()
         self.category_edit.setEditable(True)
         self.category_edit.addItems(category_suggestions(service.list_applications()))
         self.category_edit.setCurrentText(entry.metadata.get(CATEGORY_KEY) or "")

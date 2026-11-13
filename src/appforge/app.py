@@ -6,12 +6,13 @@ import logging.handlers
 import os
 import sys
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QObject, Qt, Signal
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
 
 from . import APP_DISPLAY_NAME, APP_ID, __version__
 from .core.database import Database
+from .core.instance import InstanceGuard
 from .core.library import LibraryService
 from .core.paths import data_dir, database_path, icons_dir
 
@@ -29,6 +30,12 @@ def resource_path(name: str) -> str:
     if base:
         return os.path.join(base, "appforge", "resources", name)
     return os.path.join(os.path.dirname(__file__), "resources", name)
+
+
+class _Activator(QObject):
+    """Hands "show yourself" requests from the single-instance listener thread to the GUI thread."""
+
+    requested = Signal(list)
 
 
 def _teardown(app, window) -> None:
@@ -53,7 +60,9 @@ def _selftest(path: str | None) -> int:
 
     from PySide6.QtWidgets import QApplication
 
+    from .core.instance import InstanceGuard as _  # noqa: F401 - packaged-build import check
     from .core.library import inspect_file
+    from .ui import popups as _popups  # noqa: F401
     from .ui import theme
     from .ui.icons import app_pixmap
     from .ui.main_window import MainWindow
@@ -112,6 +121,12 @@ def main(argv: list[str] | None = None) -> int:
         os.environ["_AF_BUNDLED"] = "1"  # see services.launcher.clean_environment
     _setup_logging()
 
+    # Only one AppForge at a time: a second launch asks the running one to come to the front
+    # (from the tray, minimized or behind other windows) and exits instead of opening a duplicate.
+    guard = InstanceGuard()
+    if not guard.acquire([a for a in argv[1:] if not a.startswith("-")]):
+        return 0
+
     QApplication.setHighDpiScaleFactorRoundingPolicy(Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
     app = QApplication(argv)
     app.setApplicationName(APP_ID)
@@ -121,11 +136,18 @@ def main(argv: list[str] | None = None) -> int:
     app.setDesktopFileName(APP_ID)
     app.setWindowIcon(QIcon(resource_path("appforge.png")))
 
+    from .core.desktop.selflauncher import ensure_self_launcher
     from .ui import theme
     from .ui.main_window import MainWindow
+    from .ui.popups import install_popup_rounding
 
     theme.apply_theme(app)
+    install_popup_rounding(app)
     app.styleHints().colorSchemeChanged.connect(lambda *_: theme.apply_theme(app))
+
+    # Lets the desktop match AppForge's window to a launcher, which is what makes "Pin to Task Manager"
+    # appear when right-clicking its taskbar entry (an AppImage has no .desktop file of its own).
+    ensure_self_launcher(resource_path("appforge.png"))
 
     db = Database(database_path())
     service = LibraryService(db, icons_dir())
@@ -138,8 +160,19 @@ def main(argv: list[str] | None = None) -> int:
     except Exception:  # noqa: BLE001 - never block startup on launcher housekeeping
         logging.getLogger(__name__).warning("Launcher sync failed", exc_info=True)
     window = MainWindow(service, auto_check=True, tray_icon=app.windowIcon())
+    activator = _Activator()
+    activator.requested.connect(lambda _args: window.bring_to_front())
+    guard.serve(activator.requested.emit)      # emitted on the listener thread, delivered on the GUI thread
     window.show()
     code = app.exec()
+    restart_path = None
+    if window.restart_requested:
+        from .core.selfupdate import appimage_path
+        restart_path = appimage_path()
     _teardown(app, window)
     db.close()
+    guard.release()
+    if restart_path is not None:               # self-update finished: start the new build
+        from .core.selfupdate import relaunch
+        relaunch(restart_path)
     return code

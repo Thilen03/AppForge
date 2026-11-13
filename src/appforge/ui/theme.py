@@ -110,8 +110,11 @@ def stylesheet(t: Tokens) -> str:
                 padding: 6px 10px; min-height: 18px; }}
     QComboBox:focus {{ border: 1px solid {t.accent}; }}
     QComboBox:disabled {{ color: {t.muted}; }}
+    QComboBoxPrivateContainer {{ background: transparent; border: none; margin: 0; padding: 0; }}
     QComboBox QAbstractItemView {{ background: {t.surface}; border: 1px solid {t.border_strong};
+                                  border-radius: 10px; padding: 4px; outline: none;
                                   selection-background-color: {t.accent_soft}; selection-color: {t.text}; }}
+    QComboBox QAbstractItemView::item {{ min-height: 22px; padding: 4px 8px; border-radius: 6px; }}
 
     QToolButton {{ background: transparent; border: 1px solid transparent; border-radius: 8px;
                   padding: 4px; }}

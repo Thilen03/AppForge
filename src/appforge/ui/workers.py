@@ -6,7 +6,7 @@ import threading
 
 from PySide6.QtCore import QObject, QRunnable, Signal
 
-from ..core.selfupdate import check_self_update
+from ..core.selfupdate import check_self_update, install_self_update
 from ..core.updates.checker import check_for_update
 from ..core.updates.installer import InstallError, install_update
 
@@ -62,3 +62,28 @@ class SelfUpdateJob(QRunnable):
             return
         if found:
             self.signals.found.emit(found)
+
+
+class SelfInstallSignals(QObject):
+    progress = Signal(int, int)         # bytes_done, bytes_total
+    done = Signal(object)               # InstallResult | InstallError
+
+
+class SelfInstallJob(QRunnable):
+    """Downloads the new AppForge AppImage and swaps it in (the running copy keeps working)."""
+
+    def __init__(self, update):
+        super().__init__()
+        self._update, self.signals = update, SelfInstallSignals()
+        self.cancel = threading.Event()
+
+    def run(self):
+        try:
+            result = install_self_update(
+                self._update, progress=lambda done, total: self.signals.progress.emit(done, total),
+                cancel=self.cancel)
+        except InstallError as exc:
+            result = exc
+        except Exception as exc:  # noqa: BLE001 - never let a worker die silently
+            result = InstallError(f"Unexpected error: {exc}")
+        self.signals.done.emit(result)

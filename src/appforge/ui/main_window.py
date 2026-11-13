@@ -10,8 +10,8 @@ from pathlib import Path
 from PySide6.QtCore import QRunnable, QSettings, QThreadPool, QTimer, QUrl, Qt
 from PySide6.QtGui import QDesktopServices, QGuiApplication
 from PySide6.QtWidgets import (
-    QApplication, QComboBox, QFileDialog, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QMainWindow,
-    QMessageBox, QPushButton, QScrollArea, QStackedWidget, QVBoxLayout, QWidget,
+    QApplication, QFileDialog, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QMainWindow,
+    QMessageBox, QProgressDialog, QPushButton, QScrollArea, QStackedWidget, QVBoxLayout, QWidget,
 )
 
 from .. import APP_DISPLAY_NAME, __version__
@@ -20,6 +20,7 @@ from ..core.models import AppEntry, UpdateStatus
 from ..core.organize import (
     ALL, SORT_NAME, SORTS, STATUS_FILTERS, Filter, categories_in_use, matches, sort_entries,
 )
+from ..core.selfupdate import appimage_path, install_blocker
 from ..core.settings import AppSettings
 from ..core.updates.assets import is_appimage_name
 from ..core.updates.installer import InstallCancelled, InstallResult
@@ -31,9 +32,10 @@ from .backups_dialog import BackupsDialog
 from .dialogs import FILE_FILTER, AddApplicationDialog, AssetPickerDialog, EditApplicationDialog
 from .flow_layout import FlowLayout
 from .icons import placeholder_pixmap
+from .popups import RoundedComboBox
 from .settings_dialog import SettingsDialog
 from .tray import TrayController, tray_available
-from .workers import CheckJob, InstallJob, SelfUpdateJob
+from .workers import CheckJob, InstallJob, SelfInstallJob, SelfUpdateJob
 
 log = logging.getLogger(__name__)
 STALE_AFTER = 30 * 60   # re-check automatically at startup if the last check is older than this
@@ -79,12 +81,16 @@ class MainWindow(QMainWindow):
         self._client = github_client
         self._live = auto_check
         self._quitting = False
+        self.restart_requested = False   # set by the self-update: app.main() relaunches after quitting
+        self._self_offer_open = False
+        self._self_install: SelfInstallJob | None = None
+        self._self_progress: QProgressDialog | None = None
         self._tray_check = False
         self._tray_hint_shown = False
         self.tray: TrayController | None = None
         if tray_icon is not None and tray_available():
             self.tray = TrayController(tray_icon, self)
-            self.tray.showRequested.connect(self.show_from_tray)
+            self.tray.showRequested.connect(self.bring_to_front)
             self.tray.checkRequested.connect(self._check_from_tray)
             self.tray.quitRequested.connect(self.quit_app)
         self.setWindowTitle(f"{APP_DISPLAY_NAME} {__version__}")
@@ -163,9 +169,9 @@ class MainWindow(QMainWindow):
         fl = QHBoxLayout(self.filter_row)
         fl.setContentsMargins(0, 0, 0, 0)
         fl.setSpacing(10)
-        self.category_cb = QComboBox()
+        self.category_cb = RoundedComboBox()
         self.category_cb.setToolTip("Show one category")
-        self.status_cb = QComboBox()
+        self.status_cb = RoundedComboBox()
         self.status_cb.setToolTip("Filter by status")
         for key, label in STATUS_FILTERS:
             self.status_cb.addItem(label, key)
@@ -173,7 +179,7 @@ class MainWindow(QMainWindow):
         fl.addWidget(self.status_cb)
         fl.addStretch(1)
         fl.addWidget(QLabel("Sort by", objectName="subtitle"))
-        self.sort_cb = QComboBox()
+        self.sort_cb = RoundedComboBox()
         for key, label in SORTS:
             self.sort_cb.addItem(label, key)
         fl.addWidget(self.sort_cb)
@@ -402,20 +408,96 @@ class MainWindow(QMainWindow):
     def _check_self_update(self):
         job = SelfUpdateJob(self._client, self.settings.effective_github_token())
         job.signals.found.connect(self._offer_self_update)
-        self._self_job = job                       # keep the signal object alive
+        self._self_check = job                     # keep the signal object alive
         self.check_pool.start(job)
 
     def _offer_self_update(self, found):
-        box = QMessageBox(self)
-        box.setIcon(QMessageBox.Information)
-        box.setWindowTitle("AppForge update available")
-        box.setText(f"A new build of AppForge is available: {found.version} (you have {__version__}).")
-        box.setInformativeText("Do you want to update now? This opens the download page.")
-        yes = box.addButton("Update", QMessageBox.AcceptRole)
+        """Startup popup. "Later" just closes it: the check runs at every start, so it asks again next time."""
+        if self._self_offer_open or self._self_install is not None:
+            return
+        self._self_offer_open = True
+        try:
+            blocker = install_blocker(found)
+            box = QMessageBox(self)
+            box.setIcon(QMessageBox.Information)
+            box.setWindowTitle("AppForge update available")
+            box.setText(f"A new version of AppForge is available: {found.version} (you have {__version__}).")
+            if blocker is None:
+                box.setInformativeText("Do you want to update now? AppForge downloads the new version, "
+                                       "replaces itself (the old build is kept as a backup) and restarts.")
+                yes = box.addButton("Update now", QMessageBox.AcceptRole)
+            else:
+                box.setInformativeText(f"{blocker}\n\nOpen the download page instead?")
+                yes = box.addButton("Open download page", QMessageBox.AcceptRole)
+            box.addButton("Later", QMessageBox.RejectRole)
+            box.exec()
+            chosen = box.clickedButton() is yes
+        finally:
+            self._self_offer_open = False
+        if not chosen:
+            return
+        if blocker is None:
+            self._start_self_install(found)
+        else:
+            self._open_release_url(found.url)
+
+    @staticmethod
+    def _open_release_url(url: str):
+        if url.startswith("https://"):
+            QDesktopServices.openUrl(QUrl(url))
+
+    def _start_self_install(self, found):
+        job = SelfInstallJob(found)
+        dlg = QProgressDialog(f"Downloading AppForge {found.version}…", "Cancel", 0, 100, self)
+        dlg.setWindowTitle("Updating AppForge")
+        dlg.setWindowModality(Qt.WindowModal)
+        dlg.setMinimumDuration(0)
+        dlg.setAutoClose(False)
+        dlg.setAutoReset(False)
+        dlg.setValue(0)
+        dlg.canceled.connect(job.cancel.set)
+        job.signals.progress.connect(lambda done, total: self._on_self_progress(dlg, done, total))
+        job.signals.done.connect(lambda result: self._on_self_done(found, dlg, result))
+        self._self_install, self._self_progress = job, dlg
+        self.check_pool.start(job)
+
+    @staticmethod
+    def _on_self_progress(dlg: QProgressDialog, done: int, total: int):
+        if total:
+            dlg.setMaximum(100)
+            dlg.setValue(min(99, done * 100 // total))
+            dlg.setLabelText(f"Downloading… {done / 1e6:.1f} / {total / 1e6:.1f} MB")
+        else:
+            dlg.setMaximum(0)
+
+    def _on_self_done(self, found, dlg: QProgressDialog, result):
+        dlg.close()
+        dlg.deleteLater()
+        self._self_install = self._self_progress = None
+        if isinstance(result, InstallCancelled):
+            return
+        if not isinstance(result, InstallResult):
+            box = QMessageBox(QMessageBox.Warning, "Couldn't update AppForge",
+                              f"{result}\n\nThe version you are running was not changed.", parent=self)
+            page = box.addButton("Open download page", QMessageBox.ActionRole)
+            box.addButton("Close", QMessageBox.RejectRole)
+            box.exec()
+            if box.clickedButton() is page:
+                self._open_release_url(found.url)
+            return
+        box = QMessageBox(QMessageBox.Information, "AppForge updated",
+                          f"AppForge {found.version} is installed.", parent=self)
+        box.setInformativeText("Restart now to start using it? Otherwise it takes effect the next time "
+                               "you start AppForge.")
+        restart = box.addButton("Restart now", QMessageBox.AcceptRole)
         box.addButton("Later", QMessageBox.RejectRole)
         box.exec()
-        if box.clickedButton() is yes and found.url.startswith("https://"):
-            QDesktopServices.openUrl(QUrl(found.url))
+        if box.clickedButton() is restart and appimage_path() is not None:
+            self.restart_requested = True
+            self.quit_app()
+            if self.restart_requested:      # quit_app() clears it again if the user cancelled the quit
+                return
+        self.statusBar().showMessage(f"AppForge {found.version} will be used the next time you start it", 8000)
 
     # -- idle checks, notifications, tray, settings (Phase 5) -----------------------------
     def _scheduled_check(self):
@@ -453,11 +535,28 @@ class MainWindow(QMainWindow):
         self._tray_check = True
         self.check_updates()
 
-    def show_from_tray(self):
-        self.showNormal()
+    def bring_to_front(self):
+        """Show the window whatever state it is in: hidden in the tray, minimized, or behind others.
+
+        Used by the tray icon and when a second AppForge is started (that one exits and asks this
+        instance to come forward instead of opening a duplicate).
+        """
+        modal = QApplication.activeModalWidget()
+        if self.isMinimized() or not self.isVisible():
+            self.setWindowState(self.windowState() & ~Qt.WindowMinimized)
+            self.showNormal()
         self.raise_()
         self.activateWindow()
-        self.reload()
+        handle = self.windowHandle()
+        if handle is not None:
+            handle.requestActivate()          # Wayland: the compositor decides, but this is the proper ask
+        if modal is not None and modal is not self:
+            modal.raise_()                    # a dialog is open: keep it on top instead of reloading under it
+            modal.activateWindow()
+        else:
+            self.reload()
+
+    show_from_tray = bring_to_front
 
     def apply_settings(self):
         """Apply preferences that affect the running window (tray icon, quit behaviour)."""
@@ -481,6 +580,7 @@ class MainWindow(QMainWindow):
             QApplication.quit()
         else:
             self._quitting = False
+            self.restart_requested = False
 
     def open_release_page(self, app_id: str):
         entry = self.service.get(app_id)
