@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=AppForge
+GenericName=Application Manager
+Comment=Library and launcher for AppImages
+Exec=appforge %F
+Icon=appforge
+Terminal=false
+StartupNotify=true
+StartupWMClass=appforge
+Categories=System;Utility;
+Keywords=AppImage;launcher;apps;

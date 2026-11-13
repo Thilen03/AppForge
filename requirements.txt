@@ -1,0 +1,4 @@
+PySide6-Essentials>=6.6
+PySquashfsImage>=0.9
+zstandard>=0.22
+certifi>=2023.7
