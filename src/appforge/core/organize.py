@@ -19,7 +19,7 @@ MAX_CATEGORY_LEN = 40
 # freedesktop "Main Categories" -> label shown in AppForge (order = priority when an app lists several)
 _MAIN = (
     ("Development", "Development"), ("Graphics", "Graphics"), ("AudioVideo", "Multimedia"),
-    ("Audio", "Multimedia"), ("Video", "Multimedia"), ("Game", "Games"), ("Network", "Internet"),
+    ("Audio", "Multimedia"), ("Video", "Multimedia"), ("Emulator", "Emulators"), ("Game", "Games"), ("Network", "Internet"),
     ("Office", "Office"), ("Education", "Education"), ("Science", "Science"), ("System", "System"),
     ("Settings", "System"), ("Utility", "Utilities"),
 )

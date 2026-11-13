@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (
     QMessageBox, QPushButton, QScrollArea, QStackedWidget, QVBoxLayout, QWidget,
 )
 
-from .. import APP_DISPLAY_NAME
+from .. import APP_DISPLAY_NAME, __version__
 from ..core.library import FileState, LibraryError, LibraryService, file_state
 from ..core.models import AppEntry, UpdateStatus
 from ..core.organize import (
@@ -33,7 +33,7 @@ from .flow_layout import FlowLayout
 from .icons import placeholder_pixmap
 from .settings_dialog import SettingsDialog
 from .tray import TrayController, tray_available
-from .workers import CheckJob, InstallJob
+from .workers import CheckJob, InstallJob, SelfUpdateJob
 
 log = logging.getLogger(__name__)
 STALE_AFTER = 30 * 60   # re-check automatically at startup if the last check is older than this
@@ -87,7 +87,7 @@ class MainWindow(QMainWindow):
             self.tray.showRequested.connect(self.show_from_tray)
             self.tray.checkRequested.connect(self._check_from_tray)
             self.tray.quitRequested.connect(self.quit_app)
-        self.setWindowTitle(APP_DISPLAY_NAME)
+        self.setWindowTitle(f"{APP_DISPLAY_NAME} {__version__}")
         self.setAcceptDrops(True)
         self.resize(1040, 700)
         self.setMinimumSize(620, 420)
@@ -109,6 +109,7 @@ class MainWindow(QMainWindow):
         QGuiApplication.instance().applicationStateChanged.connect(self._on_app_state)
         self.apply_settings()
         if auto_check:
+            QTimer.singleShot(1500, self._check_self_update)
             if self.settings.auto_check:
                 QTimer.singleShot(800, lambda: self.check_updates(only_stale=True))
             self._timer = QTimer(self)
@@ -396,6 +397,25 @@ class MainWindow(QMainWindow):
             n = sum(1 for c in self._cards if can_update(c.entry) and c.entry.update_status is UpdateStatus.UPDATE_AVAILABLE)
             self.statusBar().showMessage(
                 f"{n} update{'s' if n != 1 else ''} available" if n else "Everything is up to date", 5000)
+
+    # -- AppForge's own updates -----------------------------------------------------------
+    def _check_self_update(self):
+        job = SelfUpdateJob(self._client, self.settings.effective_github_token())
+        job.signals.found.connect(self._offer_self_update)
+        self._self_job = job                       # keep the signal object alive
+        self.check_pool.start(job)
+
+    def _offer_self_update(self, found):
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Information)
+        box.setWindowTitle("AppForge update available")
+        box.setText(f"A new build of AppForge is available: {found.version} (you have {__version__}).")
+        box.setInformativeText("Do you want to update now? This opens the download page.")
+        yes = box.addButton("Update", QMessageBox.AcceptRole)
+        box.addButton("Later", QMessageBox.RejectRole)
+        box.exec()
+        if box.clickedButton() is yes and found.url.startswith("https://"):
+            QDesktopServices.openUrl(QUrl(found.url))
 
     # -- idle checks, notifications, tray, settings (Phase 5) -----------------------------
     def _scheduled_check(self):

@@ -6,6 +6,7 @@ import threading
 
 from PySide6.QtCore import QObject, QRunnable, Signal
 
+from ..core.selfupdate import check_self_update
 from ..core.updates.checker import check_for_update
 from ..core.updates.installer import InstallError, install_update
 
@@ -43,3 +44,21 @@ class InstallJob(QRunnable):
         except Exception as exc:  # noqa: BLE001 - never let a worker die silently
             result = InstallError(f"Unexpected error: {exc}")
         self.signals.done.emit(self.app_id, result)
+
+
+class SelfUpdateSignals(QObject):
+    found = Signal(object)              # SelfUpdate
+
+
+class SelfUpdateJob(QRunnable):
+    def __init__(self, client=None, token: str | None = None):
+        super().__init__()
+        self._client, self._token, self.signals = client, token, SelfUpdateSignals()
+
+    def run(self):
+        try:
+            found = check_self_update(self._client, self._token)
+        except Exception:  # noqa: BLE001 - a failed self-check must never disturb startup
+            return
+        if found:
+            self.signals.found.emit(found)
