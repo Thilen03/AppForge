@@ -203,47 +203,6 @@ The script creates a build virtualenv, runs PyInstaller (bundling Python and Qt)
 `appimagetool` (downloaded on first use into `build/tools/`, or use your own on `PATH`). It needs `squashfs-tools`
 (`sudo pacman -S squashfs-tools`) and `curl`.
 
-## Development
-
-```bash
-PYTHONPATH=src python -m pytest -q          # unit and GUI tests
-APPFORGE_DATA_DIR=/tmp/af python -m appforge --selftest path/to/Some.AppImage   # headless smoke test
-```
-
-Some tests build tiny real AppImages and need `appimagetool` (on `PATH`, in `$APPIMAGETOOL`, or in `build/tools/`);
-they are skipped otherwise.
-
-### Project structure
-
-```
-src/appforge/
-  app.py                 bootstrap (+ --selftest)
-  core/                  UI-independent logic
-    models.py            AppEntry, UpdateStatus
-    database.py          SQLite + versioned migrations
-    library.py           add / edit / remove / refresh, file-state checks
-    updates/             version comparison, release clients (GitHub, GitLab, Codeberg,
-                         self-hosted), asset choice, safe download + replace
-    backups/             list, retention, delete, rollback
-    desktop/             .desktop launchers: render, write, remove, orphan cleanup
-    formats/             one module per application format (AppImage, executables)
-    relocate.py          finds a moved or renamed AppImage
-    organize.py          categories, filtering, sorting
-    settings.py          global preferences
-    selfupdate.py        AppForge's own update check
-  services/              detached launching, desktop notifications
-  ui/                    PySide6 widgets (theme, main window, cards, dialogs, tray, workers)
-  resources/             logo (svg/png)
-tests/                   pytest suite + fixture AppImage builder
-packaging/               PyInstaller spec, AppRun, .desktop file
-scripts/                 build_appimage.sh, render_icon.py, screenshots.py
-```
-
-The UI only talks to the Qt-free `LibraryService` and `services.launcher`. Each application format is an `AppFormat`
-strategy registered in `core/formats/__init__.py`, so adding a format means adding a module rather than touching the
-library or the UI. Network and file work run on worker threads and only return results; all database writes happen
-on the UI thread.
-
 ## Troubleshooting
 
 | Symptom | Fix |
