@@ -6,8 +6,8 @@ from dataclasses import dataclass, field
 
 from ..models import UpdateStatus
 from .assets import choose_asset
-from .github import GitHubClient, GitHubError
-from ..github_url import parse_repo
+from .github import GitHubError
+from .providers import client_for, parse_source
 from .version import compare, display_version
 
 
@@ -28,11 +28,14 @@ class CheckOutcome:
 def check_for_update(*, repo_url: str, installed_version: str | None, current_filename: str,
                      app_name: str, asset_pattern: str | None = None,
                      include_prereleases: bool = False,
-                     client: GitHubClient | None = None) -> CheckOutcome:
-    ref = parse_repo(repo_url)
+                     client=None, token: str | None = None,
+                     format_id: str = "appimage") -> CheckOutcome:
+    """``client`` (anything with ``releases(owner, name)``) overrides the provider's own client;
+    ``token`` is only ever used for GitHub."""
+    ref = parse_source(repo_url)
     if ref is None:
-        return CheckOutcome(UpdateStatus.FAILED, "The GitHub repository URL isn't valid.")
-    client = client or GitHubClient()
+        return CheckOutcome(UpdateStatus.FAILED, "The update source URL isn't valid.")
+    client = client or client_for(ref, token)
     try:
         releases = client.releases(ref.owner, ref.name)
     except GitHubError as exc:
@@ -44,14 +47,15 @@ def check_for_update(*, repo_url: str, installed_version: str | None, current_fi
         if rel.draft or (rel.prerelease and not include_prereleases):
             continue
         choice = choose_asset(rel, current_filename=current_filename, app_name=app_name,
-                              pattern=asset_pattern)
+                              pattern=asset_pattern, format_id=format_id)
         if choice:
             chosen = (rel, choice)
             break
         candidates_seen = candidates_seen or bool(rel.assets)
     if chosen is None:
         newest = next((r for r in releases if not r.draft and (include_prereleases or not r.prerelease)), None)
-        msg = ("No AppImage was found in the recent releases of this repository." if newest
+        what = "AppImage" if format_id == "appimage" else "matching Linux executable (raw binaries only)"
+        msg = (f"No {what} was found in the recent releases of this repository." if newest
                else "This repository has no published releases.")
         return CheckOutcome(UpdateStatus.UNAVAILABLE, msg,
                             release_url=newest.html_url if newest else None,

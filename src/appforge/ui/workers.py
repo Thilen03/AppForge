@@ -25,17 +25,18 @@ class CheckJob(QRunnable):
 
 
 class InstallJob(QRunnable):
-    def __init__(self, app_id: str, path: str, asset: dict, assets: list[dict], old_version: str | None):
+    def __init__(self, app_id: str, path: str, asset: dict, assets: list[dict], old_version: str | None,
+                 format_id: str = "appimage"):
         super().__init__()
         self.app_id, self.signals = app_id, JobSignals()
-        self._args = (path, asset, assets, old_version)
+        self._args = (path, asset, assets, old_version, format_id)
         self.cancel = threading.Event()
 
     def run(self):
-        path, asset, assets, old_version = self._args
+        path, asset, assets, old_version, format_id = self._args
         try:
             result = install_update(
-                path, asset, assets, old_version=old_version, cancel=self.cancel,
+                path, asset, assets, old_version=old_version, cancel=self.cancel, format_id=format_id,
                 progress=lambda done, total: self.signals.progress.emit(self.app_id, done, total))
         except InstallError as exc:
             result = exc

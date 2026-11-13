@@ -35,6 +35,7 @@ def _teardown(app, window) -> None:
     """Destroy the window (and its thread pools) deterministically, before the QApplication goes."""
     import gc
 
+    window._quitting = True      # really close (don't just hide to the tray)
     window.close()
     for pool in (window.check_pool, window.install_pool):
         pool.waitForDone(3000)
@@ -73,6 +74,12 @@ def _selftest(path: str | None) -> int:
         assert service.desktop_enabled(added) and launcher_file.is_file(), "launcher creation failed"
         assert str(Path(added.path)) in launcher_file.read_text("utf-8"), "launcher doesn't point at the app"
         print("launcher ok:", launcher_file.name)
+    from .core.organize import category_of
+    from .core.settings import AppSettings
+    from .core.updates.providers import parse_source
+    assert AppSettings(db).check_interval_hours >= 1 and parse_source("https://codeberg.org/o/r")
+    if path:
+        print("category:", category_of(added))
     window = MainWindow(service)
     window.show()
     app.processEvents()
@@ -130,7 +137,7 @@ def main(argv: list[str] | None = None) -> int:
                 report.repaired, report.adopted, report.removed, report.failed)
     except Exception:  # noqa: BLE001 - never block startup on launcher housekeeping
         logging.getLogger(__name__).warning("Launcher sync failed", exc_info=True)
-    window = MainWindow(service, auto_check=True)
+    window = MainWindow(service, auto_check=True, tray_icon=app.windowIcon())
     window.show()
     code = app.exec()
     _teardown(app, window)

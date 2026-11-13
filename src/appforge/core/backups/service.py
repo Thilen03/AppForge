@@ -6,7 +6,8 @@ treats the *files on disk* as the truth: records whose file vanished are dropped
 found in the backup folder without a record (e.g. after a database reset) are adopted.
 
 Safety rules:
-* Only files inside a ``.<something>.backups`` folder, ending in ``.AppImage``, are ever deleted.
+* Only files inside a ``.<something>.backups`` folder, ending in ``.AppImage`` (AppImages) or
+  ``.bak`` (other formats), are ever deleted.
 * A rollback backs up the currently installed file *first*, stages the restored file next to the
   target and swaps it in with ``os.replace``; any failure leaves the installed file untouched.
 * Main-thread only (it writes to the SQLite connection), like ``UpdateService``.
@@ -23,7 +24,10 @@ from pathlib import Path
 
 from ..library import LibraryError, LibraryService
 from ..models import AppEntry
-from ..updates.installer import InstallError, _safe_label, backup_dir_for, validate_appimage_file
+from ..updates.installer import (
+    InstallError, _safe_label, backup_dir_for, backup_suffix, validate_appimage_file,
+    validate_executable_file,
+)
 
 log = logging.getLogger(__name__)
 
@@ -31,6 +35,7 @@ SETTING_KEEP = "backup_keep"
 DEFAULT_KEEP = 3          # newest backups kept per app
 MAX_KEEP = 50             # 0 means "keep everything"
 _BACKUP_DIR_RE = re.compile(r"^\..+\.backups$")
+_BACKUP_SUFFIXES = (".appimage", ".bak")
 
 
 @dataclass
@@ -49,9 +54,9 @@ class RollbackResult:
 
 
 def is_backup_file(path: str | os.PathLike) -> bool:
-    """True only for AppImage files inside a ``.<name>.backups`` folder (the deletion guard)."""
+    """True only for backup files inside a ``.<name>.backups`` folder (the deletion guard)."""
     p = Path(path)
-    return bool(_BACKUP_DIR_RE.match(p.parent.name)) and p.suffix.lower() == ".appimage"
+    return bool(_BACKUP_DIR_RE.match(p.parent.name)) and p.suffix.lower() in _BACKUP_SUFFIXES
 
 
 def _same(a: str, b: str) -> bool:
@@ -63,17 +68,17 @@ def _stem(path: Path) -> str:
 
 
 def _version_from_name(filename: str, stem: str) -> str | None:
-    base = re.sub(r"\.appimage$", "", filename, flags=re.IGNORECASE)
+    base = re.sub(r"\.(appimage|bak)$", "", filename, flags=re.IGNORECASE)
     if base.startswith(stem + "-"):
         base = base[len(stem) + 1:]
     return None if base in ("", "previous") else base
 
 
-def _unique_backup_path(bdir: Path, stem: str, label: str) -> Path:
-    path = bdir / f"{stem}-{label}.AppImage"
+def _unique_backup_path(bdir: Path, stem: str, label: str, ext: str = ".AppImage") -> Path:
+    path = bdir / f"{stem}-{label}{ext}"
     n = 2
     while path.exists():
-        path = bdir / f"{stem}-{label}-{n}.AppImage"
+        path = bdir / f"{stem}-{label}-{n}{ext}"
         n += 1
     return path
 
@@ -161,7 +166,10 @@ class BackupService:
         if has_current and os.path.samefile(src, target):
             raise LibraryError("That backup is the version that is already installed.")
         try:
-            validate_appimage_file(src)
+            if entry.format == "appimage":
+                validate_appimage_file(src)
+            else:
+                validate_executable_file(src)
         except InstallError as exc:
             raise LibraryError(f"This backup can't be restored: {exc}") from exc
 
@@ -177,7 +185,8 @@ class BackupService:
             if has_current:                                  # 1. keep what is installed now
                 bdir = backup_dir_for(target)
                 bdir.mkdir(exist_ok=True)
-                pre_backup = _unique_backup_path(bdir, _stem(target), _safe_label(saved_version))
+                pre_backup = _unique_backup_path(bdir, _stem(target), _safe_label(saved_version),
+                                                 backup_suffix(entry.format))
                 _link_or_copy(target, pre_backup)
             stage.unlink(missing_ok=True)                    # 2. stage the restored file
             _link_or_copy(src, stage)
@@ -239,7 +248,7 @@ class BackupService:
         bdir = backup_dir_for(target)
         if bdir.is_dir():
             for p in sorted(bdir.iterdir()):
-                if (p.suffix.lower() == ".appimage" and p.is_file()
+                if (p.suffix.lower() in _BACKUP_SUFFIXES and p.is_file()
                         and os.path.abspath(p) not in seen):
                     seen.add(os.path.abspath(p))
                     found.append({"file": str(p), "version": _version_from_name(p.name, _stem(target)),

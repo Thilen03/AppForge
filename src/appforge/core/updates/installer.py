@@ -25,6 +25,7 @@ from pathlib import Path
 from typing import Callable
 
 from ..formats.appimage import appimage_type, find_squashfs_offset
+from ..formats.executable import executable_kind
 from .github import user_agent
 from .net import urlopen
 
@@ -53,6 +54,11 @@ class InstallResult:
 def backup_dir_for(path: Path) -> Path:
     stem = re.sub(r"\.appimage$", "", path.name, flags=re.IGNORECASE)
     return path.parent / f".{stem}.backups"
+
+
+def backup_suffix(format_id: str) -> str:
+    """File extension of backup copies: ``.AppImage`` for AppImages, ``.bak`` for everything else."""
+    return ".AppImage" if format_id == "appimage" else ".bak"
 
 
 def _safe_label(text: str | None) -> str:
@@ -153,6 +159,19 @@ def validate_appimage_file(path: Path) -> None:
         raise InstallError("The downloaded AppImage is damaged (no embedded file system found).")
 
 
+def validate_executable_file(path: Path) -> None:
+    """A downloaded standalone executable must be a real ELF binary or a ``#!`` script."""
+    if path.stat().st_size < 20:
+        raise InstallError("The downloaded file is too small to be a program.")
+    if executable_kind(path) is None:
+        raise InstallError("The downloaded file is not a Linux executable (not an ELF binary or "
+                           "script) - the release may only offer an archive or package.")
+
+
+def validate_for_format(path: Path, format_id: str) -> None:
+    (validate_appimage_file if format_id == "appimage" else validate_executable_file)(path)
+
+
 def _hash_file(path: Path, algo: str) -> str:
     h = hashlib.new(algo)
     with open(path, "rb") as f:
@@ -173,7 +192,8 @@ def clean_stale_parts(path: Path) -> None:
 # -- main entry point ---------------------------------------------------------------------
 def install_update(path: str | os.PathLike, asset: dict, assets: list[dict], *,
                    old_version: str | None, progress: Progress | None = None,
-                   cancel: threading.Event | None = None) -> InstallResult:
+                   cancel: threading.Event | None = None,
+                   format_id: str = "appimage") -> InstallResult:
     target = Path(path)
     if not target.is_file():
         raise InstallError("The installed AppImage was not found, so it can't be updated.")
@@ -189,7 +209,7 @@ def install_update(path: str | os.PathLike, asset: dict, assets: list[dict], *,
     backup: Path | None = None
     try:
         size, sha256_hex = _download(asset["url"], fd, size_hint, progress, cancel)
-        validate_appimage_file(tmp)
+        validate_appimage_file(tmp) if format_id == "appimage" else validate_executable_file(tmp)
 
         expected = find_expected_checksum(asset, assets)
         if expected:
@@ -217,10 +237,11 @@ def install_update(path: str | os.PathLike, asset: dict, assets: list[dict], *,
         bdir.mkdir(exist_ok=True)
         stem = re.sub(r"\.appimage$", "", target.name, flags=re.IGNORECASE)
         label = _safe_label(old_version)
-        backup = bdir / f"{stem}-{label}.AppImage"
+        ext = backup_suffix(format_id)
+        backup = bdir / f"{stem}-{label}{ext}"
         n = 2
         while backup.exists():
-            backup = bdir / f"{stem}-{label}-{n}.AppImage"
+            backup = bdir / f"{stem}-{label}-{n}{ext}"
             n += 1
         try:
             os.link(target, backup)

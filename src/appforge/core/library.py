@@ -14,9 +14,10 @@ from pathlib import Path
 from .database import Database, DuplicatePathError
 from .desktop import DesktopError, DesktopService, SyncReport
 from .formats import AppMetadata, FormatError, detect_format, get_format
-from .github_url import parse_repo
 from .models import AppEntry, UpdateStatus
+from .organize import CATEGORY_KEY, clean_category
 from .relocate import find_candidates
+from .updates.providers import SUPPORTED_HINT, parse_source
 
 log = logging.getLogger(__name__)
 
@@ -46,7 +47,8 @@ def inspect_file(path: str | os.PathLike) -> AppMetadata:
         raise LibraryError("That path is not a file.")
     fmt = detect_format(p)
     if fmt is None:
-        raise LibraryError("This doesn't look like an AppImage. Choose a file ending in .AppImage.")
+        raise LibraryError("AppForge can't use this file. Choose an AppImage, a Linux program (ELF binary) "
+                           "or a script that starts with #!.")
     try:
         return fmt.extract_metadata(p)
     except FormatError as exc:
@@ -54,12 +56,13 @@ def inspect_file(path: str | os.PathLike) -> AppMetadata:
 
 
 def normalize_repo(text: str | None) -> str | None:
-    """Return a canonical GitHub URL, ``None`` for blank input, or raise LibraryError."""
+    """Return the canonical repository URL (GitHub, GitLab or Codeberg), ``None`` for blank input,
+    or raise LibraryError."""
     if text is None or not text.strip():
         return None
-    ref = parse_repo(text)
+    ref = parse_source(text)
     if ref is None:
-        raise LibraryError("Enter a GitHub repository like https://github.com/owner/repo.")
+        raise LibraryError(f"Enter a repository like {SUPPORTED_HINT}.")
     return ref.url
 
 
@@ -152,8 +155,15 @@ class LibraryService:
         installed_version: str | None = ...,  # type: ignore[assignment]
         settings: dict | None = None,
         icon: str | None = ...,  # type: ignore[assignment]  (path = set custom, None = reset to built-in)
+        category: str | None = ...,  # type: ignore[assignment]  (text = set, None/blank = automatic)
     ) -> AppEntry:
         entry = self._require(app_id)
+        if category is not ...:
+            chosen = clean_category(category)
+            if chosen:
+                entry.metadata[CATEGORY_KEY] = chosen
+            else:
+                entry.metadata.pop(CATEGORY_KEY, None)
         if icon is not ...:
             if icon:
                 entry.icon_path = self._store_custom_icon(entry.id, icon, entry.icon_path)
@@ -171,7 +181,7 @@ class LibraryService:
                 raise LibraryError("Another library entry already uses that file.")
             fmt = detect_format(Path(new_path))
             if fmt is None:
-                raise LibraryError("That file doesn't look like an AppImage.")
+                raise LibraryError("That file isn't an AppImage, Linux program or script AppForge can use.")
             entry.path, entry.format = new_path, fmt.id
         if github_repo is not ...:
             new_repo = normalize_repo(github_repo)

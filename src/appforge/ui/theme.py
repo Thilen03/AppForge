@@ -106,6 +106,13 @@ def stylesheet(t: Tokens) -> str:
                         padding: 6px 10px; }}
     QPushButton#ghost:hover {{ background: {t.accent_soft}; }}
 
+    QComboBox {{ background: {t.surface}; border: 1px solid {t.border_strong}; border-radius: 8px;
+                padding: 6px 10px; min-height: 18px; }}
+    QComboBox:focus {{ border: 1px solid {t.accent}; }}
+    QComboBox:disabled {{ color: {t.muted}; }}
+    QComboBox QAbstractItemView {{ background: {t.surface}; border: 1px solid {t.border_strong};
+                                  selection-background-color: {t.accent_soft}; selection-color: {t.text}; }}
+
     QToolButton {{ background: transparent; border: 1px solid transparent; border-radius: 8px;
                   padding: 4px; }}
     QToolButton:hover {{ background: {t.accent_soft}; }}

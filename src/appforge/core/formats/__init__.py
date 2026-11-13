@@ -5,8 +5,10 @@ from pathlib import Path
 
 from .appimage import AppImageFormat
 from .base import AppFormat, AppMetadata, FormatError
+from .executable import ExecutableFormat
 
-FORMATS: list[AppFormat] = [AppImageFormat()]
+# Order matters for detection: AppImage first, the generic executable format last.
+FORMATS: list[AppFormat] = [AppImageFormat(), ExecutableFormat()]
 
 
 def get_format(format_id: str) -> AppFormat | None:

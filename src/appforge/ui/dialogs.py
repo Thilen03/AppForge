@@ -8,7 +8,7 @@ from pathlib import Path
 from PySide6.QtCore import QObject, QRunnable, QThreadPool, Qt, Signal
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
-    QCheckBox, QDialog, QFileDialog, QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem,
+    QCheckBox, QComboBox, QDialog, QFileDialog, QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem,
     QPushButton, QVBoxLayout, QWidget,
 )
 
@@ -17,9 +17,11 @@ from ..core.library import (
     LibraryError, LibraryService, inspect_file, normalize_path, normalize_repo,
 )
 from ..core.models import AppEntry
+from ..core.organize import CATEGORY_KEY, category_suggestions
 from .icons import app_pixmap, placeholder_pixmap
 
-FILE_FILTER = "AppImage (*.AppImage *.appimage);;All files (*)"
+FILE_FILTER = "AppImage (*.AppImage *.appimage);;All files (*)"   # programs and scripts: pick "All files"
+SOURCE_HINT = "GitHub, GitLab or Codeberg repository, used for update checks."
 ICON_FILTER = "Images (*.png *.svg *.jpg *.jpeg *.webp *.bmp *.ico *.xpm);;All files (*)"
 
 
@@ -74,13 +76,13 @@ class AddApplicationDialog(QDialog):
         lay.setContentsMargins(24, 22, 24, 20)
         lay.setSpacing(10)
         lay.addWidget(QLabel("Add application", objectName="title"))
-        lay.addWidget(QLabel("Pick an AppImage anywhere on your computer. It stays where it is.",
+        lay.addWidget(QLabel("Pick an AppImage (or a Linux program or script) anywhere on your computer. It stays where it is.",
                              objectName="subtitle"))
         lay.addSpacing(8)
 
-        lay.addWidget(_field_label("AppImage file"))
+        lay.addWidget(_field_label("File"))
         row = QHBoxLayout()
-        self.path_edit = QLineEdit(placeholderText="Choose an .AppImage file…")
+        self.path_edit = QLineEdit(placeholderText="Choose an AppImage, program or script…")
         self.path_edit.setReadOnly(True)
         browse = QPushButton("Browse…")
         browse.clicked.connect(self._browse)
@@ -132,11 +134,11 @@ class AddApplicationDialog(QDialog):
         self._reset_details()
 
         lay.addSpacing(4)
-        lay.addWidget(_field_label("GitHub repository (optional)"))
+        lay.addWidget(_field_label("Update source (optional)"))
         self.repo_edit = QLineEdit(placeholderText="https://github.com/owner/repo")
         self.repo_edit.textChanged.connect(self._validate)
         lay.addWidget(self.repo_edit)
-        self.repo_msg = QLabel("Used for update checks in a later version.", objectName="hint")
+        self.repo_msg = QLabel(SOURCE_HINT, objectName="hint")
         lay.addWidget(self.repo_msg)
         self.menu_cb = QCheckBox("Add to the application menu")
         self.menu_cb.setToolTip("Creates a launcher in your desktop's application menu so you can start "
@@ -160,7 +162,7 @@ class AddApplicationDialog(QDialog):
     # -- file selection -----------------------------------------------------------------
     def _browse(self):
         start = str(Path(self.path_edit.text()).parent) if self.path_edit.text() else str(Path.home())
-        path, _ = QFileDialog.getOpenFileName(self, "Choose an AppImage", start, FILE_FILTER)
+        path, _ = QFileDialog.getOpenFileName(self, "Choose an application", start, FILE_FILTER)
         if path:
             self._set_path(path)
 
@@ -176,7 +178,7 @@ class AddApplicationDialog(QDialog):
         if self.service.find_by_path(path):
             self._show_file_msg("This application is already in your library.")
             return
-        self.meta_lbl.setText("Reading AppImage…")
+        self.meta_lbl.setText("Reading file…")
         self._token += 1
         job = _InspectJob(self._token, path)
         job.signals.done.connect(self._on_inspected)
@@ -247,7 +249,7 @@ class AddApplicationDialog(QDialog):
         self.name_edit.setEnabled(False)
         self.name_edit.clear()
         self._name_touched = False
-        self.meta_lbl.setText("Choose an AppImage to see its name, version and icon.")
+        self.meta_lbl.setText("Choose a file to see its name, version and icon.")
         self.warn_lbl.clear()
 
     def _show_icon(self, md: AppMetadata):
@@ -289,7 +291,7 @@ class AddApplicationDialog(QDialog):
             self.repo_msg.setText(err)
             self.repo_msg.setObjectName("error")
         else:
-            self.repo_msg.setText("Used for update checks in a later version.")
+            self.repo_msg.setText(SOURCE_HINT)
             self.repo_msg.setObjectName("hint")
         self.repo_msg.style().unpolish(self.repo_msg)
         self.repo_msg.style().polish(self.repo_msg)
@@ -356,6 +358,15 @@ class EditApplicationDialog(QDialog):
         self.name_edit = QLineEdit(entry.name)
         lay.addWidget(self.name_edit)
 
+        lay.addWidget(_field_label("Category"))
+        self.category_edit = QComboBox()
+        self.category_edit.setEditable(True)
+        self.category_edit.addItems(category_suggestions(service.list_applications()))
+        self.category_edit.setCurrentText(entry.metadata.get(CATEGORY_KEY) or "")
+        self.category_edit.lineEdit().setPlaceholderText("Automatic (taken from the application)")
+        self.category_edit.setToolTip("Pick a category or type your own. Leave empty for automatic.")
+        lay.addWidget(self.category_edit)
+
         lay.addWidget(_field_label("File location"))
         row = QHBoxLayout()
         self.path_edit = QLineEdit(entry.path)
@@ -374,7 +385,7 @@ class EditApplicationDialog(QDialog):
         self.version_edit.setPlaceholderText("Unknown")
         lay.addWidget(self.version_edit)
 
-        lay.addWidget(_field_label("GitHub repository (optional)"))
+        lay.addWidget(_field_label("Update source (optional)"))
         self.repo_edit = QLineEdit(entry.github_repo or "")
         self.repo_edit.setPlaceholderText("https://github.com/owner/repo")
         self.repo_edit.textChanged.connect(self._repo_changed)
@@ -432,7 +443,7 @@ class EditApplicationDialog(QDialog):
 
     def _browse(self):
         start = str(Path(self.path_edit.text()).parent)
-        path, _ = QFileDialog.getOpenFileName(self, "Choose the AppImage", start, FILE_FILTER)
+        path, _ = QFileDialog.getOpenFileName(self, "Choose the file", start, FILE_FILTER)
         if path:
             self.path_edit.setText(path)
 
@@ -459,6 +470,7 @@ class EditApplicationDialog(QDialog):
         try:
             new_path = self.path_edit.text().strip()
             changes: dict = dict(name=self.name_edit.text(),
+                                 category=self.category_edit.currentText(),
                                  github_repo=self.repo_edit.text(),
                                  installed_version=self.version_edit.text(),
                                  settings={"include_prereleases": self.pre_cb.isChecked(),

@@ -7,29 +7,51 @@ import subprocess
 import time
 from pathlib import Path
 
-from PySide6.QtCore import QSettings, QThreadPool, QTimer, QUrl, Qt
+from PySide6.QtCore import QRunnable, QSettings, QThreadPool, QTimer, QUrl, Qt
 from PySide6.QtGui import QDesktopServices, QGuiApplication
 from PySide6.QtWidgets import (
-    QApplication, QFileDialog, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QMainWindow,
+    QApplication, QComboBox, QFileDialog, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QMainWindow,
     QMessageBox, QPushButton, QScrollArea, QStackedWidget, QVBoxLayout, QWidget,
 )
 
 from .. import APP_DISPLAY_NAME
 from ..core.library import FileState, LibraryError, LibraryService, file_state
 from ..core.models import AppEntry, UpdateStatus
+from ..core.organize import (
+    ALL, SORT_NAME, SORTS, STATUS_FILTERS, Filter, categories_in_use, matches, sort_entries,
+)
+from ..core.settings import AppSettings
 from ..core.updates.assets import is_appimage_name
 from ..core.updates.installer import InstallCancelled, InstallResult
 from ..core.updates.service import UpdateService, can_update
 from ..services import launcher
+from ..services.notifier import send_desktop_notification, summarize_updates
 from .app_card import AppCard
 from .backups_dialog import BackupsDialog
 from .dialogs import FILE_FILTER, AddApplicationDialog, AssetPickerDialog, EditApplicationDialog
 from .flow_layout import FlowLayout
 from .icons import placeholder_pixmap
+from .settings_dialog import SettingsDialog
+from .tray import TrayController, tray_available
 from .workers import CheckJob, InstallJob
 
 log = logging.getLogger(__name__)
 STALE_AFTER = 30 * 60   # re-check automatically at startup if the last check is older than this
+BACKGROUND_TICK_MS = 10 * 60 * 1000   # how often the idle checker looks at whether a check is due
+
+
+class _FnJob(QRunnable):
+    """Runs a small blocking function (e.g. notify-send) off the UI thread."""
+
+    def __init__(self, fn, *args):
+        super().__init__()
+        self._fn, self._args = fn, args
+
+    def run(self):
+        try:
+            self._fn(*self._args)
+        except Exception:  # noqa: BLE001
+            log.debug("background helper failed", exc_info=True)
 
 
 def _ago(ts: float | None) -> str:
@@ -46,11 +68,25 @@ def _ago(ts: float | None) -> str:
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, service: LibraryService, github_client=None, auto_check: bool = False):
+    def __init__(self, service: LibraryService, github_client=None, auto_check: bool = False,
+                 settings: AppSettings | None = None, tray_icon=None):
+        """``auto_check=True`` is the real application: startup check, periodic idle checks and
+        notifications. Tests leave it off, so nothing runs (or pops up) by itself."""
         super().__init__()
         self.service = service
         self.updates = UpdateService(service)
+        self.settings = settings or AppSettings(service.db)
         self._client = github_client
+        self._live = auto_check
+        self._quitting = False
+        self._tray_check = False
+        self._tray_hint_shown = False
+        self.tray: TrayController | None = None
+        if tray_icon is not None and tray_available():
+            self.tray = TrayController(tray_icon, self)
+            self.tray.showRequested.connect(self.show_from_tray)
+            self.tray.checkRequested.connect(self._check_from_tray)
+            self.tray.quitRequested.connect(self.quit_app)
         self.setWindowTitle(APP_DISPLAY_NAME)
         self.setAcceptDrops(True)
         self.resize(1040, 700)
@@ -71,8 +107,13 @@ class MainWindow(QMainWindow):
             self.restoreGeometry(geo)
         self.reload()
         QGuiApplication.instance().applicationStateChanged.connect(self._on_app_state)
+        self.apply_settings()
         if auto_check:
-            QTimer.singleShot(800, lambda: self.check_updates(only_stale=True))
+            if self.settings.auto_check:
+                QTimer.singleShot(800, lambda: self.check_updates(only_stale=True))
+            self._timer = QTimer(self)
+            self._timer.timeout.connect(self._scheduled_check)
+            self._timer.start(BACKGROUND_TICK_MS)
 
     # -- layout -------------------------------------------------------------------------
     def _build(self):
@@ -107,11 +148,39 @@ class MainWindow(QMainWindow):
         self.update_all_btn = QPushButton("Update All")
         self.update_all_btn.clicked.connect(self.update_all)
         header.addWidget(self.update_all_btn)
+        self.settings_btn = QPushButton("Settings", objectName="ghost")
+        self.settings_btn.setCursor(Qt.PointingHandCursor)
+        self.settings_btn.clicked.connect(self.open_settings)
+        header.addWidget(self.settings_btn)
         self.add_btn = QPushButton("Add Application", objectName="primary")
         self.add_btn.clicked.connect(self.add_application)
         self.add_btn.setCursor(Qt.PointingHandCursor)
         header.addWidget(self.add_btn)
         root.addLayout(header)
+
+        self.filter_row = QWidget()
+        fl = QHBoxLayout(self.filter_row)
+        fl.setContentsMargins(0, 0, 0, 0)
+        fl.setSpacing(10)
+        self.category_cb = QComboBox()
+        self.category_cb.setToolTip("Show one category")
+        self.status_cb = QComboBox()
+        self.status_cb.setToolTip("Filter by status")
+        for key, label in STATUS_FILTERS:
+            self.status_cb.addItem(label, key)
+        fl.addWidget(self.category_cb)
+        fl.addWidget(self.status_cb)
+        fl.addStretch(1)
+        fl.addWidget(QLabel("Sort by", objectName="subtitle"))
+        self.sort_cb = QComboBox()
+        for key, label in SORTS:
+            self.sort_cb.addItem(label, key)
+        fl.addWidget(self.sort_cb)
+        self.category_cb.addItem("All categories", None)
+        self.category_cb.currentIndexChanged.connect(lambda *_: self._apply_filter())
+        self.status_cb.currentIndexChanged.connect(lambda *_: self._apply_filter())
+        self.sort_cb.currentIndexChanged.connect(lambda *_: self.reload())
+        root.addWidget(self.filter_row)
 
         self.banner = QLabel(objectName="banner")
         self.banner.setWordWrap(True)
@@ -151,7 +220,7 @@ class MainWindow(QMainWindow):
         el.addStretch(3)
         self.stack.addWidget(empty)
 
-        self.no_results = QLabel("No applications match your search.", objectName="subtitle",
+        self.no_results = QLabel("No applications match your search or filters.", objectName="subtitle",
                                  alignment=Qt.AlignCenter)
         self.stack.addWidget(self.no_results)
 
@@ -176,9 +245,13 @@ class MainWindow(QMainWindow):
     def _card(self, app_id: str) -> AppCard | None:
         return next((c for c in self._cards if c.entry.id == app_id), None)
 
+    def _current_filter(self) -> Filter:
+        return Filter(self.search.text(), self.category_cb.currentData(),
+                      self.status_cb.currentData() or ALL)
+
     def _matches(self, entry: AppEntry) -> bool:
-        q = self.search.text().strip().lower()
-        return not q or q in entry.name.lower() or q in entry.path.lower()
+        return matches(entry, self._current_filter(),
+                       file_ok=lambda e: file_state(e) is FileState.OK)
 
     def _refresh_card(self, app_id: str):
         """Rebuild one card in place (state changed) without touching the others."""
@@ -205,7 +278,8 @@ class MainWindow(QMainWindow):
 
     # -- data ---------------------------------------------------------------------------
     def reload(self):
-        apps = self.service.list_applications()
+        apps = sort_entries(self.service.list_applications(), self.sort_cb.currentData() or SORT_NAME)
+        self._refresh_categories(apps)
         for c in self._cards:
             self.flow.removeWidget(c)
             c.deleteLater()
@@ -218,6 +292,7 @@ class MainWindow(QMainWindow):
             self.flow.addWidget(card)
             self._cards.append(card)
         self.search.setEnabled(bool(apps))
+        self.filter_row.setVisible(bool(apps))
         if missing:
             self.banner.setText(
                 f"{missing} application{' file is' if missing == 1 else ' files are'} missing from "
@@ -225,6 +300,19 @@ class MainWindow(QMainWindow):
         self.banner.setVisible(bool(missing))
         self._refresh_header()
         self._apply_filter()
+
+    def _refresh_categories(self, apps: list[AppEntry]):
+        """Rebuild the category list from the library, keeping the current choice if it still exists."""
+        current = self.category_cb.currentData()
+        names = categories_in_use(apps)
+        self.category_cb.blockSignals(True)
+        self.category_cb.clear()
+        self.category_cb.addItem("All categories", None)
+        for n in names:
+            self.category_cb.addItem(n, n)
+        idx = self.category_cb.findData(current) if current in names else 0
+        self.category_cb.setCurrentIndex(max(0, idx))
+        self.category_cb.blockSignals(False)
 
     def _refresh_header(self):
         apps = [c.entry for c in self._cards]
@@ -266,13 +354,15 @@ class MainWindow(QMainWindow):
 
     # -- update checks ------------------------------------------------------------------
     def check_updates(self, ids: list[str] | None = None, only_stale: bool = False,
-                      user_initiated: bool = False):
+                      user_initiated: bool = False, stale_after: float | None = None):
         now = time.time()
+        limit = STALE_AFTER if stale_after is None else stale_after
+        token = self.settings.effective_github_token()
         targets = []
         for e in self.service.list_applications():
             if not e.github_repo or e.id in self._busy or (ids is not None and e.id not in ids):
                 continue
-            if only_stale and e.last_update_check and now - e.last_update_check < STALE_AFTER:
+            if only_stale and e.last_update_check and now - e.last_update_check < limit:
                 continue
             targets.append(e)
         if not targets:
@@ -285,7 +375,8 @@ class MainWindow(QMainWindow):
                 e.id, repo_url=e.github_repo, installed_version=e.installed_version,
                 current_filename=Path(e.path).name, app_name=e.name,
                 asset_pattern=e.metadata.get("asset_pattern"),
-                include_prereleases=bool(e.metadata.get("include_prereleases")), client=self._client)
+                include_prereleases=bool(e.metadata.get("include_prereleases")), client=self._client,
+                token=token, format_id=e.format)
             job.signals.done.connect(self._on_check_done)
             self._jobs[e.id] = job
             self._set_busy(e.id, "Checking for updates…", None)
@@ -296,11 +387,80 @@ class MainWindow(QMainWindow):
         self._jobs.pop(app_id, None)
         self.updates.apply_check(app_id, outcome)
         self._set_busy(app_id, None, rebuild=True)
-        if not any(t == "Checking for updates…" for t, _ in self._busy.values()) and self._user_check:
+        all_done = not any(t == "Checking for updates…" for t, _ in self._busy.values())
+        user = self._user_check
+        if all_done:
+            self._after_checks(user)
+        if all_done and self._user_check:
             self._user_check = False
             n = sum(1 for c in self._cards if can_update(c.entry) and c.entry.update_status is UpdateStatus.UPDATE_AVAILABLE)
             self.statusBar().showMessage(
                 f"{n} update{'s' if n != 1 else ''} available" if n else "Everything is up to date", 5000)
+
+    # -- idle checks, notifications, tray, settings (Phase 5) -----------------------------
+    def _scheduled_check(self):
+        """Timer tick: check apps whose last check is older than the configured interval."""
+        if not self.settings.auto_check or self._batch is not None:
+            return
+        if any(isinstance(j, InstallJob) for j in self._jobs.values()):
+            return
+        self.check_updates(only_stale=True, stale_after=self.settings.check_interval_seconds)
+
+    def _after_checks(self, user_initiated: bool):
+        """All pending checks finished: tell the user about updates they haven't heard of yet."""
+        pending = self.updates.pending_notifications()
+        from_tray, self._tray_check = self._tray_check, False
+        if not self._live:
+            return
+        if user_initiated or (self.isVisible() and self.isActiveWindow()):
+            for e in pending:                       # they can see the cards: don't also pop up
+                self.updates.mark_notified(e.id)
+            return
+        if pending and self.settings.notifications:
+            self._notify(*summarize_updates(pending))
+            for e in pending:
+                self.updates.mark_notified(e.id)
+        elif from_tray and not pending:
+            self._notify("AppForge", "Everything is up to date.")
+
+    def _notify(self, title: str, body: str):
+        if self.tray is not None and self.tray.visible:
+            self.tray.message(title, body)
+        else:
+            self.check_pool.start(_FnJob(send_desktop_notification, title, body))
+
+    def _check_from_tray(self):
+        self._tray_check = True
+        self.check_updates()
+
+    def show_from_tray(self):
+        self.showNormal()
+        self.raise_()
+        self.activateWindow()
+        self.reload()
+
+    def apply_settings(self):
+        """Apply preferences that affect the running window (tray icon, quit behaviour)."""
+        background = bool(self.tray is not None and self.settings.run_in_background)
+        if self.tray is not None:
+            self.tray.set_visible(background)
+        app = QApplication.instance()
+        if app is not None:
+            app.setQuitOnLastWindowClosed(not background)
+
+    def open_settings(self):
+        dlg = SettingsDialog(self.settings, self.tray is not None, self)
+        if dlg.exec() == SettingsDialog.Accepted:
+            self.apply_settings()
+            self.statusBar().showMessage("Settings saved", 3000)
+
+    def quit_app(self):
+        """Really quit (the window's close button only hides it while background running is on)."""
+        self._quitting = True
+        if self.close():
+            QApplication.quit()
+        else:
+            self._quitting = False
 
     def open_release_page(self, app_id: str):
         entry = self.service.get(app_id)
@@ -341,7 +501,8 @@ class MainWindow(QMainWindow):
                 return
             entry = self.updates.set_asset_pattern(app_id, name) or entry
             info = entry.metadata["update"]
-        job = InstallJob(app_id, entry.path, info["asset"], info.get("assets", []), entry.installed_version)
+        job = InstallJob(app_id, entry.path, info["asset"], info.get("assets", []), entry.installed_version,
+                         entry.format)
         job.signals.progress.connect(self._on_install_progress)
         job.signals.done.connect(self._on_install_done)
         self._jobs[app_id] = job
@@ -642,6 +803,16 @@ class MainWindow(QMainWindow):
             QTimer.singleShot(0, lambda: self.add_application(files[0]))
 
     def closeEvent(self, ev):
+        if (not self._quitting and self.tray is not None and self.tray.visible
+                and self.settings.run_in_background):
+            QSettings().setValue("geometry", self.saveGeometry())
+            ev.ignore()
+            self.hide()
+            if not self._tray_hint_shown:
+                self._tray_hint_shown = True
+                self.tray.message("AppForge is still running",
+                                  "It keeps checking for updates. Use the tray icon to open or quit it.")
+            return
         installing = [j for j in self._jobs.values() if isinstance(j, InstallJob)]
         if installing:
             if QMessageBox.question(self, "Updates in progress",

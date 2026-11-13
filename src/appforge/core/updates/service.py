@@ -12,6 +12,7 @@ from .installer import InstallResult
 from .version import display_version
 
 log = logging.getLogger(__name__)
+NOTIFIED_KEY = "notified_version"     # entry.metadata: latest version the user was already told about
 
 
 def pattern_from_asset(asset_name: str, tag: str | None) -> str:
@@ -44,6 +45,22 @@ class UpdateService:
             "asset": outcome.asset, "ambiguous": outcome.ambiguous, "candidates": outcome.candidates,
             "assets": outcome.release_assets}
         return self.db.update(entry)
+
+    # -- notifications (Phase 5) ---------------------------------------------------------
+    @staticmethod
+    def should_notify(entry: AppEntry) -> bool:
+        """True when an update is available that the user hasn't been told about yet."""
+        return (entry.update_status is UpdateStatus.UPDATE_AVAILABLE and bool(entry.latest_version)
+                and entry.metadata.get(NOTIFIED_KEY) != entry.latest_version)
+
+    def mark_notified(self, app_id: str) -> None:
+        entry = self.db.get(app_id)
+        if entry is not None and entry.latest_version:
+            entry.metadata[NOTIFIED_KEY] = entry.latest_version
+            self.db.update(entry)
+
+    def pending_notifications(self) -> list[AppEntry]:
+        return [e for e in self.db.list_all() if self.should_notify(e)]
 
     def clear_update_state(self, app_id: str) -> AppEntry | None:
         entry = self.db.get(app_id)
@@ -114,4 +131,4 @@ def can_update(entry: AppEntry) -> bool:
     return entry.update_status is UpdateStatus.FAILED and bool(info.get("install_error"))
 
 
-__all__ = ["UpdateService", "can_update", "pattern_from_asset"]
+__all__ = ["UpdateService", "can_update", "pattern_from_asset", "NOTIFIED_KEY"]
