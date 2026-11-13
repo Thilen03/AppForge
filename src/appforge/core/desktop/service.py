@@ -25,6 +25,7 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from ..envvars import env_of
 from ..formats import get_format
 from ..models import AppEntry
 from ..paths import applications_dir
@@ -41,6 +42,17 @@ _MAX_COMMENT = 200
 # Characters that force quoting of an Exec argument (Desktop Entry spec, "The Exec key").
 _EXEC_RESERVED = frozenset(' \t\n"\'\\><~|&;$*?#()`')
 _CATEGORY_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+
+# The freedesktop "Main Categories" and the heading KDE's application launcher files them under.
+# (desktop-file key, label shown in AppForge). A launcher needs one of these to show up in a section.
+MENU_CATEGORIES: tuple[tuple[str, str], ...] = (
+    ("Development", "Development"), ("Education", "Education"), ("Game", "Games"),
+    ("Graphics", "Graphics"), ("Network", "Internet"), ("AudioVideo", "Multimedia"),
+    ("Office", "Office"), ("Science", "Science & Math"), ("Settings", "Settings"),
+    ("System", "System"), ("Utility", "Utilities"),
+)
+MENU_CATEGORY_KEY = "menu_category"     # entry.metadata key holding the user's choice
+_MAIN_KEYS = frozenset(k for k, _ in MENU_CATEGORIES)
 _FIELD_CODE_RE = re.compile(r"^%[fFuU]$")
 
 
@@ -100,6 +112,26 @@ def _categories(raw: str | None) -> str:
     return (";".join(cats) + ";") if cats else DEFAULT_CATEGORIES
 
 
+def menu_category_of(entry: AppEntry) -> str | None:
+    """The main category the user picked for the application menu, or ``None`` = automatic."""
+    value = entry.metadata.get(MENU_CATEGORY_KEY)
+    return value if value in _MAIN_KEYS else None
+
+
+def _entry_categories(entry: AppEntry) -> str:
+    """``Categories=`` value: the user's main category first, then the app's own extra categories.
+
+    The app's own *main* categories are dropped when the user picked one (otherwise KDE would list
+    the app in several sections); additional categories such as ``Qt`` or ``Emulator`` are kept.
+    """
+    chosen = menu_category_of(entry)
+    base = _categories(entry.metadata.get("categories"))
+    if not chosen:
+        return base
+    extra = [c for c in base.split(";") if c and c not in _MAIN_KEYS]
+    return ";".join([chosen, *extra]) + ";"
+
+
 def _field_code(desktop_exec: str | None) -> str | None:
     """Reuse the AppImage's own ``%U``/``%F`` (so "Open with…" keeps working); nothing else is copied."""
     if not desktop_exec:
@@ -117,6 +149,9 @@ def render_entry(entry: AppEntry) -> str:
         raise DesktopError("The file path contains control characters, so it can't be used in a launcher.")
     fmt = get_format(entry.format)
     argv = fmt.launch_command(path) if fmt else [str(path)]
+    env = env_of(entry)
+    if env:   # same as KDE's menu editor: Exec=env NAME=value … command
+        argv = ["env", *(f"{k}={v}" for k, v in env.items()), *argv]
     exec_line = " ".join(quote_exec_arg(a) for a in argv)
     code = _field_code(entry.metadata.get("desktop_exec"))
     if code:
@@ -143,7 +178,7 @@ def render_entry(entry: AppEntry) -> str:
         f"Path={_escape_value(str(path.parent))}",
         f"Icon={_escape_value(icon)}",
         "Terminal=false",
-        f"Categories={_categories(entry.metadata.get('categories'))}",
+        f"Categories={_entry_categories(entry)}",
     ]
     wm_class = _escape_value(entry.metadata.get("startup_wm_class") or "")
     if wm_class:
@@ -253,4 +288,5 @@ class DesktopService:
 
 
 __all__ = ["DesktopService", "DesktopError", "ManagedEntry", "SyncReport", "entry_filename",
-           "quote_exec_arg", "render_entry", "MARKER_KEY"]
+           "quote_exec_arg", "render_entry", "MARKER_KEY", "MENU_CATEGORIES", "MENU_CATEGORY_KEY",
+           "menu_category_of"]

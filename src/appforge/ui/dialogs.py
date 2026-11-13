@@ -9,9 +9,11 @@ from PySide6.QtCore import QObject, QRunnable, QThreadPool, Qt, Signal
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
     QCheckBox, QComboBox, QDialog, QFileDialog, QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem,
-    QPushButton, QVBoxLayout, QWidget,
+    QPlainTextEdit, QPushButton, QVBoxLayout, QWidget,
 )
 
+from ..core.desktop import MENU_CATEGORIES, MENU_CATEGORY_KEY
+from ..core.envvars import ENV_KEY, EnvVarError, clean_env, format_env_text, parse_env_text
 from ..core.formats import AppMetadata, get_format
 from ..core.library import (
     LibraryError, LibraryService, inspect_file, normalize_path, normalize_repo,
@@ -54,12 +56,47 @@ def _field_label(text: str) -> QLabel:
     return QLabel(text, objectName="sectionLabel")
 
 
+ENV_HINT = "One per line, NAME=value. Used in the menu launcher and when you press Launch."
+ENV_PLACEHOLDER = "QT_QPA_PLATFORM=xcb\nDRI_PRIME=1"
+
+
+def _menu_category_combo(current: str | None) -> QComboBox:
+    """Combo with \"Automatic\" plus the KDE/freedesktop main categories (item data = desktop key)."""
+    combo = QComboBox()
+    combo.addItem("Automatic (from the application)", None)
+    for key, label in MENU_CATEGORIES:
+        combo.addItem(label, key)
+    idx = combo.findData(current)
+    combo.setCurrentIndex(idx if idx >= 0 else 0)
+    combo.setToolTip("The section of the KDE application launcher (and other desktop menus) this "
+                     "application is listed under.")
+    return combo
+
+
+def _env_edit(text: str = "") -> QPlainTextEdit:
+    edit = QPlainTextEdit()
+    edit.setPlaceholderText(ENV_PLACEHOLDER)
+    edit.setPlainText(text)
+    edit.setFixedHeight(64)
+    edit.setTabChangesFocus(True)
+    edit.setToolTip(ENV_HINT)
+    return edit
+
+
+def _env_error(edit: QPlainTextEdit) -> str | None:
+    try:
+        parse_env_text(edit.toPlainText())
+        return None
+    except EnvVarError as exc:
+        return str(exc)
+
+
 class AddApplicationDialog(QDialog):
     def __init__(self, service: LibraryService, parent=None, initial_path: str | None = None):
         super().__init__(parent)
         self.service = service
         self.setWindowTitle("Add application")
-        self.setFixedSize(560, 604)  # never resizes while open: avoids compositor resize artefacts
+        self.setFixedSize(560, 770)  # never resizes while open: avoids compositor resize artefacts
         self.metadata: AppMetadata | None = None
         self.added: AppEntry | None = None
         self.menu_requested = False   # whether the "application menu" box was ticked on accept
@@ -145,6 +182,18 @@ class AddApplicationDialog(QDialog):
                                 "the app without opening AppForge. The AppImage itself is not touched.")
         self.menu_cb.setChecked(self.service.desktop_default())
         lay.addWidget(self.menu_cb)
+
+        lay.addWidget(_field_label("Application menu category"))
+        self.menu_category_cb = _menu_category_combo(None)
+        lay.addWidget(self.menu_category_cb)
+
+        lay.addWidget(_field_label("Environment variables (optional)"))
+        self.env_edit = _env_edit()
+        self.env_edit.textChanged.connect(self._validate)
+        lay.addWidget(self.env_edit)
+        self.env_msg = QLabel(ENV_HINT, objectName="hint")
+        self.env_msg.setWordWrap(True)
+        lay.addWidget(self.env_msg)
 
         lay.addStretch(1)
         btns = QHBoxLayout()
@@ -295,8 +344,13 @@ class AddApplicationDialog(QDialog):
             self.repo_msg.setObjectName("hint")
         self.repo_msg.style().unpolish(self.repo_msg)
         self.repo_msg.style().polish(self.repo_msg)
+        env_err = _env_error(self.env_edit)
+        self.env_msg.setText(env_err or ENV_HINT)
+        self.env_msg.setObjectName("error" if env_err else "hint")
+        self.env_msg.style().unpolish(self.env_msg)
+        self.env_msg.style().polish(self.env_msg)
         self.add_btn.setEnabled(bool(self.metadata and self.name_edit.text().strip()) and not err
-                                and not self.file_msg.isVisible())
+                                and not env_err and not self.file_msg.isVisible())
 
     def _accept(self):
         self.menu_requested = self.menu_cb.isChecked()
@@ -305,6 +359,8 @@ class AddApplicationDialog(QDialog):
                 self.path_edit.text(), name=self.name_edit.text(),
                 github_repo=self.repo_edit.text(), metadata=self.metadata,
                 custom_icon=self._custom_icon, integrate_desktop=self.menu_requested,
+                menu_category=self.menu_category_cb.currentData(),
+                env_vars=parse_env_text(self.env_edit.toPlainText()),
             )
         except LibraryError as exc:
             self._show_file_msg(str(exc))
@@ -366,6 +422,18 @@ class EditApplicationDialog(QDialog):
         self.category_edit.lineEdit().setPlaceholderText("Automatic (taken from the application)")
         self.category_edit.setToolTip("Pick a category or type your own. Leave empty for automatic.")
         lay.addWidget(self.category_edit)
+
+        lay.addWidget(_field_label("Application menu category"))
+        self.menu_category_cb = _menu_category_combo(entry.metadata.get(MENU_CATEGORY_KEY))
+        lay.addWidget(self.menu_category_cb)
+
+        lay.addWidget(_field_label("Environment variables (optional)"))
+        self.env_edit = _env_edit(format_env_text(clean_env(entry.metadata.get(ENV_KEY))))
+        self.env_edit.textChanged.connect(self._revalidate)
+        lay.addWidget(self.env_edit)
+        self.env_msg = QLabel(ENV_HINT, objectName="hint")
+        self.env_msg.setWordWrap(True)
+        lay.addWidget(self.env_msg)
 
         lay.addWidget(_field_label("File location"))
         row = QHBoxLayout()
@@ -464,13 +532,28 @@ class EditApplicationDialog(QDialog):
         self.repo_msg.setText(err)
         self.repo_msg.setVisible(bool(err))
         _set_invalid(self.repo_edit, bool(err))
-        self.save_btn.setEnabled(not err)
+        self._revalidate()
+
+    def _revalidate(self):
+        try:
+            normalize_repo(self.repo_edit.text())
+            repo_ok = True
+        except LibraryError:
+            repo_ok = False
+        env_err = _env_error(self.env_edit)
+        self.env_msg.setText(env_err or ENV_HINT)
+        self.env_msg.setObjectName("error" if env_err else "hint")
+        self.env_msg.style().unpolish(self.env_msg)
+        self.env_msg.style().polish(self.env_msg)
+        self.save_btn.setEnabled(repo_ok and not env_err)
 
     def _save(self):
         try:
             new_path = self.path_edit.text().strip()
             changes: dict = dict(name=self.name_edit.text(),
                                  category=self.category_edit.currentText(),
+                                 menu_category=self.menu_category_cb.currentData(),
+                                 env_vars=parse_env_text(self.env_edit.toPlainText()),
                                  github_repo=self.repo_edit.text(),
                                  installed_version=self.version_edit.text(),
                                  settings={"include_prereleases": self.pre_cb.isChecked(),

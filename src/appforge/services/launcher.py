@@ -8,6 +8,7 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
+from ..core.envvars import env_of
 from ..core.formats import get_format
 from ..core.library import FileState, file_state
 from ..core.models import AppEntry
@@ -78,12 +79,14 @@ def launch(entry: AppEntry) -> LaunchHandle:
     path = Path(entry.path)
     cmd = fmt.launch_command(path) if fmt else [str(path)]
     log_path = logs_dir() / f"{entry.id}.log"
+    # the user's own variables go on top of the cleaned environment, so they always win
+    env = {**clean_environment(), **env_of(entry)}
     try:
         with open(log_path, "wb") as logf:
             proc = subprocess.Popen(  # noqa: S603 - the user explicitly asked to run this file
                 cmd,
                 cwd=str(path.parent),
-                env=clean_environment(),
+                env=env,
                 stdin=subprocess.DEVNULL,
                 stdout=logf,
                 stderr=subprocess.STDOUT,

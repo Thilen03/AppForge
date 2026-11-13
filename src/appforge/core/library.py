@@ -12,7 +12,8 @@ import time
 from pathlib import Path
 
 from .database import Database, DuplicatePathError
-from .desktop import DesktopError, DesktopService, SyncReport
+from .desktop import MENU_CATEGORIES, MENU_CATEGORY_KEY, DesktopError, DesktopService, SyncReport
+from .envvars import ENV_KEY, EnvVarError, validate_pair
 from .formats import AppMetadata, FormatError, detect_format, get_format
 from .models import AppEntry, UpdateStatus
 from .organize import CATEGORY_KEY, clean_category
@@ -24,6 +25,25 @@ log = logging.getLogger(__name__)
 
 class LibraryError(Exception):
     """A user-presentable problem (invalid input, duplicate, …)."""
+
+
+def _check_menu_category(value: str | None) -> str | None:
+    value = (value or "").strip() or None
+    if value is not None and value not in {k for k, _ in MENU_CATEGORIES}:
+        raise LibraryError(f"“{value}” is not an application-menu category.")
+    return value
+
+
+def _check_env(env) -> dict[str, str]:
+    """Validate a ``{name: value}`` mapping from the UI; raises LibraryError."""
+    out: dict[str, str] = {}
+    try:
+        for k, v in dict(env or {}).items():
+            name, value = validate_pair(str(k), str(v))
+            out[name] = value
+    except EnvVarError as exc:
+        raise LibraryError(str(exc)) from exc
+    return out
 
 
 class FileState(enum.Enum):
@@ -109,12 +129,16 @@ class LibraryService:
         metadata: AppMetadata | None = None,
         custom_icon: str | None = None,
         integrate_desktop: bool = False,
+        menu_category: str | None = None,
+        env_vars: dict[str, str] | None = None,
     ) -> AppEntry:
         """Add an application. ``integrate_desktop`` also creates its application-menu launcher;
         a failure there never fails the add – check :meth:`desktop_enabled` on the result."""
         norm = normalize_path(path)
         if self.db.find_by_path(norm):
             raise LibraryError("This application is already in your library.")
+        menu_category = _check_menu_category(menu_category)
+        env_vars = _check_env(env_vars)
         md = metadata or inspect_file(norm)
         entry = AppEntry(
             name=(name or "").strip() or md.name_suggestion,
@@ -125,6 +149,10 @@ class LibraryService:
             description=md.description,
             metadata={**md.extra, "warnings": md.warnings},
         )
+        if menu_category:
+            entry.metadata[MENU_CATEGORY_KEY] = menu_category
+        if env_vars:
+            entry.metadata[ENV_KEY] = env_vars
         entry.icon_path = self._store_icon(entry.id, md)
         if custom_icon:
             try:
@@ -156,8 +184,22 @@ class LibraryService:
         settings: dict | None = None,
         icon: str | None = ...,  # type: ignore[assignment]  (path = set custom, None = reset to built-in)
         category: str | None = ...,  # type: ignore[assignment]  (text = set, None/blank = automatic)
+        menu_category: str | None = ...,  # type: ignore[assignment]  (freedesktop key; None = automatic)
+        env_vars: dict[str, str] | None = ...,  # type: ignore[assignment]  (empty/None = none)
     ) -> AppEntry:
         entry = self._require(app_id)
+        if menu_category is not ...:
+            chosen_menu = _check_menu_category(menu_category)
+            if chosen_menu:
+                entry.metadata[MENU_CATEGORY_KEY] = chosen_menu
+            else:
+                entry.metadata.pop(MENU_CATEGORY_KEY, None)
+        if env_vars is not ...:
+            checked_env = _check_env(env_vars)
+            if checked_env:
+                entry.metadata[ENV_KEY] = checked_env
+            else:
+                entry.metadata.pop(ENV_KEY, None)
         if category is not ...:
             chosen = clean_category(category)
             if chosen:
