@@ -27,7 +27,7 @@ a = Analysis(
     pathex=[os.path.join(ROOT, "src")],
     binaries=binaries,
     datas=[(os.path.join(ROOT, "src", "appforge", "resources"), "appforge/resources")] + collect_data_files("certifi"),
-    hiddenimports=["PySide6.QtSvg", "zstandard", "certifi"],
+    hiddenimports=["PySide6.QtDBus", "PySide6.QtSvg", "zstandard", "certifi"],
     excludes=EXCLUDES,
     noarchive=False,
 )

@@ -112,6 +112,12 @@ def _selftest(path: str | None) -> int:
     return 0
 
 
+def activate_window(window, args):
+    """An ordinary second launch opens the library; login duplicates stay quiet."""
+    if "--autostart" not in args:
+        window.bring_to_front()
+
+
 def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv if argv is None else argv)
     if "--selftest" in argv:
@@ -123,8 +129,10 @@ def main(argv: list[str] | None = None) -> int:
 
     # Only one AppForge at a time: a second launch asks the running one to come to the front
     # (from the tray, minimized or behind other windows) and exits instead of opening a duplicate.
+    autostart_launch = "--autostart" in argv
     guard = InstanceGuard()
-    if not guard.acquire([a for a in argv[1:] if not a.startswith("-")]):
+    activation_args = ["--autostart"] if autostart_launch else [a for a in argv[1:] if not a.startswith("-")]
+    if not guard.acquire(activation_args):
         return 0
 
     QApplication.setHighDpiScaleFactorRoundingPolicy(Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
@@ -160,10 +168,16 @@ def main(argv: list[str] | None = None) -> int:
     except Exception:  # noqa: BLE001 - never block startup on launcher housekeeping
         logging.getLogger(__name__).warning("Launcher sync failed", exc_info=True)
     window = MainWindow(service, auto_check=True, tray_icon=app.windowIcon())
+    from .core import autostart
+    if window.settings.start_at_login:
+        try:
+            autostart.set_enabled(True)
+        except autostart.AutostartError:
+            logging.getLogger(__name__).warning("Could not refresh login startup entry", exc_info=True)
     activator = _Activator()
-    activator.requested.connect(lambda _args: window.bring_to_front())
+    activator.requested.connect(lambda args: activate_window(window, args))
     guard.serve(activator.requested.emit)      # emitted on the listener thread, delivered on the GUI thread
-    window.show()
+    window.show_initial(autostart_launch)
     code = app.exec()
     restart_path = None
     if window.restart_requested:

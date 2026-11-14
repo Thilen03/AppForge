@@ -1,10 +1,12 @@
 """One application card in the library grid."""
 from __future__ import annotations
 
-from PySide6.QtCore import QEasingCurve, QEvent, QPoint, QPropertyAnimation, Qt, Signal
-from PySide6.QtGui import QColor, QFontMetrics, QPainter
+import math
+
+from PySide6.QtCore import QEasingCurve, QEvent, QPoint, QPointF, QPropertyAnimation, Qt, Signal
+from PySide6.QtGui import QColor, QFontMetrics, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import (
-    QFrame, QGraphicsOpacityEffect, QHBoxLayout, QLabel, QProgressBar, QPushButton,
+    QAbstractButton, QFrame, QGraphicsOpacityEffect, QHBoxLayout, QLabel, QProgressBar, QPushButton,
     QToolButton, QVBoxLayout, QWidget,
 )
 
@@ -41,6 +43,56 @@ class _DotsButton(QToolButton):
             p.drawEllipse(QPoint(int(cx + dx), int(cy)), 2, 2)
 
 
+class _FavoriteStar(QAbstractButton):
+    """Compact rounded star button; gold for favorites and gray on card hover."""
+
+    def __init__(self, favorite=False, parent=None):
+        super().__init__(parent)
+        self.favorite = favorite
+        self.setFixedSize(18, 18)
+        policy = self.sizePolicy()
+        policy.setRetainSizeWhenHidden(True)
+        self.setSizePolicy(policy)
+        self.setFocusPolicy(Qt.StrongFocus)
+        self.setCursor(Qt.PointingHandCursor)
+        text = "Remove from favorites" if favorite else "Add to favorites"
+        self.setToolTip(text)
+        self.setAccessibleName(text)
+
+    def paintEvent(self, ev):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        points = []
+        for i in range(10):
+            radius = 7.2 if i % 2 == 0 else 4.2
+            angle = -math.pi / 2 + i * math.pi / 5
+            points.append(QPointF(9 + radius * math.cos(angle), 9 + radius * math.sin(angle)))
+        # Round both tips and inner corners with short quadratic curves.
+        path = QPainterPath()
+        for i, point in enumerate(points):
+            incoming = point + (points[i - 1] - point) * .20
+            outgoing = point + (points[(i + 1) % 10] - point) * .20
+            if i == 0:
+                path.moveTo(incoming)
+            else:
+                path.lineTo(incoming)
+            path.quadTo(point, outgoing)
+        path.closeSubpath()
+        color = QColor("#F5BE35" if self.favorite else theme.tokens().muted)
+        pen = QPen(color, 1.8, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin)
+        painter.setPen(pen)
+        painter.setBrush(color)
+        painter.drawPath(path)
+        if self.hasFocus():
+            painter.setBrush(Qt.NoBrush)
+            painter.setPen(QPen(QColor(theme.tokens().accent), 1, Qt.DotLine))
+            painter.drawRoundedRect(0.5, 0.5, 17, 17, 4, 4)
+
+    def mouseDoubleClickEvent(self, ev):
+        # A double-click on this control must not launch the card's application.
+        ev.accept()
+
+
 class AppCard(QFrame):
     detailsRequested = Signal(str)
     launchRequested = Signal(str)
@@ -57,11 +109,13 @@ class AppCard(QFrame):
     chooseAssetRequested = Signal(str)
     backupsRequested = Signal(str)
     desktopToggleRequested = Signal(str)
+    favoriteRequested = Signal(str, bool)
 
     def __init__(self, entry: AppEntry, state: FileState, busy: tuple[str, float | None] | None = None,
-                 parent: QWidget | None = None):
+                 parent: QWidget | None = None, *, favorite: bool = False):
         super().__init__(parent)
         self.entry, self.state = entry, state
+        self.favorite = favorite
         self.setObjectName("card")
         self.setFixedSize(CARD_W, CARD_H)
         self.setProperty("missing", state in (FileState.MISSING, FileState.NOT_A_FILE))
@@ -110,9 +164,19 @@ class AppCard(QFrame):
         info = QVBoxLayout()
         info.setSpacing(3)
         name = QLabel(objectName="cardName")
-        name.setText(QFontMetrics(name.font()).elidedText(e.name, Qt.ElideRight, CARD_W - ICON - 70))
+        name.ensurePolished()
+        name.setText(QFontMetrics(name.font()).elidedText(e.name, Qt.ElideRight,
+                                                       CARD_W - ICON - 96))
         name.setToolTip(e.name)
-        info.addWidget(name)
+        title = QHBoxLayout()
+        title.setSpacing(8)
+        title.addWidget(name, 1)
+        self.favorite_star = _FavoriteStar(self.favorite, self)
+        self.favorite_star.clicked.connect(lambda: self.favoriteRequested.emit(e.id, not self.favorite))
+        self.favorite_star.installEventFilter(self)
+        self.favorite_star.setVisible(self.favorite)
+        title.addWidget(self.favorite_star, 0, Qt.AlignTop | Qt.AlignRight)
+        info.addLayout(title)
         version = QLabel(objectName="cardMeta")
         text = f"Version {e.installed_version}" if e.installed_version else "Version unknown"
         if e.latest_version and e.update_status in (UpdateStatus.UPDATE_AVAILABLE, UpdateStatus.FAILED) \
@@ -219,6 +283,8 @@ class AppCard(QFrame):
         m.setToolTipsVisible(True)
         m.addAction("Details…", lambda: self.detailsRequested.emit(e.id))
         m.addAction("Edit information…", lambda: self.editRequested.emit(e.id))
+        m.addAction("Remove from favorites" if self.favorite else "Add to favorites",
+                    lambda: self.favoriteRequested.emit(e.id, not self.favorite))
         if e.github_repo:
             m.addSeparator()
             m.addAction("Check for updates", lambda: self.checkRequested.emit(e.id))
@@ -272,6 +338,7 @@ class AppCard(QFrame):
         self._reveal(open_ or self.underMouse())
 
     def _reveal(self, show: bool):
+        self.favorite_star.setVisible(self.favorite or show or self.favorite_star.hasFocus())
         self.setProperty("hot", show)
         self.style().unpolish(self)
         self.style().polish(self)

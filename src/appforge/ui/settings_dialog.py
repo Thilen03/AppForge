@@ -3,9 +3,10 @@ from __future__ import annotations
 
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
-    QCheckBox, QDialog, QHBoxLayout, QLabel, QLineEdit, QPushButton, QVBoxLayout,
+    QCheckBox, QDialog, QHBoxLayout, QLabel, QLineEdit, QPushButton, QScrollArea, QVBoxLayout, QWidget,
 )
 
+from ..core import autostart
 from ..core.settings import INTERVAL_CHOICES, AppSettings
 from .popups import RoundedComboBox
 
@@ -29,8 +30,16 @@ class SettingsDialog(QDialog):
         self.settings = settings
         self.setWindowTitle("Settings")
         self.resize(560, 660)
-        self.setMinimumSize(520, 600)
-        lay = QVBoxLayout(self)
+        self.setMinimumSize(520, 440)
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QScrollArea.NoFrame)
+        content = QWidget()
+        scroll.setWidget(content)
+        outer.addWidget(scroll, 1)
+        lay = QVBoxLayout(content)
         lay.setContentsMargins(24, 22, 24, 20)
         lay.setSpacing(8)
         lay.addWidget(QLabel("Settings", objectName="title"))
@@ -61,13 +70,31 @@ class SettingsDialog(QDialog):
         self.notify_cb = QCheckBox("Notify me when an update is found")
         self.notify_cb.setChecked(settings.notifications)
         lay.addWidget(self.notify_cb)
-        self.bg_cb = QCheckBox("Keep running in the system tray when the window is closed")
+        self.bg_cb = QCheckBox("Minimize or close to the system tray")
         self.bg_cb.setChecked(settings.run_in_background and tray_available)
         self.bg_cb.setEnabled(tray_available)
         lay.addWidget(self.bg_cb)
-        lay.addWidget(_hint("Lets AppForge keep checking for updates after you close the window. Quit it "
+        lay.addWidget(_hint("Keeps AppForge out of the taskbar when minimized or closed. Quit it "
                             "from the tray icon." if tray_available else
                             "No system tray was found on this desktop, so background running is unavailable."))
+
+        lay.addSpacing(8)
+        lay.addWidget(_label("Startup"))
+        self.startup_cb = QCheckBox("Start AppForge at login")
+        self.startup_cb.setChecked(settings.start_at_login)
+        lay.addWidget(self.startup_cb)
+        self.start_minimized_cb = QCheckBox("Start minimized to the system tray")
+        self.start_minimized_cb.setChecked(settings.start_minimized)
+        lay.addWidget(self.start_minimized_cb)
+        lay.addWidget(_hint("Applies when you log in to your desktop. Starting minimized enables "
+                            "tray background mode; without a tray, AppForge opens normally."))
+        self.startup_cb.toggled.connect(
+            lambda enabled: self.start_minimized_cb.setEnabled(enabled and tray_available))
+        self.start_minimized_cb.setEnabled(self.startup_cb.isChecked() and tray_available)
+        self.start_minimized_cb.toggled.connect(
+            lambda enabled: self.bg_cb.setChecked(True) if enabled and tray_available else None)
+        self.bg_cb.toggled.connect(
+            lambda enabled: self.start_minimized_cb.setChecked(False) if not enabled else None)
 
         lay.addSpacing(8)
         lay.addWidget(_label("GitHub access token (optional)"))
@@ -80,9 +107,6 @@ class SettingsDialog(QDialog):
             "Raises GitHub's rate limit from 60 to 5000 requests per hour. It is only ever sent to "
             "api.github.com and is stored unencrypted in AppForge's library file (readable only by you)."
             + (" Currently using GITHUB_TOKEN from the environment." if src == "environment" else "")))
-        self.error_lbl = QLabel(objectName="error")
-        self.error_lbl.setWordWrap(True)
-        lay.addWidget(self.error_lbl)
 
         lay.addWidget(_label("Library transfer"))
         transfer = QHBoxLayout()
@@ -98,7 +122,12 @@ class SettingsDialog(QDialog):
                             "Transfers apply immediately, independently of Save."))
 
         lay.addStretch(1)
+        self.error_lbl = QLabel(objectName="error")
+        self.error_lbl.setWordWrap(True)
+        self.error_lbl.setContentsMargins(24, 0, 24, 0)
+        outer.addWidget(self.error_lbl)
         btns = QHBoxLayout()
+        btns.setContentsMargins(24, 4, 24, 20)
         btns.addStretch(1)
         cancel = QPushButton("Cancel")
         cancel.clicked.connect(self.reject)
@@ -107,16 +136,22 @@ class SettingsDialog(QDialog):
         save.clicked.connect(self._save)
         btns.addWidget(cancel)
         btns.addWidget(save)
-        lay.addLayout(btns)
+        outer.addLayout(btns)
 
     def _save(self):
         try:
-            self.settings.set_github_token(self.token_edit.text())
-        except ValueError as exc:
+            token = self.settings.validate_github_token(self.token_edit.text())
+            if self.startup_cb.isChecked() or self.settings.start_at_login:
+                autostart.set_enabled(self.startup_cb.isChecked())
+        except (ValueError, autostart.AutostartError) as exc:
             self.error_lbl.setText(str(exc))
             return
+        self.settings.set_github_token(token)
         self.settings.auto_check = self.auto_cb.isChecked()
         self.settings.check_interval_hours = int(self.interval.currentData())
         self.settings.notifications = self.notify_cb.isChecked()
-        self.settings.run_in_background = self.bg_cb.isChecked()
+        if self.bg_cb.isEnabled():
+            self.settings.run_in_background = self.bg_cb.isChecked()
+        self.settings.start_at_login = self.startup_cb.isChecked()
+        self.settings.start_minimized = self.start_minimized_cb.isChecked()
         self.accept()

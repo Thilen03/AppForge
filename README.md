@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img alt="version" src="https://img.shields.io/badge/version-0.5.8-2B63D9">
+  <img alt="version" src="https://img.shields.io/badge/version-0.5.9-2B63D9">
   <img alt="platform" src="https://img.shields.io/badge/platform-Linux-informational">
   <img alt="python" src="https://img.shields.io/badge/python-3.10%2B-blue">
   <img alt="Qt" src="https://img.shields.io/badge/Qt-6%20(PySide6)-41cd52">
@@ -140,6 +140,55 @@ what is included.
 See the [0.5.8 release notes](releases/RELEASE_NOTES_v0.5.8.md) and the
 [storage guide](docs/STORAGE.md) for safety and measurement details.
 
+### Enhanced system tray (new in 0.5.9)
+
+See the [0.5.9 release notes](releases/RELEASE_NOTES_v0.5.9.md) for this update.
+
+- Enable **Minimize or close to the system tray** in Settings on a desktop with tray support.
+  The tray menu shows available update counts and current download/check activity,
+  with **Check for updates** and **Update All** using the existing confirmation workflow.
+- Use **Open AppForge** to return to the library, or open Settings directly from the tray.
+  **Exit AppForge** quits; minimizing or closing the window hides it from the taskbar
+  and keeps background checks and updates running while background mode is enabled.
+- On KDE Plasma Wayland, AppForge uses a temporary KWin observer to receive
+  titlebar/taskbar minimize notifications that Qt may not receive. It observes only
+  AppForge's own main window while tray mode is enabled, and is unloaded when tray
+  mode is disabled or AppForge exits. No KDE configuration is changed. If KWin's
+  scripting interface is unavailable, AppForge reports it; closing to tray still works.
+- Launch from **Applications**, **Favorites** or **Recently used**. Use **Choose favorites**
+  to select favorites. Recent launches remember the last eight apps launched through
+  AppForge; external desktop launches are not recorded. Missing/non-executable or busy
+  apps are disabled. Launches use each app's existing environment preferences.
+- Availability notifications remain once per new version. Hidden updates report success
+  or failure, with a single summary per Update All batch. Repeated identical background
+  check errors are suppressed for the session. Notification preferences apply throughout.
+- In each library card's menu beside **Edit**, choose **Add to favorites** or
+  **Remove from favorites**. Favorites appear first with a small gold star in the
+  top-right corner. Hover over a card to reveal a gray star in that same spot;
+  click it to add a favorite, or click the gold star to remove one. The stars have
+  a fuller, rounded shape, and the card layout stays still as they appear.
+  The selected sort order applies within favorites and other apps;
+  search and filters continue to apply. Favorites are shared with the tray in both directions.
+- Favorites and recent launches are saved locally and excluded from library exports.
+  Tray support and native menu appearance depend on your desktop; without a tray host,
+  continue using the main window.
+
+### Start at login (new in 0.5.9)
+
+- In Settings, enable **Start AppForge at login** to launch it when you log in to
+  your Linux desktop. Optionally enable **Start minimized to the system tray**;
+  this also enables background mode. Ordinary launches still open the window.
+- Without tray support, AppForge opens visibly. Startup self-update prompts wait
+  until you open the hidden window. A duplicate login launch leaves an existing
+  instance alone; an ordinary second launch brings it forward.
+- Save writes AppForge's own entry under `$XDG_CONFIG_HOME/autostart/appforge.desktop`
+  (normally `~/.config/autostart/appforge.desktop`). Disabling startup removes that
+  entry. Files not managed by AppForge are preserved, and save errors are shown.
+- Keep the AppImage at its saved location. If you move it, open it once from its
+  new location to refresh the startup entry. Source installations point to their
+  current Python environment and source folder, which must remain available.
+- Settings scrolls on smaller screens while Save and Cancel stay visible.
+
 ### Library and launcher
 - **Add apps from anywhere**: by file picker or by dragging `.AppImage` files onto the window. Files are never
   moved or copied. To add a plain executable or script, choose *All files* in the file picker.
@@ -206,8 +255,8 @@ See the [0.5.8 release notes](releases/RELEASE_NOTES_v0.5.8.md) and the
   verified, the old build is kept as a backup, and it is swapped in atomically.
 - **Single instance**: starting AppForge while it is already running just brings the existing window forward.
 - **Pin to taskbar**: AppForge writes its own launcher so the desktop can offer "Pin to Task Manager".
-- **Settings** (gear icon to the right of **Add Application**): automatic checks and interval, notifications, tray behaviour, and an
-  optional GitHub token to raise the API rate limit.
+- **Settings** (gear icon to the right of **Add Application**): automatic checks and interval, notifications, tray behaviour,
+  login startup and an optional GitHub token to raise the API rate limit.
 
 ## Install
 
@@ -308,7 +357,8 @@ The script creates a build virtualenv, runs PyInstaller (bundling Python and Qt)
 | Icon or name not detected | Some AppImages use unsupported compression or the Type 1 format; the file name is used instead. The reason is shown in the Add dialog. |
 | `Couldn't reach ...` / rate limit | Check your connection. For GitHub, add a token in Settings (or set `GITHUB_TOKEN`) to raise the limit. |
 | Self-hosted source says "not found" | Check the URL and that the repository has public releases. The server must run Forgejo, Gitea or GitLab and be reachable over `https://`. |
-| No notifications | Enable them in Settings. Without the tray option AppForge uses `notify-send` (`sudo pacman -S libnotify`). They only appear for updates found by background checks while the window isn't in front. |
+| Plasma minimize-to-tray still uses the taskbar | Exit the old AppForge instance from the tray before launching a rebuilt AppImage. Tray mode must be enabled. Check `~/.local/share/appforge/appforge.log` for `KWin minimize observer active for AppForge` or a KWin/D-Bus error. |
+| No notifications | Enable them in Settings. Without the tray option AppForge uses `notify-send` (`sudo pacman -S libnotify`). Background availability checks and update completion notify while the window isn't in front. |
 | *Checksum mismatch* during an update | The download was discarded and your app is untouched. Retry; if it persists, the release's published checksum is wrong. |
 | App missing from the application menu | Use the card menu, *Add to application menu*. The entry is hidden while the file is missing or not executable. Some desktops need a minute (or `kbuildsycoca6`) to notice new launchers. |
 
@@ -320,4 +370,4 @@ The script creates a build virtualenv, runs PyInstaller (bundling Python and Qt)
 - Updates for standalone executables work when a release publishes the **raw binary**; releases that only ship
   `.tar.gz`, `.zip`, `.deb` or `.rpm` show "no matching file".
 - Only checksums are verified, not GPG or minisign signatures.
-- AppForge does not yet start automatically at login.
+- Login startup requires a desktop that supports XDG autostart; it starts after login, not before it.

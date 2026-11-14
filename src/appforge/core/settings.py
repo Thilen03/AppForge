@@ -80,16 +80,37 @@ class AppSettings:
     def run_in_background(self, value: bool) -> None:
         self._set_bool(KEY_BACKGROUND, bool(value))
 
+    @property
+    def start_at_login(self) -> bool:
+        return self._bool("start_at_login", False)
+
+    @start_at_login.setter
+    def start_at_login(self, value: bool) -> None:
+        self._set_bool("start_at_login", bool(value))
+
+    @property
+    def start_minimized(self) -> bool:
+        return self._bool("start_minimized", False)
+
+    @start_minimized.setter
+    def start_minimized(self, value: bool) -> None:
+        self._set_bool("start_minimized", bool(value))
+
     # -- GitHub token -------------------------------------------------------------------
     @property
     def github_token(self) -> str:
         """The token saved in AppForge ('' if none). See :meth:`effective_github_token`."""
         return (self.db.get_setting(KEY_TOKEN) or "").strip()
 
-    def set_github_token(self, token: str | None) -> None:
+    @staticmethod
+    def validate_github_token(token: str | None) -> str:
         token = (token or "").strip()
         if any(c.isspace() or ord(c) < 33 or ord(c) > 126 for c in token):
             raise ValueError("A GitHub token contains only visible ASCII characters, without spaces.")
+        return token
+
+    def set_github_token(self, token: str | None) -> None:
+        token = self.validate_github_token(token)
         self.db.set_setting(KEY_TOKEN, token)
         if token:                      # the token is stored in clear text: at least keep the file private
             try:

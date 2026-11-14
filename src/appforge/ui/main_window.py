@@ -8,7 +8,7 @@ import time
 from pathlib import Path
 
 from PySide6.QtCore import QEvent, QRunnable, QSettings, QSize, QThreadPool, QTimer, QUrl, Qt
-from PySide6.QtGui import QDesktopServices, QGuiApplication
+from PySide6.QtGui import QDesktopServices, QGuiApplication, QWindow
 from PySide6.QtWidgets import (
     QApplication, QFileDialog, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QMainWindow,
     QMessageBox, QProgressDialog, QPushButton, QScrollArea, QStackedWidget, QToolButton, QVBoxLayout,
@@ -23,6 +23,7 @@ from ..core.organize import (
 )
 from ..core.selfupdate import appimage_path, install_blocker
 from ..core.settings import AppSettings
+from ..core.tray import TrayShortcuts
 from ..core.updates.assets import is_appimage_name
 from ..core.updates.installer import InstallCancelled, InstallResult
 from ..core.updates.service import UpdateService, can_update
@@ -37,6 +38,7 @@ from . import theme
 from .popups import RoundedComboBox
 from .settings_dialog import SettingsDialog
 from .tray import TrayController, tray_available
+from .kwin_tray import KWinTrayBridge, plasma_wayland
 from .workers import CheckJob, InstallJob, SelfInstallJob, SelfUpdateJob
 
 log = logging.getLogger(__name__)
@@ -83,18 +85,36 @@ class MainWindow(QMainWindow):
         self._client = github_client
         self._live = auto_check
         self._quitting = False
+        self._kwin_bridge = None
+        self._tray_window_handle = None
+        self._tray_minimize_timer = QTimer(self)
+        self._tray_minimize_timer.setSingleShot(True)
+        self._tray_minimize_timer.setInterval(0)
+        self._tray_minimize_timer.timeout.connect(self._minimize_to_tray)
         self.restart_requested = False   # set by the self-update: app.main() relaunches after quitting
         self._self_offer_open = False
+        self._pending_self_update = None
         self._self_install: SelfInstallJob | None = None
         self._self_progress: QProgressDialog | None = None
         self._tray_check = False
         self._tray_hint_shown = False
+        self.shortcuts = TrayShortcuts(service.db)
+        self._issue_notified = set()
         self.tray: TrayController | None = None
-        if tray_icon is not None and tray_available():
-            self.tray = TrayController(tray_icon, self)
-            self.tray.showRequested.connect(self.bring_to_front)
-            self.tray.checkRequested.connect(self._check_from_tray)
-            self.tray.quitRequested.connect(self.quit_app)
+        try:
+            if tray_icon is not None and tray_available():
+                self.tray = TrayController(tray_icon, self)
+                self.tray.showRequested.connect(self.bring_to_front)
+                self.tray.settingsRequested.connect(self._settings_from_tray)
+                self.tray.checkRequested.connect(self._check_from_tray)
+                self.tray.updateAllRequested.connect(self._update_from_tray)
+                self.tray.launchRequested.connect(self._launch_from_tray)
+                self.tray.favoriteRequested.connect(self._favorite_from_tray)
+                self.tray.refreshRequested.connect(self._refresh_tray_shortcuts)
+                self.tray.quitRequested.connect(self.quit_app)
+        except Exception:
+            log.warning("System tray unavailable", exc_info=True)
+            self.tray = None
         self.setWindowTitle(f"{APP_DISPLAY_NAME} {__version__}")
         self.setAcceptDrops(True)
         self.resize(1040, 700)
@@ -118,6 +138,7 @@ class MainWindow(QMainWindow):
         self.reload()
         QGuiApplication.instance().applicationStateChanged.connect(self._on_app_state)
         self.apply_settings()
+        QApplication.instance().aboutToQuit.connect(self._stop_kwin_bridge)
         if auto_check:
             QTimer.singleShot(1500, self._check_self_update)
             if self.settings.auto_check:
@@ -153,6 +174,11 @@ class MainWindow(QMainWindow):
 
     def changeEvent(self, ev):
         super().changeEvent(ev)
+        if ev.type() == QEvent.WindowStateChange:
+            if self.isMinimized():
+                self._tray_minimize_timer.start()
+            else:
+                self._tray_minimize_timer.stop()
         if ev.type() in (QEvent.PaletteChange, QEvent.StyleChange) and hasattr(self, "settings_btn"):
             self._refresh_gear()
 
@@ -271,7 +297,9 @@ class MainWindow(QMainWindow):
 
     # -- cards --------------------------------------------------------------------------
     def _make_card(self, entry: AppEntry) -> AppCard:
-        card = AppCard(entry, file_state(entry), self._busy.get(entry.id), self.grid_host)
+        card = AppCard(entry, file_state(entry), self._busy.get(entry.id), self.grid_host,
+                       favorite=entry.id in self.shortcuts.favorites)
+        card.favoriteRequested.connect(self._favorite_from_tray)
         card.detailsRequested.connect(self.show_details)
         card.launchRequested.connect(self.launch)
         card.editRequested.connect(self.edit_application)
@@ -325,6 +353,7 @@ class MainWindow(QMainWindow):
             self._refresh_card(app_id)
 
         self._refresh_details()
+        self._refresh_tray()
 
     def _refresh_details(self):
         for dialog in list(self._details.values()):
@@ -361,6 +390,9 @@ class MainWindow(QMainWindow):
     # -- data ---------------------------------------------------------------------------
     def reload(self):
         apps = sort_entries(self.service.list_applications(), self.sort_cb.currentData() or SORT_NAME)
+        favorites = set(self.shortcuts.favorites)
+        # Stable partition preserves the selected sort within each group.
+        apps.sort(key=lambda entry: entry.id not in favorites)
         self._refresh_categories(apps)
         for c in self._cards:
             self.flow.removeWidget(c)
@@ -420,6 +452,66 @@ class MainWindow(QMainWindow):
         self.update_all_btn.style().polish(self.update_all_btn)
         self.update_all_btn.setToolTip("" if ready else
                                        "No updates available. Link a GitHub repository to an app to enable updates.")
+
+        self._refresh_tray()
+
+    def _tray_call(self, method, *args):
+        if self.tray is None:
+            return
+        try:
+            getattr(self.tray, method)(*args)
+        except Exception:
+            log.warning("System tray failed; returning to the library", exc_info=True)
+            try:
+                self.tray.set_visible(False)
+            except Exception:
+                pass
+            self.tray = None
+            self._stop_kwin_bridge()
+            QApplication.instance().setQuitOnLastWindowClosed(True)
+            self.showNormal()
+
+    def _refresh_tray(self):
+        if self.tray is None:
+            return
+        apps = self.service.list_applications()
+        count = sum(e.update_status is UpdateStatus.UPDATE_AVAILABLE for e in apps)
+        ready = sum(can_update(e) and e.id not in self._busy and file_state(e) is FileState.OK
+                    for e in apps)
+        installs = [(i, status) for i, status in self._busy.items()
+                    if status[0] != "Checking for updates…"]
+        checking = any(t == "Checking for updates…" for t, _ in self._busy.values())
+        activity = "Checking for updates…" if checking else "Idle"
+        if installs:
+            i, (text, _) = next(((i, s) for i, s in installs if s[0] != "Waiting…"), installs[0])
+            entry = next((e for e in apps if e.id == i), None)
+            activity = f"{entry.name if entry else 'Application'}: {text}"
+            if self._batch:
+                activity = f"{self._batch['done']}/{self._batch['total']} completed — {activity}"
+        self._tray_call("set_status", count, ready, checking, activity,
+                        bool(installs) or self._batch is not None)
+
+    def _refresh_tray_shortcuts(self):
+        self._refresh_tray()
+        self._tray_call("set_applications", self.service.list_applications(),
+                        self.shortcuts.favorites, self.shortcuts.recent, self._busy)
+
+    def _favorite_from_tray(self, app_id, enabled):
+        if self.service.get(app_id):
+            self.shortcuts.set_favorite(app_id, enabled)
+            self.reload()
+
+    def _settings_from_tray(self):
+        self.bring_to_front()
+        self.open_settings()
+
+    def _update_from_tray(self):
+        self.bring_to_front()
+        self.update_all()
+
+    def _launch_from_tray(self, app_id):
+        if app_id not in self._busy:
+            self.launch(app_id)
 
     def _apply_filter(self):
         shown = 0
@@ -489,6 +581,9 @@ class MainWindow(QMainWindow):
 
     def _offer_self_update(self, found):
         """Startup popup. "Later" just closes it: the check runs at every start, so it asks again next time."""
+        if not self.isVisible() and self.tray is not None and self.tray.visible:
+            self._pending_self_update = found
+            return
         if self._self_offer_open or self._self_install is not None:
             return
         self._self_offer_open = True
@@ -594,22 +689,46 @@ class MainWindow(QMainWindow):
             for e in pending:                       # they can see the cards: don't also pop up
                 self.updates.mark_notified(e.id)
             return
-        if pending and self.settings.notifications:
-            self._notify(*summarize_updates(pending))
+        if not self.settings.notifications:
+            return
+        apps = [e for e in self.service.list_applications() if e.github_repo]
+        failures = [(e.id, (e.metadata.get("update") or {}).get("message", "Check failed"))
+                    for e in apps if e.update_status is UpdateStatus.FAILED]
+        fresh_failures = [issue for issue in failures if issue not in self._issue_notified]
+        self._issue_notified.update(failures)
+        if pending:
+            title, body = summarize_updates(pending)
+            if failures:
+                body += f"\nCould not check {len(failures)} application(s); open the library for details."
+            self._notify(title, body)
             for e in pending:
                 self.updates.mark_notified(e.id)
-        elif from_tray and not pending:
-            self._notify("AppForge", "Everything is up to date.")
+        elif fresh_failures:
+            self._notify("Update checks failed",
+                         f"Could not check {len(failures)} application(s). Open the library for details.")
+        elif from_tray and not failures:
+            # Already announced versions need no repeated balloon; failed or
+            # unavailable sources must never produce an all-up-to-date claim.
+            if any(e.update_status is UpdateStatus.UPDATE_AVAILABLE for e in apps):
+                return
+            incomplete = any(e.update_status is not UpdateStatus.UP_TO_DATE for e in apps)
+            self._notify("AppForge", "Some update sources need attention. Open the library for details."
+                         if incomplete else "Everything is up to date." if apps else "No update sources configured.")
 
     def _notify(self, title: str, body: str):
+        if not self.settings.notifications:
+            return
         if self.tray is not None and self.tray.visible:
-            self.tray.message(title, body)
-        else:
-            self.check_pool.start(_FnJob(send_desktop_notification, title, body))
+            self._tray_call("message", title, body)
+            if self.tray is not None:
+                return
+        self.check_pool.start(_FnJob(send_desktop_notification, title, body))
 
     def _check_from_tray(self):
         self._tray_check = True
         self.check_updates()
+        if not any(t == "Checking for updates…" for t, _ in self._busy.values()):
+            self._after_checks(False)
 
     def bring_to_front(self):
         """Show the window whatever state it is in: hidden in the tray, minimized, or behind others.
@@ -617,6 +736,7 @@ class MainWindow(QMainWindow):
         Used by the tray icon and when a second AppForge is started (that one exits and asks this
         instance to come forward instead of opening a duplicate).
         """
+        self._tray_minimize_timer.stop()
         modal = QApplication.activeModalWidget()
         if self.isMinimized() or not self.isVisible():
             self.setWindowState(self.windowState() & ~Qt.WindowMinimized)
@@ -632,16 +752,73 @@ class MainWindow(QMainWindow):
         else:
             self.reload()
 
+        if self._pending_self_update is not None:
+            found, self._pending_self_update = self._pending_self_update, None
+            QTimer.singleShot(0, lambda: self._offer_self_update(found))
+
     show_from_tray = bring_to_front
+
+    def show_initial(self, autostart=False):
+        if (autostart and self.settings.start_at_login and self.settings.start_minimized
+                and self.settings.run_in_background and self.tray is not None and self.tray.visible):
+            self.hide()
+        else:
+            self.show()
+
+    def showEvent(self, ev):
+        super().showEvent(ev)
+        handle = self.windowHandle()
+        if handle is not None and handle is not self._tray_window_handle:
+            self._tray_window_handle = handle
+            handle.windowStateChanged.connect(self._native_window_state_changed)
+            handle.visibilityChanged.connect(self._native_window_visibility_changed)
+
+    def _native_window_state_changed(self, state):
+        if state & Qt.WindowMinimized:
+            self._tray_minimize_timer.start()
+        else:
+            self._tray_minimize_timer.stop()
+
+    def _native_window_visibility_changed(self, visibility):
+        if visibility == QWindow.Minimized:
+            self._tray_minimize_timer.start()
+        else:
+            self._tray_minimize_timer.stop()
+
+    def _minimize_to_tray(self):
+        handle = self.windowHandle()
+        native_minimized = handle is not None and (
+            bool(handle.windowState() & Qt.WindowMinimized) or handle.visibility() == QWindow.Minimized)
+        if self.isMinimized() or native_minimized:
+            self._hide_to_tray()
 
     def apply_settings(self):
         """Apply preferences that affect the running window (tray icon, quit behaviour)."""
         background = bool(self.tray is not None and self.settings.run_in_background)
         if self.tray is not None:
-            self.tray.set_visible(background)
+            self._tray_call("set_visible", background)
+            background = background and self.tray is not None
         app = QApplication.instance()
         if app is not None:
             app.setQuitOnLastWindowClosed(not background)
+        if background and self._kwin_bridge is None and plasma_wayland(QGuiApplication.platformName()):
+            try:
+                self._kwin_bridge = KWinTrayBridge(self)
+                self._kwin_bridge.minimized.connect(self._hide_to_tray)
+                self._kwin_bridge.failed.connect(self._kwin_bridge_failed)
+            except Exception as exc:
+                log.warning("Could not initialize KWin tray integration", exc_info=True)
+                self._kwin_bridge_failed(str(exc))
+        if self._kwin_bridge is not None:
+            self._kwin_bridge.set_enabled(background)
+
+    def _kwin_bridge_failed(self, message):
+        self.statusBar().showMessage(
+            "KDE minimize-to-tray is unavailable. Closing still hides to the tray. " + message, 15000)
+
+    def _stop_kwin_bridge(self):
+        if self._kwin_bridge is not None:
+            self._kwin_bridge.set_enabled(False)
 
     def open_settings(self):
         dlg = SettingsDialog(self.settings, self.tray is not None, self)
@@ -732,6 +909,8 @@ class MainWindow(QMainWindow):
         self._refresh_header()
 
     def update_all(self):
+        if self._batch is not None:
+            return
         ready, skipped = [], []
         for c in self._cards:
             e = c.entry
@@ -794,22 +973,34 @@ class MainWindow(QMainWindow):
             self.updates.apply_install_failure(app_id, str(result))
         self._set_busy(app_id, None, rebuild=True)
 
-        if self._batch and app_id in self._batch["ids"]:
+        in_batch = bool(self._batch and app_id in self._batch["ids"])
+        if in_batch:
             self._batch["done"] += 1
             if ok:
                 self._batch["ok"].append(name)
             elif not cancelled:
                 self._batch["failed"].append((name, str(result)))
+            self._refresh_tray()
             if self._batch["done"] >= self._batch["total"]:
                 b, self._batch = self._batch, None
                 self._refresh_header()
                 self._show_batch_summary(b)
-        elif not ok and not cancelled:
+        elif not ok and not cancelled and (self.isVisible() and self.isActiveWindow()):
             QMessageBox.warning(self, f"Couldn't update {name}",
                                 f"{result}\n\nYour existing version was not changed.")
 
+        if not in_batch and not cancelled and not (self.isVisible() and self.isActiveWindow()):
+            self._notify("Application updated" if ok else "Application update failed",
+                         msg if ok else f"{name}: {result}. Open the library for details.")
+
     def _show_batch_summary(self, b: dict):
         self.statusBar().showMessage(f"Updated {len(b['ok'])} of {b['total']} applications", 6000)
+        if not (self.isVisible() and self.isActiveWindow()):
+            self._notify("AppForge updates finished",
+                         f"{len(b['ok'])} updated, {len(b['failed'])} failed, "
+                         f"{b['total'] - len(b['ok']) - len(b['failed'])} cancelled. "
+                         "Open the library for details.")
+            return
         if b["failed"]:
             box = QMessageBox(QMessageBox.Warning, "Some updates failed",
                               f"{len(b['ok'])} updated, {len(b['failed'])} failed. "
@@ -926,10 +1117,12 @@ class MainWindow(QMainWindow):
                 self.reload()
             self._launch_failed(entry.id, str(exc), exc.state)
             return
+        self.shortcuts.launched(app_id)
         self.statusBar().showMessage(f"Launching {entry.name}…", 3000)
         QTimer.singleShot(2500, lambda: self._check_started(entry.name, handle))
 
     def _launch_failed(self, app_id: str, message: str, state):
+        self.bring_to_front()
         if state is FileState.NOT_EXECUTABLE:
             if QMessageBox.question(self, "Not executable", message + "\n\nMake it executable and launch?") \
                     == QMessageBox.Yes:
@@ -944,6 +1137,7 @@ class MainWindow(QMainWindow):
     def _check_started(self, name: str, handle: launcher.LaunchHandle):
         code = handle.early_exit_code()
         if code not in (None, 0):
+            self.bring_to_front()
             tail = handle.log_tail()
             box = QMessageBox(QMessageBox.Warning, "Application closed unexpectedly",
                               f"“{name}” exited right after starting (exit code {code}).", parent=self)
@@ -1050,16 +1244,30 @@ class MainWindow(QMainWindow):
             ev.acceptProposedAction()
             QTimer.singleShot(0, lambda: self.add_application(files[0]))
 
+    def _hide_to_tray(self):
+        if (self._quitting or self.tray is None or not self.tray.visible
+                or not self.settings.run_in_background):
+            return False
+        QSettings().setValue("geometry", self.saveGeometry())
+        self._tray_minimize_timer.stop()
+        self.hide()
+        # Explicitly unmap the platform window too: its minimized/visible state
+        # can lead the QWidget state during compositor-driven minimization.
+        handle = self.windowHandle()
+        if handle is not None:
+            handle.hide()
+        self.setWindowState(self.windowState() & ~Qt.WindowMinimized)
+        if handle is not None:
+            handle.setWindowState(handle.windowState() & ~Qt.WindowMinimized)
+        if not self._tray_hint_shown and self.settings.notifications:
+            self._tray_hint_shown = True
+            self._tray_call("message", "AppForge is still running",
+                            "It keeps checking for updates. Use the tray icon to open or quit it.")
+        return True
+
     def closeEvent(self, ev):
-        if (not self._quitting and self.tray is not None and self.tray.visible
-                and self.settings.run_in_background):
-            QSettings().setValue("geometry", self.saveGeometry())
+        if self._hide_to_tray():
             ev.ignore()
-            self.hide()
-            if not self._tray_hint_shown:
-                self._tray_hint_shown = True
-                self.tray.message("AppForge is still running",
-                                  "It keeps checking for updates. Use the tray icon to open or quit it.")
             return
         installing = [j for j in self._jobs.values() if isinstance(j, InstallJob)]
         if installing:
@@ -1074,4 +1282,5 @@ class MainWindow(QMainWindow):
         QSettings().setValue("geometry", self.saveGeometry())
         for dialog in list(self._details.values()) + list(self._release_notes.values()):
             dialog.close()
+        self._stop_kwin_bridge()
         super().closeEvent(ev)
