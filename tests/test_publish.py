@@ -166,6 +166,10 @@ def record(publisher, monkeypatch):
                         commit if args == ('rev-parse', 'HEAD') else
                         'tree' if args == ('rev-parse', 'HEAD^{tree}') else '')
     monkeypatch.setattr(publisher, 'names', lambda *args: [])
+    monkeypatch.setattr(publisher, 'identity', lambda: None)
+    monkeypatch.setattr(publisher, 'remote_release', lambda tag: False)
+    monkeypatch.setattr(publisher, 'run', lambda args, **kwargs:
+                        subprocess.CompletedProcess(args, 0, b'', b''))
     log = publisher.root / 'dist/tests.log'
     log.write_text('Passing controlled build tests and artifact selftest fixture')
     evidence = {'passed': True, 'exit_code': 0, 'log': log.name, 'sha256': pub.sha256(log)}
@@ -216,15 +220,14 @@ def test_existing_tag_never_moved(publisher, monkeypatch):
         publisher.remote_release('v1.0.0')
 
 
-def test_release_pushes_only_after_manual_approval_and_stops_without_provenance(publisher, monkeypatch):
-    calls = []
-    monkeypatch.setattr(publisher, 'confirm', lambda *args: calls.append('tested'))
-    monkeypatch.setattr(publisher, 'push', lambda: calls.append('push'))
+def test_manual_build_dry_run_does_not_require_missing_provenance(publisher, monkeypatch, capsys):
     configure_asset(publisher)
-    monkeypatch.setattr(publisher, 'run', lambda *args: pytest.fail('No GitHub call allowed'))
-    with pytest.raises(pub.Stop, match='Cannot confirm'):
-        publisher.release()
-    assert calls == ['tested', 'push']
+    publisher.dry_run = True
+    monkeypatch.setattr(publisher, 'push', lambda: None)
+    monkeypatch.setattr(publisher, 'run', lambda *a, **k: pytest.fail('Offline preview used network'))
+    monkeypatch.setattr(publisher, 'confirm', lambda *a: pytest.fail('Offline preview asked approval'))
+    publisher.release()
+    assert 'local release checks passed' in capsys.readouterr().out
 
 
 def test_secret_detection_does_not_print_secret(publisher):
@@ -260,13 +263,17 @@ def test_confirmed_push_uses_only_cached_removal_and_explicit_ref(publisher, mon
     assert ('rm', '--cached', '--', 'build/output') in calls
     assert ('add', '--', 'README.md') in calls
     assert ('commit', '-m', 'Describe the public changes') in calls
+    assert publisher.remote_tip == 'head'
     assert ('-c', 'push.followTags=false', 'push', '--no-force', '--no-follow-tags',
             'origin', 'HEAD:refs/heads/main') in calls
     assert not any('--force' in call or '--hard' in call for call in calls)
 
 
-def test_confirmed_release_uploads_only_asset_to_exact_commit(publisher, monkeypatch):
-    asset, _, _ = record(publisher, monkeypatch)
+@pytest.mark.parametrize('with_record', [False, True])
+def test_confirmed_release_uploads_only_asset_to_exact_commit(publisher, monkeypatch, with_record):
+    asset, sidecar, _ = record(publisher, monkeypatch)
+    if not with_record:
+        sidecar.unlink()  # isolated fixture: ordinary manually built AppImage
     calls = []
     monkeypatch.setattr(publisher, 'push', lambda: calls.append(['source-push']))
     monkeypatch.setattr(publisher, 'confirm', lambda *args: None)
@@ -286,7 +293,8 @@ def test_confirmed_release_uploads_only_asset_to_exact_commit(publisher, monkeyp
                       '--title', 'AppForge 0.10.0', '--notes-file',
                       str(publisher.root / 'releases/RELEASE_NOTES_v0.10.0.md'),
                       '--target', 'a' * 40]
-    assert calls[0] == ['source-push']
+    assert calls[0] == ['gh', 'auth', 'status']
+    assert calls[1] == ['source-push']
     assert not any('--clobber' in call for call in calls)
 
 
@@ -302,7 +310,7 @@ def test_no_release_when_confirmation_declined(publisher, monkeypatch):
     monkeypatch.setattr(publisher, 'confirm', reject)
     with pytest.raises(pub.Stop, match='Cancelled'):
         publisher.release()
-    assert calls == []
+    assert calls == [['gh', 'auth', 'status']]
 
 
 def test_readonly_metadata_is_reported_without_write_probe(publisher, monkeypatch):
@@ -384,17 +392,19 @@ def test_wrong_notes_heading_and_symlink_stop(publisher):
         publisher.release_notes('0.10.0')
 
 
-def test_manual_approval_binds_exact_version_and_hash(publisher, monkeypatch):
+def test_manual_approval_binds_exact_version_and_hash(publisher, monkeypatch, capsys):
     asset, _, _ = record(publisher, monkeypatch)
     words = []
     def confirm(word, description):
         words.append(word)
         raise pub.Stop('Stopped after presenting testing prompt')
     monkeypatch.setattr(publisher, 'confirm', confirm)
-    monkeypatch.setattr(publisher, 'push', lambda: pytest.fail('User has not approved'))
+    monkeypatch.setattr(publisher, 'push', lambda: None)
     with pytest.raises(pub.Stop, match='testing prompt'):
         publisher.release()
-    assert words == ['TESTED 0.10.0 ' + pub.sha256(asset)]
+    assert words == ['RELEASE']
+    output = capsys.readouterr().out
+    assert asset.name in output and pub.sha256(asset) in output
 
 
 def test_notes_change_during_push_invalidates_approval(publisher, monkeypatch):
@@ -403,7 +413,9 @@ def test_notes_change_during_push_invalidates_approval(publisher, monkeypatch):
     path = publisher.root / 'releases/RELEASE_NOTES_v0.10.0.md'
     monkeypatch.setattr(publisher, 'push', lambda: path.write_text(
         '# AppForge 0.10.0\n\nChanged after approval\n'))
-    monkeypatch.setattr(publisher, 'run', lambda *args: pytest.fail('No upload allowed'))
+    calls = []
+    monkeypatch.setattr(publisher, 'run', lambda args, **kw:
+        calls.append(args) or subprocess.CompletedProcess(args, 0, b'', b''))
     with pytest.raises(pub.Stop, match='notes changed'):
         publisher.release()
 
@@ -415,4 +427,58 @@ def test_release_dry_run_never_assumes_manual_approval(publisher, monkeypatch, c
     monkeypatch.setattr(publisher, 'confirm', lambda *args: pytest.fail('Dry run prompted'))
     monkeypatch.setattr(publisher, 'run', lambda *args: pytest.fail('Dry run used GitHub'))
     publisher.release()
-    assert 'none assumed' in capsys.readouterr().out
+    assert 'No publishing or testing approval assumed' in capsys.readouterr().out
+
+
+def test_authentication_failure_occurs_before_any_confirmation_or_push(publisher, monkeypatch):
+    asset, sidecar, _ = record(publisher, monkeypatch)
+    sidecar.unlink()
+    monkeypatch.setattr(publisher, 'confirm', lambda *a: pytest.fail('Must check authentication first'))
+    monkeypatch.setattr(publisher, 'push', lambda: pytest.fail('Must check authentication first'))
+    def fail_auth(args, **kwargs):
+        raise pub.Stop('GitHub authentication failed')
+    monkeypatch.setattr(publisher, 'run', fail_auth)
+    with pytest.raises(pub.Stop, match='authentication failed'):
+        publisher.release()
+
+
+def test_supplied_invalid_provenance_is_not_ignored(publisher, monkeypatch):
+    asset, sidecar, data = record(publisher, monkeypatch)
+    sidecar.write_text(json.dumps({**data, 'sha256': 'wrong'}))
+    monkeypatch.setattr(publisher, 'confirm', lambda *a: pytest.fail('Invalid record needs fixing first'))
+    monkeypatch.setattr(publisher, 'push', lambda: pytest.fail('Invalid record needs fixing first'))
+    with pytest.raises(pub.Stop, match='hash does not match'):
+        publisher.release()
+
+
+def test_release_conflict_checked_before_source_push_and_approval(publisher, monkeypatch):
+    asset, sidecar, data = record(publisher, monkeypatch)
+    sidecar.unlink()
+    def conflict(tag):
+        raise pub.Stop('Release already exists')
+    monkeypatch.setattr(publisher, 'remote_release', conflict)
+    monkeypatch.setattr(publisher, 'push', lambda: pytest.fail('Conflict should stop first'))
+    monkeypatch.setattr(publisher, 'confirm', lambda *a: pytest.fail('Conflict should stop first'))
+    with pytest.raises(pub.Stop, match='already exists'):
+        publisher.release()
+
+
+def test_mutation_after_release_confirmation_prevents_upload(publisher, monkeypatch):
+    asset, sidecar, _ = record(publisher, monkeypatch)
+    sidecar.unlink()
+    monkeypatch.setattr(publisher, 'push', lambda: None)
+    monkeypatch.setattr(publisher, 'remote_unchanged', lambda: None)
+    monkeypatch.setattr(publisher, 'confirm', lambda *a: asset.write_bytes(b'changed after approval'))
+    calls = []
+    monkeypatch.setattr(publisher, 'run', lambda args, **kw:
+        calls.append(args) or subprocess.CompletedProcess(args, 0, b'', b''))
+    with pytest.raises(pub.Stop, match='Approval is invalid'):
+        publisher.release()
+    assert calls == [['gh', 'auth', 'status']]
+
+
+def test_source_advance_from_successful_push_is_expected(publisher, monkeypatch):
+    # Source push advances origin; release must use the updated expected tip.
+    monkeypatch.setattr(publisher, 'git', lambda *args: 'new-commit\trefs/heads/main')
+    publisher.remote_tip = 'new-commit'
+    publisher.remote_unchanged()  # no false divergence error for our own push

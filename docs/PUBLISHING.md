@@ -13,7 +13,7 @@ that is why publishing is performed from the user's terminal.
 ```
 
 A dry run is offline and read-only. It does not stage, fetch, commit, push or call
-GitHub. Release preview still requires valid local build/test evidence. It cannot
+GitHub. Release preview validates the asset/version/notes locally. It cannot
 confirm remote availability or the absence of an existing release/tag.
 
 The public roots are `.gitignore`, `src/`, `docs/`, `packaging/`, `scripts/`,
@@ -27,7 +27,7 @@ complete secret detector: inspect the full proposed diff before approving.
 
 `push` fetches the configured main branch without tags and stops if its tip changed,
 is ahead, or diverged. It never pulls, merges, rebases, forces, or rewrites history.
-It checks outgoing commits as well as the new snapshot. Excluded tracked paths,
+It checks outgoing commits as well as the new snapshot. Excluded tracked paths
 are removed from the index with
 `git rm --cached`; local files remain untouched and previous commits retain them.
 Conflicting staged changes cause a stop rather than a forced removal.
@@ -53,17 +53,30 @@ Codex reports the previous/new versions, files changed, documented features/fixe
 notes location, automated test results and remaining build/manual-testing work.
 Automated tests are not a claim that you manually tested the AppImage.
 
-## Release evidence and approval
+## Publish your manually tested AppImage
 
-`release` first selects the highest-version AppImage and checks its matching public
-notes. It prints the notes and requires you to type `TESTED <version> <sha256>` to
-confirm you personally tested and approve that exact binary. This terminal prompt
-is distinct from automated test evidence; a dry run never assumes approval.
-The script then runs the approved source push. It can publish source successfully
-and then stop on a provenance or later release check. To avoid a stale build, push the source, build and
-test that exact committed version, then run `release` with no further source edits.
-The second source workflow still asks for confirmation, even if no new commit is
-needed. Existing release files are never deleted or overwritten by the publisher.
+Run `./scripts/publish.sh release` after building and testing the prepared version.
+The script checks the AppImage/version/notes, GitHub authentication and existing
+release/tag conflicts, then performs the normal source push workflow. Approve its
+source changes with PUSH as usual. Source publication can succeed while a later
+release check fails; the script reports these as separate operations.
+
+After those checks, it displays the selected asset, SHA-256, source commit and
+release notes. Type only `RELEASE` to confirm you built this AppImage from the
+prepared release source, manually tested this exact file and approve publishing
+it with those notes. You do not need to type a version or long hash. Declining
+stops the upload. A dry run never assumes you built or tested the file.
+
+Ordinary manual builds do not require a provenance JSON file or automated-test
+logs. The build script does not generate them. Your explicit confirmation supplies
+manual build/test approval; it is not automatic verification of build provenance.
+The publisher never creates evidence or pretends automated tests passed.
+
+The binary and notes are rechecked before upload. Authentication failures and
+existing-release conflicts are reported before approval. Upload progress is
+visible; a successful verified upload prints the GitHub Release URL. Source
+publication may already have succeeded if a later step fails. Existing local
+release files are never deleted or overwritten by the publisher.
 
 The selected asset is the highest SemVer file matching
 `dist/AppForge-<version>-x86_64.AppImage`. Numeric version ordering is used;
@@ -71,7 +84,10 @@ prereleases sort below their stable version. Build metadata does not affect orde
 equal-precedence candidates stop as ambiguous. Unversioned and other-architecture
 files are not selected. Both project version declarations must match the asset.
 
-A controlled build/test process must produce a sidecar named
+## Optional automated build evidence
+
+If you use a controlled build/test process that produces evidence, it may supply
+a sidecar named
 `<asset>.provenance.json` beside the AppImage, for example
 `dist/AppForge-0.5.5-x86_64.AppImage.provenance.json`, with this schema:
 
@@ -105,14 +121,17 @@ source without local public changes. `tests` represents successful relevant test
 Python source. Record actual command exit codes and output from the build/test
 process. Do not hand-create a passing record for an old, unverified binary.
 
-This publisher verifies local evidence consistency; it is not a signed CI
-attestation verifier and cannot establish the honesty of an arbitrarily fabricated
-record. It intentionally does not manufacture evidence, run tests, or rebuild
-assets during publication. Existing builds without evidence stop safely and need
-a controlled rebuild/test step before they can be released.
+A supplied sidecar must pass all consistency checks; malformed or stale evidence
+is never silently ignored. If it refers to an earlier source commit, use your
+controlled build/test process again after publishing source changes. A manual
+build without a sidecar uses the explicit user approval described above.
 
-After evidence checks, the script authenticates `gh` and checks remote releases
-and tags. An existing release stops the workflow; an existing tag must already
+This publisher verifies supplied local evidence consistency; it is not a signed CI
+attestation verifier. It does not manufacture records, run tests, or rebuild assets
+during publication.
+
+Before the final confirmation, the script authenticates `gh` and checks remote
+releases and tags. An existing release stops the workflow; an existing tag must already
 identify the verified source commit. A missing tag is created by GitHub at that
 exact commit during release creation. A separate `RELEASE` confirmation is required.
 Only the selected AppImage is uploaded as an asset; no logs, archives, provenance

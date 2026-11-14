@@ -110,11 +110,12 @@ class Publisher:
                                          'GIT_ALTERNATE_OBJECT_DIRECTORIES')):
             raise Stop('Remove Git metadata/index overrides from the environment first.')
 
-    def run(self, args, check=True):
-        result = subprocess.run(args, cwd=self.root, env=self.env, capture_output=True)
+    def run(self, args, check=True, stream=False):
+        output = {} if stream else {'capture_output': True}
+        result = subprocess.run(args, cwd=self.root, env=self.env, **output)
         if check and result.returncode:
             raise Stop(f'Command failed ({result.returncode}): {args[0]} {args[1]}\n'
-                       + result.stderr.decode(errors='replace'))
+                       + (result.stderr or b'').decode(errors='replace'))
         return result
 
     def git(self, *args):
@@ -249,6 +250,8 @@ class Publisher:
         self.remote_unchanged()
         self.git('-c', 'push.followTags=false', 'push', '--no-force', '--no-follow-tags',
                  'origin', 'HEAD:refs/heads/main')
+        # Release checks must compare against the commit just pushed, not its parent.
+        self.remote_tip = self.git('rev-parse', 'HEAD')
         print('Source push succeeded.')
 
     def select_release(self):
@@ -351,48 +354,75 @@ class Publisher:
         self.check_content(str(path.relative_to(self.root)), path.read_bytes())
         return path, sha256(path)
 
+    def optional_provenance(self, version, asset):
+        """Validate supplied evidence; manual user approval handles ordinary builds."""
+        record = Path(str(asset) + '.provenance.json')
+        if record.exists() or record.is_symlink():
+            return self.provenance(version, asset)
+        return None
+
+    def release_source(self):
+        if self.git('diff', '--no-ext-diff', '--no-textconv', 'HEAD', '--',
+                    *sorted(DIRECTORIES | FILES)):
+            raise Stop('Public source changed during publishing. Run push and review again.')
+        if any(allowed(name) for name in self.names('ls-files', '--others', '--exclude-standard')):
+            raise Stop('New public files appeared during publishing. Run push and review again.')
+        return self.git('rev-parse', 'HEAD')
+
     def release(self):
-        # Validate release inputs and obtain explicit manual-test approval first.
         version, asset = self.select_release()
         notes, notes_digest = self.release_notes(version)
         digest = sha256(asset)
-        print(f'Selected AppImage: {asset.name}; SHA-256 {digest}')
+        evidence = self.optional_provenance(version, asset)
+        print(f'Selected AppImage: {asset.name} ({asset.stat().st_size} bytes)', flush=True)
+        print(f'SHA-256: {digest}')
         print(f'Public release notes: {notes.relative_to(self.root)}')
-        print(notes.read_text(encoding='utf-8'))
-        if not self.dry_run:
-            self.confirm(f'TESTED {version} {digest}',
-                         'Have you personally tested this exact AppImage and approved it for release?')
+        if evidence is None:
+            print('Manual build: you will confirm that you built and tested this exact AppImage.')
         else:
-            print('DRY RUN: explicit user testing approval is still required; none assumed.')
-        # The normal source workflow has its own PUSH confirmation.
+            print('Automated build/test record verified; your manual testing approval is still required.')
+        if self.dry_run:
+            self.push()
+            print(notes.read_text(encoding='utf-8'))
+            print('DRY RUN: local release checks passed. No publishing or testing approval assumed.')
+            print('GitHub authentication, remote release/tag availability and source push are not checked offline.')
+            return
+        # Fail on authentication/existing release/tag conflicts before asking approval.
+        self.identity()
+        print('Checking GitHub authentication and release availability...', flush=True)
+        self.run(['gh', 'auth', 'status'])
+        self.remote_release('v' + version)
+        # Keep the working source-push workflow and its own explicit approval.
+        print('Reviewing and publishing approved source changes first...', flush=True)
         self.push()
+        commit = self.release_source()
         if self.select_release() != (version, asset) or sha256(asset) != digest:
-            raise Stop('AppImage changed since manual testing approval. Approval is invalid.')
+            raise Stop('AppImage changed during source publication. Review/test the selected binary again.')
         if self.release_notes(version) != (notes, notes_digest):
             raise Stop('Release notes changed during source publication. Review again.')
-        commit, verified_digest = self.provenance(version, asset)
-        if verified_digest != digest:
-            raise Stop('AppImage no longer matches the approved digest.')
-        if self.dry_run:
-            print(f'DRY RUN release candidate: {asset.name}; version {version}; sha256 {digest}')
-            print('Release/tag existence and authentication are not checked offline.')
-            return
-        self.run(['gh', 'auth', 'status'])
+        if self.optional_provenance(version, asset) != evidence:
+            raise Stop('Build/test evidence changed during source publication. Review again.')
         existing_tag = self.remote_release('v' + version)
-        print(f'Release v{version}: {asset.name}, {asset.stat().st_size} bytes, SHA-256 {digest}')
-        self.confirm('RELEASE', 'Publish this AppImage as a GitHub Release asset?')
+        print(f'Ready to publish AppForge {version} at source commit {commit}')
+        print(f'Asset: {asset.name}; SHA-256: {digest}')
+        print(notes.read_text(encoding='utf-8'))
+        self.confirm('RELEASE',
+                     'Confirm you built this AppImage from the prepared release source, personally '
+                     'tested this exact file, and approve publishing it with these notes.')
         self.remote_unchanged()
-        if (self.select_release() != (version, asset)
-                or self.provenance(version, asset) != (commit, digest)
+        if (self.release_source() != commit or self.select_release() != (version, asset)
+                or sha256(asset) != digest or self.optional_provenance(version, asset) != evidence
                 or self.release_notes(version) != (notes, notes_digest)):
-            raise Stop('Release inputs changed during review.')
+            raise Stop('Release inputs changed during review. Approval is invalid; nothing uploaded.')
         existing_tag = self.remote_release('v' + version)
         args = ['gh', 'release', 'create', 'v' + version, str(asset), '--repo', REPO,
                 '--title', 'AppForge ' + version, '--notes-file', str(notes)]
         args += ['--verify-tag'] if existing_tag else ['--target', commit]
         if semver(version)[1]:
             args.append('--prerelease')
-        self.run(args)
+        print(f'Uploading {asset.name} to GitHub Release v{version}...', flush=True)
+        self.run(args, stream=True)
+        print('Upload command completed; verifying the GitHub release...', flush=True)
         result = self.run(['gh', 'release', 'view', 'v' + version, '--repo', REPO,
                            '--json', 'url,assets,tagName,body'])
         data = json.loads(result.stdout)
