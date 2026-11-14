@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img alt="version" src="https://img.shields.io/badge/version-0.5.6-2B63D9">
+  <img alt="version" src="https://img.shields.io/badge/version-0.5.7-2B63D9">
   <img alt="platform" src="https://img.shields.io/badge/platform-Linux-informational">
   <img alt="python" src="https://img.shields.io/badge/python-3.10%2B-blue">
   <img alt="Qt" src="https://img.shields.io/badge/Qt-6%20(PySide6)-41cd52">
@@ -78,12 +78,45 @@ See the [0.5.6 release notes](releases/RELEASE_NOTES_v0.5.6.md) for this update.
   installed version, location, file size and date added, alongside update status,
   repository, last check, update channel and backup storage information.
 - Launch, check for updates, update, edit, open the installation folder, or manage
-  backups using the same actions as the library. **View release page** opens the
-  known release in your browser; an in-app release-notes viewer is planned.
+  backups using the same actions as the library. **Release notes…** opens the
+  in-app viewer; **View release page** opens the known release in your browser.
 - Details refresh after library changes and every few seconds. **Refresh** also
   rechecks the file and backups. Missing files offer **Locate file…**; files without
   execute permission offer **Make executable**. Filesystem inspection runs in the
   background and never launches an application.
+
+### Release notes (new in 0.5.7)
+
+- Choose **Release notes…** from a card menu or application details after checking
+  for updates. **Update All** also offers release notes before you approve updates.
+- Read the selected release's version, title, publication date, stable/prerelease
+  status and formatted description in a scrollable viewer. HTTP(S) links open in
+  your browser; embedded images are omitted.
+- Notes are cached with the repository and exact release tag, including across
+  restarts. **Refresh** reloads that tag through the existing GitHub, GitLab,
+  Codeberg or self-hosted Forgejo/Gitea/GitLab API in the background. Refresh errors
+  keep cached notes visible. Reading notes never starts an update.
+- Releases without descriptions show an explicit message. Older library records
+  fetch notes on first opening. If the tag is no longer among the provider's recent
+  releases, use **Open release page** or check for updates again.
+
+### Export and import library (new in 0.5.7)
+
+- In **Settings**, use **Export Library…** to save application configuration and
+  icons as versioned JSON. Application files, backups, update caches and AppForge
+  access tokens are excluded. Environment variables require an explicit opt-in.
+- **Import Library…** previews the file before registration. Choose individual
+  applications or all eligible rows; duplicate files are skipped. Conflicting IDs
+  can be imported with new IDs, and existing entries stay unchanged.
+- Missing applications retain their configuration and can be reconnected with
+  **Locate file…**. Imports restore categories, repositories, update preferences,
+  icons and optional menu preferences. Environment restoration is off by default.
+- Background file work supports cancellation. Completed imports are kept, with a
+  summary of imports, skips, duplicates, missing files and errors. Transfers apply
+  immediately, independently of saving other Settings preferences.
+
+See the [library transfer guide](docs/LIBRARY_TRANSFER.md) for conflicts, limits and
+what is included.
 
 ### Library and launcher
 - **Add apps from anywhere**: by file picker or by dragging `.AppImage` files onto the window. Files are never

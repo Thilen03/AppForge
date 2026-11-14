@@ -100,6 +100,7 @@ class MainWindow(QMainWindow):
         self.resize(1040, 700)
         self.setMinimumSize(620, 420)
         self._details = {}
+        self._release_notes = {}
         self._cards: list[AppCard] = []
         self._busy: dict[str, tuple[str, float | None]] = {}
         self._jobs: dict[str, object] = {}
@@ -279,6 +280,7 @@ class MainWindow(QMainWindow):
         card.updateRequested.connect(self.start_update)
         card.checkRequested.connect(lambda i: self.check_updates([i], user_initiated=True))
         card.releasePageRequested.connect(self.open_release_page)
+        card.releaseNotesRequested.connect(self.show_release_notes)
         card.chooseAssetRequested.connect(self.choose_asset)
         card.backupsRequested.connect(self.show_backups)
         card.desktopToggleRequested.connect(self.toggle_desktop_entry)
@@ -324,6 +326,8 @@ class MainWindow(QMainWindow):
     def _refresh_details(self):
         for dialog in list(self._details.values()):
             dialog.refresh()
+        for dialog in list(self._release_notes.values()):
+            dialog.sync()
 
     def show_details(self, app_id: str):
         if not self.service.get(app_id):
@@ -345,7 +349,7 @@ class MainWindow(QMainWindow):
             "launch": self.launch, "check": lambda i: self.check_updates([i], user_initiated=True),
             "update": self.start_update, "folder": self.show_in_file_manager,
             "edit": self.edit_application, "backups": self.show_backups,
-            "release": self.open_release_page, "locate": self.locate_file,
+            "release": self.open_release_page, "notes": self.show_release_notes, "locate": self.locate_file,
             "executable": self.make_executable,
         }
         actions[action](app_id)
@@ -638,9 +642,18 @@ class MainWindow(QMainWindow):
 
     def open_settings(self):
         dlg = SettingsDialog(self.settings, self.tray is not None, self)
+        dlg.exportRequested.connect(lambda: self.open_library_transfer("export", dlg))
+        dlg.importRequested.connect(lambda: self.open_library_transfer("import", dlg))
         if dlg.exec() == SettingsDialog.Accepted:
             self.apply_settings()
             self.statusBar().showMessage("Settings saved", 3000)
+
+    def open_library_transfer(self, mode, parent=None):
+        from .library_transfer_dialog import LibraryTransferDialog
+        dialog = LibraryTransferDialog(self.service, mode, parent or self)
+        dialog.libraryChanged.connect(self.reload)
+        dialog.exec()
+        self.reload()
 
     def quit_app(self):
         """Really quit (the window's close button only hides it while background running is on)."""
@@ -650,6 +663,22 @@ class MainWindow(QMainWindow):
         else:
             self._quitting = False
             self.restart_requested = False
+
+    def show_release_notes(self, app_id: str):
+        if not self.service.get(app_id):
+            return
+        if app_id not in self._release_notes:
+            from .release_notes_dialog import ReleaseNotesDialog
+            dialog = ReleaseNotesDialog(self.service, app_id, self._client,
+                                        self.settings.effective_github_token(), self)
+            dialog.finished.connect(lambda _: self._release_notes.pop(app_id, None))
+            dialog.finished.connect(dialog.deleteLater)
+            self._release_notes[app_id] = dialog
+        dialog = self._release_notes[app_id]
+        dialog.sync()
+        dialog.show()
+        dialog.raise_()
+        dialog.activateWindow()
 
     def open_release_page(self, app_id: str):
         entry = self.service.get(app_id)
@@ -718,8 +747,13 @@ class MainWindow(QMainWindow):
                           f"{'s' if len(ready) != 1 else ''}?", parent=self)
         box.setInformativeText(lines + "\n\nThe current version of each app is kept as a backup next to its file.")
         go = box.addButton("Update", QMessageBox.AcceptRole)
+        notes_btn = box.addButton("Release notes…", QMessageBox.ActionRole)
         box.addButton("Cancel", QMessageBox.RejectRole)
-        box.exec()
+        while True:
+            box.exec()
+            if box.clickedButton() is not notes_btn:
+                break
+            self._show_batch_notes(ready)
         if box.clickedButton() is not go:
             return
         self._batch = {"total": len(ready), "done": 0, "ok": [], "failed": [], "ids": {e.id for e in ready}}
@@ -727,6 +761,14 @@ class MainWindow(QMainWindow):
         for e in ready:
             self.start_update(e.id, from_batch=True)
         self._refresh_header()
+
+    def _show_batch_notes(self, entries):
+        choices = [f"{e.name} — {e.latest_version} ({i + 1})" for i, e in enumerate(entries)]
+        selected, ok = QInputDialog.getItem(self, "Release notes", "Application:", choices, 0, False)
+        if ok:
+            entry = entries[choices.index(selected)]
+            self.show_release_notes(entry.id)
+            self._release_notes[entry.id].exec()
 
     def _on_install_progress(self, app_id: str, done: int, total: int):
         if total:
@@ -1020,6 +1062,6 @@ class MainWindow(QMainWindow):
                 j.cancel.set()
             self.install_pool.waitForDone(8000)
         QSettings().setValue("geometry", self.saveGeometry())
-        for dialog in list(self._details.values()):
+        for dialog in list(self._details.values()) + list(self._release_notes.values()):
             dialog.close()
         super().closeEvent(ev)

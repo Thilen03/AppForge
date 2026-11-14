@@ -10,6 +10,7 @@ from .assets import choose_asset
 from .github import GitHubError
 from .providers import client_for, parse_source
 from .version import compare, display_version
+from .notes import release_notes
 
 
 @dataclass
@@ -25,6 +26,7 @@ class CheckOutcome:
     release_assets: list[dict] = field(default_factory=list)   # every asset of the chosen release
     checked_at: float = field(default_factory=time.time)
     prereleases_only: bool = False
+    notes: dict | None = None
 
 
 def check_for_update(*, repo_url: str, installed_version: str | None, current_filename: str,
@@ -67,11 +69,12 @@ def check_for_update(*, repo_url: str, installed_version: str | None, current_fi
                             release_url=newest.html_url if newest else None,
                             tag=newest.tag if newest else None,
                             release_assets=[a.to_dict() for a in (newest.assets if newest else [])],
-                            prereleases_only=prereleases_only)
+                            prereleases_only=prereleases_only,
+                            notes=release_notes(ref.url, newest) if newest else None)
 
     rel, choice = chosen
     latest = display_version(rel.tag)
-    base = dict(latest_version=latest, tag=rel.tag, release_url=rel.html_url,
+    base = dict(notes=release_notes(ref.url, rel), latest_version=latest, tag=rel.tag, release_url=rel.html_url,
                 asset=choice.asset.to_dict(), ambiguous=choice.ambiguous,
                 candidates=[a.to_dict() for a in choice.candidates],
                 release_assets=[a.to_dict() for a in rel.assets])

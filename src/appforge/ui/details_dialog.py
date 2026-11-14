@@ -96,7 +96,7 @@ class DetailsDialog(QDialog):
         for actions in (
             (("launch", "Launch"), ("check", "Check for updates"), ("update", "Update")),
             (("folder", "Open folder"), ("edit", "Edit application…"), ("backups", "Backups & rollback…")),
-            (("release", "View release page"), ("locate", "Locate file…"), ("executable", "Make executable")),
+            (("notes", "Release notes…"), ("release", "View release page"), ("locate", "Locate file…"), ("executable", "Make executable")),
         ):
             row = QHBoxLayout()
             for key, title in actions:
@@ -153,6 +153,7 @@ class DetailsDialog(QDialog):
             button.setEnabled(not busy)
         self.buttons["check"].setEnabled(bool(entry.github_repo) and not busy)
         self.buttons["update"].setEnabled(can_update(entry) and not busy)
+        self.buttons["notes"].setEnabled(bool(entry.github_repo and info.get("tag")))
         self.buttons["release"].setEnabled(bool(info.get("release_url")))
         self._sync_file_buttons(entry)
         # Disable file-dependent actions until the current snapshot has been inspected.

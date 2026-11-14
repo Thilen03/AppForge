@@ -53,6 +53,7 @@ class AppCard(QFrame):
     updateRequested = Signal(str)
     checkRequested = Signal(str)
     releasePageRequested = Signal(str)
+    releaseNotesRequested = Signal(str)
     chooseAssetRequested = Signal(str)
     backupsRequested = Signal(str)
     desktopToggleRequested = Signal(str)
@@ -221,6 +222,8 @@ class AppCard(QFrame):
         if e.github_repo:
             m.addSeparator()
             m.addAction("Check for updates", lambda: self.checkRequested.emit(e.id))
+            if info.get("tag"):
+                m.addAction("Release notes…", lambda: self.releaseNotesRequested.emit(e.id))
             if info.get("release_url"):
                 m.addAction("View release page", lambda: self.releasePageRequested.emit(e.id))
             if info.get("assets"):

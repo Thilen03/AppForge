@@ -48,6 +48,7 @@ class Release:
     published_at: str | None = None
     html_url: str | None = None
     assets: list[Asset] = field(default_factory=list)
+    body: str = ""
 
 
 def user_agent() -> str:
@@ -94,7 +95,8 @@ class GitHubClient:
                   for a in r.get("assets", []) if a.get("browser_download_url")]
         return Release(tag=r.get("tag_name") or "", name=r.get("name") or "",
                        prerelease=bool(r.get("prerelease")), draft=bool(r.get("draft")),
-                       published_at=r.get("published_at"), html_url=r.get("html_url"), assets=assets)
+                       published_at=r.get("published_at"), html_url=r.get("html_url"), assets=assets,
+                       body=r.get("body") if isinstance(r.get("body"), str) else "")
 
     @staticmethod
     def _map_http_error(exc: urllib.error.HTTPError, repo: str) -> GitHubError:

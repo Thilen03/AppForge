@@ -170,7 +170,7 @@ class ForgejoClient:
             out.append(Release(tag=r.get("tag_name") or "", name=r.get("name") or "",
                                prerelease=bool(r.get("prerelease")), draft=bool(r.get("draft")),
                                published_at=r.get("published_at"), html_url=r.get("html_url"),
-                               assets=assets))
+                               assets=assets, body=r.get("body") if isinstance(r.get("body"), str) else ""))
         return out
 
 
@@ -211,7 +211,8 @@ class GitLabClient:
             web = ((r.get("_links") or {}).get("self")) or f"https://{self.host}/{owner}/{name}/-/releases/{tag}"
             out.append(Release(tag=tag, name=r.get("name") or "",
                                prerelease=bool(r.get("upcoming_release")) or bool(_PRERELEASE_TAG.search(tag)),
-                               published_at=r.get("released_at"), html_url=web, assets=assets))
+                               published_at=r.get("released_at"), html_url=web, assets=assets,
+                               body=r.get("description") if isinstance(r.get("description"), str) else ""))
         return out
 
 

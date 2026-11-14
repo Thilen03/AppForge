@@ -1,6 +1,7 @@
 """Settings dialog (Phase 5): update checks, notifications, background running, GitHub token."""
 from __future__ import annotations
 
+from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
     QCheckBox, QDialog, QHBoxLayout, QLabel, QLineEdit, QPushButton, QVBoxLayout,
 )
@@ -20,11 +21,15 @@ def _hint(text: str) -> QLabel:
 
 
 class SettingsDialog(QDialog):
+    exportRequested = Signal()
+    importRequested = Signal()
+
     def __init__(self, settings: AppSettings, tray_available: bool, parent=None):
         super().__init__(parent)
         self.settings = settings
         self.setWindowTitle("Settings")
-        self.setFixedSize(520, 560)
+        self.resize(560, 660)
+        self.setMinimumSize(520, 600)
         lay = QVBoxLayout(self)
         lay.setContentsMargins(24, 22, 24, 20)
         lay.setSpacing(8)
@@ -78,6 +83,19 @@ class SettingsDialog(QDialog):
         self.error_lbl = QLabel(objectName="error")
         self.error_lbl.setWordWrap(True)
         lay.addWidget(self.error_lbl)
+
+        lay.addWidget(_label("Library transfer"))
+        transfer = QHBoxLayout()
+        self.export_btn = QPushButton("Export Library…")
+        self.import_btn = QPushButton("Import Library…")
+        self.export_btn.clicked.connect(self.exportRequested.emit)
+        self.import_btn.clicked.connect(self.importRequested.emit)
+        transfer.addWidget(self.export_btn)
+        transfer.addWidget(self.import_btn)
+        lay.addLayout(transfer)
+        lay.addWidget(_hint("Transfer application configuration and icons as JSON. "
+                            "Application files and AppForge tokens are excluded. "
+                            "Transfers apply immediately, independently of Save."))
 
         lay.addStretch(1)
         btns = QHBoxLayout()

@@ -1,4 +1,4 @@
-# Discovering applications in AppForge 0.5.6
+# Discovering applications in AppForge 0.5.7
 
 Discovery finds portable applications already on your computer and lets you review
 and import them into your library. It does not download or install applications.

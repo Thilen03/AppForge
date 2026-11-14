@@ -94,12 +94,16 @@ DESKTOP_FLAG = "desktop_entry"                # entry.metadata key: this app has
 
 def file_state(entry: AppEntry) -> FileState:
     p = Path(entry.path)
-    if not p.exists():
+    try:
+        if not p.exists():
+            return FileState.MISSING
+        if not p.is_file():
+            return FileState.NOT_A_FILE
+        if not os.access(p, os.X_OK):
+            return FileState.NOT_EXECUTABLE
+    except OSError:
+        # Imported configurations can reference inaccessible files on another installation.
         return FileState.MISSING
-    if not p.is_file():
-        return FileState.NOT_A_FILE
-    if not os.access(p, os.X_OK):
-        return FileState.NOT_EXECUTABLE
     return FileState.OK
 
 
@@ -171,6 +175,39 @@ class LibraryService:
                 entry = self.set_desktop_integration(entry.id, True)
             except LibraryError as exc:
                 log.warning("Added %s but couldn't create its launcher: %s", entry.name, exc)
+        return entry
+
+    def import_configuration(self, prepared) -> AppEntry:
+        """Register validated configuration without inspecting/executing its application file.
+
+        Files and icons are prepared by a worker; SQLite stays on its owning thread.
+        This supports missing files and never overwrites an existing record.
+        """
+        from .library_transfer import TransferError, entry_from_record
+        entry = entry_from_record(prepared.record)
+        if self.find_by_path(entry.path):
+            raise TransferError("Duplicate file — already registered.")
+        if self.db.get(entry.id):
+            raise TransferError("Application ID is already in use; load the export again.")
+        if frozenset((e.id, e.path) for e in self.list_applications()) != prepared.existing_keys:
+            raise TransferError("The library changed while this row was being prepared; load the export again.")
+        if prepared.icon_path:
+            icon = Path(prepared.icon_path)
+            if (icon.parent != self.icons_dir or
+                    not icon.name.startswith(entry.id + "-import-") or icon.suffix.lower() not in ICON_EXTS):
+                raise TransferError("Invalid prepared icon location.")
+            entry.icon_path = str(icon)
+        else:
+            entry.metadata.pop("custom_icon", None)
+        try:
+            self.db.add(entry)
+        except DuplicatePathError as exc:
+            raise TransferError("The file or application ID was registered during import.") from exc
+        if self.desktop_enabled(entry):
+            try:
+                self.desktop.write_entry(entry)
+            except Exception as exc:  # a launcher failure must not lose an imported configuration
+                prepared.warnings.append(f"{entry.name}: launcher could not be created ({exc}).")
         return entry
 
     def update_application(

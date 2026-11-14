@@ -1,6 +1,6 @@
 [project]
 name = "appforge"
-version = "0.5.6"
+version = "0.5.7"
 description = "A library and launcher for AppImages and other standalone Linux applications"
 requires-python = ">=3.10"
 dependencies = ["PySide6-Essentials>=6.6", "PySquashfsImage>=0.9", "zstandard>=0.22", "certifi>=2023.7"]
