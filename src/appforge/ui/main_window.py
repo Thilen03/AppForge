@@ -168,6 +168,9 @@ class MainWindow(QMainWindow):
         self.check_btn.setCursor(Qt.PointingHandCursor)
         self.check_btn.clicked.connect(lambda: self.check_updates(user_initiated=True))
         sub.addWidget(self.check_btn)
+        self.discover_btn = QPushButton("Discover apps…", objectName="ghost")
+        self.discover_btn.clicked.connect(self.discover_applications)
+        sub.addWidget(self.discover_btn)
         sub.addStretch(1)
         titles.addLayout(sub)
         header.addLayout(titles)
@@ -760,6 +763,13 @@ class MainWindow(QMainWindow):
             else f"Removed {entry.name} from the application menu", 4000)
 
     # -- other actions ------------------------------------------------------------------
+    def discover_applications(self):
+        from .discovery_dialog import DiscoveryDialog
+        dialog = DiscoveryDialog(self.service, self)
+        dialog.exec()
+        self.reload()
+        dialog.deleteLater()
+
     def add_application(self, initial_path: str | None = None):
         dlg = AddApplicationDialog(self.service, self, initial_path if isinstance(initial_path, str) else None)
         if dlg.exec() == AddApplicationDialog.Accepted and dlg.added:

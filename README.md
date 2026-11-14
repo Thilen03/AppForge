@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img alt="version" src="https://img.shields.io/badge/version-0.5.4-2B63D9">
+  <img alt="version" src="https://img.shields.io/badge/version-0.5.5-2B63D9">
   <img alt="platform" src="https://img.shields.io/badge/platform-Linux-informational">
   <img alt="python" src="https://img.shields.io/badge/python-3.10%2B-blue">
   <img alt="Qt" src="https://img.shields.io/badge/Qt-6%20(PySide6)-41cd52">
@@ -48,6 +48,27 @@ Built with **Python**, **PySide6 (Qt 6)** and **SQLite**. Developed on CachyOS /
 runs on any recent Linux desktop.
 
 ## Features
+
+### Application discovery (new in 0.5.5)
+
+See the [0.5.5 release notes](releases/RELEASE_NOTES_v0.5.5.md) and the
+[discovery guide](docs/DISCOVERY.md) for the full workflow and limitations.
+
+- Click **Discover apps…** beside the update-check control to scan `~/Applications`, `~/Downloads`,
+  `/opt`, or folders you add. Remove any folder you do not want scanned; choices are saved.
+- Scans run in a background worker with progress and cancellation. The preview shows application
+  name, icon when available, version, format, file location and registration status.
+- Check individual results, use **Select all** / **Select none**, then **Import selected**, or use
+  **Import all eligible**. A confirmation is required before anything is registered.
+- **Ignore selected** remembers unwanted file paths across scans and restarts. **Reset ignored files**
+  makes them eligible again. Registered and ignored results remain visible but cannot be imported.
+- Discovery reads files without running or changing them. It skips all symlinks (including folder
+  aliases), hidden `.<name>.backups` directories, and non-executable ELF binaries/scripts. AppImages
+  can be discovered without an executable bit; the existing **Make executable** action remains available.
+- Overlapping folders and hard links are deduplicated. Imports recheck file identity and reject
+  changed, missing or already-registered files. Desktop-menu integration is optional.
+- Cancelling a scan retains any results found so far. Closing during a scan requests cancellation and
+  waits for the current metadata read to finish. Bulk imports can be stopped between applications.
 
 ### Library and launcher
 - **Add apps from anywhere**: by file picker or by dragging `.AppImage` files onto the window. Files are never
@@ -148,7 +169,7 @@ On Arch/CachyOS you may need Qt's xcb helper library (normally already present w
 
 ## Quick start
 
-1. Click **Add Application** (or drag an AppImage onto the window) and review the detected name, version and icon.
+1. Use **Discover apps…** to find and review applications in selected folders, or click **Add Application** (or drag an AppImage onto the window) and review the detected name, version and icon.
    For a plain binary or script, pick it with the *All files* filter.
 2. Optionally paste an **update source**, such as `https://github.com/owner/repo` or
    `https://git.example.dev/owner/repo`.
@@ -221,6 +242,8 @@ The script creates a build virtualenv, runs PyInstaller (bundling Python and Qt)
 ## Current limitations
 
 - Linux only.
+- Discovery is user-initiated; it does not monitor folders continuously. Symlink paths are excluded.
+- Discovery cancellation takes effect between file reads. Very large individual AppImages can delay it.
 - Updates for standalone executables work when a release publishes the **raw binary**; releases that only ship
   `.tar.gz`, `.zip`, `.deb` or `.rpm` show "no matching file".
 - Only checksums are verified, not GPG or minisign signatures.

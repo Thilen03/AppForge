@@ -87,3 +87,26 @@ class SelfInstallJob(QRunnable):
         except Exception as exc:  # noqa: BLE001 - never let a worker die silently
             result = InstallError(f"Unexpected error: {exc}")
         self.signals.done.emit(result)
+
+
+class DiscoverySignals(QObject):
+    progress = Signal(int, str)
+    done = Signal(object)
+
+
+class DiscoveryJob(QRunnable):
+    """A read-only scan; receives plain snapshots, never the live SQLite connection."""
+
+    def __init__(self, roots, registered, ignored):
+        super().__init__()
+        self.signals = DiscoverySignals()
+        self.cancel = threading.Event()
+        self.args = roots, registered, ignored
+
+    def run(self):
+        from ..core.discovery import ScanResult, scan
+        try:
+            result = scan(*self.args, cancel=self.cancel, progress=self.signals.progress.emit)
+        except Exception as exc:  # keep cancellation/closure working even for unexpected errors
+            result = ScanResult(errors=[f"Discovery failed: {exc}"])
+        self.signals.done.emit(result)
