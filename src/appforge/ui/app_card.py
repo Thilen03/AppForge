@@ -42,6 +42,7 @@ class _DotsButton(QToolButton):
 
 
 class AppCard(QFrame):
+    detailsRequested = Signal(str)
     launchRequested = Signal(str)
     editRequested = Signal(str)
     removeRequested = Signal(str)
@@ -77,6 +78,8 @@ class AppCard(QFrame):
         msg = info.get("message") or ""
         if not e.github_repo:
             return "No update source", "muted", "Add a repository URL as update source in Edit to enable updates."
+        if e.update_status is UpdateStatus.UNAVAILABLE and info.get("prereleases_only"):
+            return "Pre-releases available", "muted", msg
         return {
             UpdateStatus.UP_TO_DATE: ("Up to date", "ok", ""),
             UpdateStatus.UPDATE_AVAILABLE: ("Update available", "update", msg),
@@ -213,6 +216,7 @@ class AppCard(QFrame):
         info = e.metadata.get("update") or {}
         m = RoundedMenu(self)
         m.setToolTipsVisible(True)
+        m.addAction("Details…", lambda: self.detailsRequested.emit(e.id))
         m.addAction("Edit information…", lambda: self.editRequested.emit(e.id))
         if e.github_repo:
             m.addSeparator()

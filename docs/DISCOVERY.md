@@ -1,4 +1,4 @@
-# Discovering applications in AppForge 0.5.5
+# Discovering applications in AppForge 0.5.6
 
 Discovery finds portable applications already on your computer and lets you review
 and import them into your library. It does not download or install applications.
@@ -8,7 +8,8 @@ and import them into your library. It does not download or install applications.
 1. Click **Discover apps…** beside **Check for updates** in the library window.
 2. Review the scan folders. The defaults are `~/Applications`, `~/Downloads`, and
    `/opt`. Use **Add folder…**, **Remove folder**, or **Default folders** as needed.
-   Your chosen folders are remembered for later scans.
+   Your chosen folders are remembered for later scans. The selected folder uses a
+   compact highlight with spacing between entries in both light and dark themes.
 3. Click **Scan folders**. AppForge scans these folders and their subfolders in the
    background, reporting progress. **Cancel scan** stops between file reads and
    keeps results found so far.
@@ -52,4 +53,5 @@ visible but cannot be imported, and the ignore list survives restarts.
   finish, which may take time for large files.
 
 The discovery update uses the existing settings storage and does not require a
-library database migration. See the [0.5.5 release notes](../releases/RELEASE_NOTES_v0.5.5.md).
+library database migration. See the original [0.5.5 discovery release notes](../releases/RELEASE_NOTES_v0.5.5.md)
+and the [0.5.6 release notes](../releases/RELEASE_NOTES_v0.5.6.md) for the latest refinements.

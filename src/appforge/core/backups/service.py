@@ -237,23 +237,7 @@ class BackupService:
     def _reconcile(self, entry: AppEntry) -> list[dict]:
         """Records whose file exists, plus adopted orphans; newest first. Persists any change."""
         stored = list(entry.backup_info.get("backups", []))
-        found: list[dict] = []
-        seen: set[str] = set()
-        for rec in stored:
-            f = rec.get("file")
-            if f and os.path.abspath(f) not in seen and os.path.isfile(f):
-                seen.add(os.path.abspath(f))
-                found.append(rec)
-        target = Path(entry.path)
-        bdir = backup_dir_for(target)
-        if bdir.is_dir():
-            for p in sorted(bdir.iterdir()):
-                if (p.suffix.lower() in _BACKUP_SUFFIXES and p.is_file()
-                        and os.path.abspath(p) not in seen):
-                    seen.add(os.path.abspath(p))
-                    found.append({"file": str(p), "version": _version_from_name(p.name, _stem(target)),
-                                  "created": p.stat().st_mtime})
-        found.sort(key=lambda r: float(r.get("created") or 0), reverse=True)
+        found = scan_backup_records(entry)
         if found != stored:
             self._store(entry, found)
         return found
@@ -285,6 +269,29 @@ class BackupService:
         except OSError:
             log.warning("Could not delete backup %s", path, exc_info=True)
             return False
+
+
+def scan_backup_records(entry: AppEntry) -> list[dict]:
+    """Read backup records from disk without changing SQLite; safe for workers."""
+    stored = list(entry.backup_info.get("backups", []))
+    found: list[dict] = []
+    seen: set[str] = set()
+    for rec in stored:
+        f = rec.get("file")
+        if f and os.path.abspath(f) not in seen and os.path.isfile(f):
+            seen.add(os.path.abspath(f))
+            found.append(rec)
+    target = Path(entry.path)
+    bdir = backup_dir_for(target)
+    if bdir.is_dir():
+        for p in sorted(bdir.iterdir()):
+            if (p.suffix.lower() in _BACKUP_SUFFIXES and p.is_file()
+                    and os.path.abspath(p) not in seen):
+                seen.add(os.path.abspath(p))
+                found.append({"file": str(p), "version": _version_from_name(p.name, _stem(target)),
+                              "created": p.stat().st_mtime})
+    found.sort(key=lambda r: float(r.get("created") or 0), reverse=True)
+    return found
 
 
 __all__ = ["BackupService", "BackupRecord", "RollbackResult", "DEFAULT_KEEP", "MAX_KEEP",

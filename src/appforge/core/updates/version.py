@@ -11,6 +11,9 @@ from dataclasses import dataclass
 
 _PRE = {"dev": -5, "nightly": -5, "snapshot": -5, "alpha": -4, "a": -4, "beta": -3, "b": -3,
         "preview": -2, "pre": -2, "rc": -1, "candidate": -1}
+_NUMBERED_NIGHTLY = re.compile(r"(?:nightly|snapshot)[-_](\d+)(?:[-_][0-9a-f]{7,40})?", re.IGNORECASE)
+_LEGACY_COMMIT_BUILD = re.compile(r"(\d+)-([0-9a-f]{7,40})", re.IGNORECASE)
+
 _POST = {"post": 1, "patch": 1, "p": 1, "hotfix": 1}
 
 
@@ -27,6 +30,13 @@ class Version:
 def parse_version(text: str | None) -> Version | None:
     if not text:
         return None
+    # Numbered nightly builds are ordered by build number, never by commit hash.
+    nightly = _NUMBERED_NIGHTLY.fullmatch(text.strip())
+    if nightly:
+        return Version((int(nightly.group(1)),))
+    legacy = _LEGACY_COMMIT_BUILD.fullmatch(text.strip())
+    if legacy and re.search(r"[a-f]", legacy.group(2), re.IGNORECASE):
+        return Version((int(legacy.group(1)),))
     m = re.search(r"\d", text)
     if not m:
         return None
@@ -35,7 +45,7 @@ def parse_version(text: str | None) -> Version | None:
     nums = [int(x) for x in re.split(r"[._]", core.group(0))]
     rest = s[core.end():]
     # "-1234" / "-05-01" style numeric groups extend the version (build numbers, dates)
-    while (g := re.match(r"-(\d+(?:[._]\d+)*)(?![A-Za-z])", rest)):
+    while (g := re.match(r"-(\d+(?:[._]\d+)*)(?![A-Za-z0-9._])", rest)):
         nums += [int(x) for x in re.split(r"[._]", g.group(1))]
         rest = rest[g.end():]
     rank, rank_num = 0, 0
@@ -58,6 +68,8 @@ def compare(a: str | None, b: str | None) -> int | None:
 
 
 def display_version(tag: str) -> str:
-    """'v1.2.3' -> '1.2.3'; tags without digits are returned unchanged."""
+    """Strip ordinary tag prefixes; retain numbered nightly tags and their build identity."""
+    if _NUMBERED_NIGHTLY.fullmatch((tag or "").strip()):
+        return tag.strip()
     m = re.search(r"\d", tag or "")
     return tag[m.start():].strip() if m else (tag or "").strip()

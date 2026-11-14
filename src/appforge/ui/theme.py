@@ -120,7 +120,10 @@ def stylesheet(t: Tokens) -> str:
 
     QToolButton {{ background: transparent; border: 1px solid transparent; border-radius: 8px;
                   padding: 4px; }}
+    QToolButton#gear {{ background: {t.accent}; border: 1px solid {t.accent}; }}
     QToolButton:hover {{ background: {t.accent_soft}; }}
+    QToolButton#gear:hover {{ background: {t.accent_hover}; border-color: {t.accent_hover}; }}
+    QToolButton#gear:focus {{ border: 1px solid {t.accent}; }}
     QToolButton:focus {{ border: 1px solid {t.accent}; }}
     QToolButton::menu-indicator {{ image: none; }}
 
@@ -145,6 +148,8 @@ def stylesheet(t: Tokens) -> str:
     QListWidget {{ background: {t.surface}; border: 1px solid {t.border_strong}; border-radius: 8px; padding: 4px; }}
     QListWidget::item {{ padding: 8px 10px; border-radius: 6px; }}
     QListWidget::item:selected {{ background: {t.accent_soft}; color: {t.text}; }}
+    QListWidget#discoveryRoots {{ outline: none; }}
+    QListWidget#discoveryRoots::item {{ padding: 4px 10px; }}
 
     QLabel#iconTile {{ background: {t.bg}; border-radius: 14px; }}
     QLabel#previewTile {{ background: {t.surface}; border: 1px solid {t.border}; border-radius: 18px; }}

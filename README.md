@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img alt="version" src="https://img.shields.io/badge/version-0.5.5-2B63D9">
+  <img alt="version" src="https://img.shields.io/badge/version-0.5.6-2B63D9">
   <img alt="platform" src="https://img.shields.io/badge/platform-Linux-informational">
   <img alt="python" src="https://img.shields.io/badge/python-3.10%2B-blue">
   <img alt="Qt" src="https://img.shields.io/badge/Qt-6%20(PySide6)-41cd52">
@@ -70,6 +70,21 @@ See the [0.5.5 release notes](releases/RELEASE_NOTES_v0.5.5.md) and the
 - Cancelling a scan retains any results found so far. Closing during a scan requests cancellation and
   waits for the current metadata read to finish. Bulk imports can be stopped between applications.
 
+### Application details (new in 0.5.6)
+
+See the [0.5.6 release notes](releases/RELEASE_NOTES_v0.5.6.md) for this update.
+
+- Choose **Details…** from an application's card menu to see its description, format,
+  installed version, location, file size and date added, alongside update status,
+  repository, last check, update channel and backup storage information.
+- Launch, check for updates, update, edit, open the installation folder, or manage
+  backups using the same actions as the library. **View release page** opens the
+  known release in your browser; an in-app release-notes viewer is planned.
+- Details refresh after library changes and every few seconds. **Refresh** also
+  rechecks the file and backups. Missing files offer **Locate file…**; files without
+  execute permission offer **Make executable**. Filesystem inspection runs in the
+  background and never launches an application.
+
 ### Library and launcher
 - **Add apps from anywhere**: by file picker or by dragging `.AppImage` files onto the window. Files are never
   moved or copied. To add a plain executable or script, choose *All files* in the file picker.
@@ -94,6 +109,9 @@ See the [0.5.5 release notes](releases/RELEASE_NOTES_v0.5.5.md) and the
   choice. You can also set a file pattern per app (for example `MyApp-*-x86_64.AppImage`) and opt single apps into
   pre-releases.
 - **Understands real-world version numbers**: `v1.2.3`, `5.0-1234`, `2024-05-01`, `2.0-rc1`, and so on.
+- For nightly-only repositories, enable **Include pre-releases when checking for updates**
+  in **Edit information…**. With that option off, the card shows **Pre-releases available**
+  and explains how to opt in. Numbered nightly builds are compared by build number, not commit hash.
 - **Update** a single app or use **Update All**.
 - **Safe by design.** Downloads go to a hidden temporary file, are validated, and are checksum-verified when the
   release publishes a SHA-256 (GitHub's asset digest, `*.sha256` or `SHA256SUMS`). Only then is the new file swapped
@@ -133,7 +151,7 @@ See the [0.5.5 release notes](releases/RELEASE_NOTES_v0.5.5.md) and the
   verified, the old build is kept as a backup, and it is swapped in atomically.
 - **Single instance**: starting AppForge while it is already running just brings the existing window forward.
 - **Pin to taskbar**: AppForge writes its own launcher so the desktop can offer "Pin to Task Manager".
-- **Settings** (gear icon, bottom-right): automatic checks and interval, notifications, tray behaviour, and an
+- **Settings** (gear icon to the right of **Add Application**): automatic checks and interval, notifications, tray behaviour, and an
   optional GitHub token to raise the API rate limit.
 
 ## Install

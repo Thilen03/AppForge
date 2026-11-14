@@ -59,7 +59,7 @@ def test_self_update_later_does_nothing_and_can_be_offered_again(qapp, service, 
     win.close()
 
 
-def test_settings_is_a_blue_gear_in_the_bottom_right_corner(qapp, service):
+def test_settings_is_a_blue_gear_next_to_add_application(qapp, service):
     from PySide6.QtGui import QColor
     from PySide6.QtWidgets import QPushButton, QToolButton
     from appforge.ui import theme
@@ -70,15 +70,17 @@ def test_settings_is_a_blue_gear_in_the_bottom_right_corner(qapp, service):
     btn = win.settings_btn
     assert isinstance(btn, QToolButton) and btn.text() == "" and not btn.icon().isNull()
     assert btn.toolTip() == "Settings"
-    # lives in the status bar, right of everything else, and is no longer in the header row
-    assert btn.parent() is win.statusBar()
-    assert btn.geometry().right() >= win.statusBar().width() - 40
+    # Shares the header row, immediately to the right of Add Application.
+    assert btn.parent() is win.add_btn.parent()
+    assert btn.geometry().left() > win.add_btn.geometry().right()
+    assert btn.geometry().center().y() == win.add_btn.geometry().center().y()
+    assert btn.height() == btn.width() == win.add_btn.height()
     assert not any(w.text() == "Settings" for w in win.findChildren(QPushButton))
-    # painted in the accent blue of the primary buttons
+    # Icon matches primary-button text against the blue button background.
     img = btn.icon().pixmap(20, 20).toImage()
-    accent = QColor(theme.tokens().accent)
+    foreground = QColor(theme.tokens().accent_text)
     colours = {img.pixelColor(x, y).rgb() for x in range(20) for y in range(20)
                if img.pixelColor(x, y).alpha() == 255}
-    assert accent.rgb() in colours
+    assert foreground.rgb() in colours
     win._quitting = True
     win.close()

@@ -172,6 +172,10 @@ _ARCH_TOKENS = {
     "linux64", "appimage", "64bit", "64-bit",
 }
 _VERSION_TOKEN = re.compile(r"^v?\d+([._+\-~]?[0-9A-Za-z]+)*$")
+_NUMBERED_NIGHTLY_IN_NAME = re.compile(
+    r"(?<![A-Za-z0-9])((?:nightly|snapshot)[-_]\d+(?:[-_][0-9a-f]{7,40})?)(?=$|[-_ .])",
+    re.IGNORECASE,
+)
 _VERSION_IN_NAME = re.compile(r"(?<![A-Za-z0-9.])v?(\d+(?:\.\d+){1,3}(?:[-+~][0-9A-Za-z.]+)?)")
 
 
@@ -194,7 +198,7 @@ def suggest_name_from_filename(filename: str) -> str:
 def version_from_filename(filename: str) -> str | None:
     stem = re.sub(r"\.appimage$", "", filename, flags=re.IGNORECASE)
     stem = "".join(t for t in re.split(r"([-_ ]+)", stem) if t.lower() not in _ARCH_TOKENS)
-    m = _VERSION_IN_NAME.search(stem)
+    m = _NUMBERED_NIGHTLY_IN_NAME.search(stem) or _VERSION_IN_NAME.search(stem)
     return m.group(1) if m else None
 
 

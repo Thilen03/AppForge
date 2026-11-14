@@ -99,6 +99,7 @@ class MainWindow(QMainWindow):
         self.setAcceptDrops(True)
         self.resize(1040, 700)
         self.setMinimumSize(620, 420)
+        self._details = {}
         self._cards: list[AppCard] = []
         self._busy: dict[str, tuple[str, float | None]] = {}
         self._jobs: dict[str, object] = {}
@@ -110,7 +111,6 @@ class MainWindow(QMainWindow):
         self.install_pool.setMaxThreadCount(1)   # one download/replace at a time
         self._build()
         self.statusBar().setSizeGripEnabled(False)
-        self._build_settings_gear()
         geo = QSettings().value("geometry")
         if geo:
             self.restoreGeometry(geo)
@@ -126,21 +126,29 @@ class MainWindow(QMainWindow):
             self._timer.start(BACKGROUND_TICK_MS)
 
     def _build_settings_gear(self):
-        """Settings cog in the bottom-right corner (the status bar's permanent, right-aligned slot)."""
+        """Settings control next to Add Application, sized to match the header buttons."""
         self.settings_btn = QToolButton(objectName="gear")
         self.settings_btn.setToolTip("Settings")
         self.settings_btn.setAccessibleName("Settings")
         self.settings_btn.setCursor(Qt.PointingHandCursor)
         self.settings_btn.setAutoRaise(True)
-        self.settings_btn.setFixedSize(32, 32)
-        self.settings_btn.setIconSize(QSize(20, 20))
+        self.add_btn.ensurePolished()
+        side = self.add_btn.sizeHint().height()
+        self.settings_btn.setFixedSize(side, side)
+        self.settings_btn.setIconSize(QSize(24, 24))
+        self.add_btn.installEventFilter(self)
         self.settings_btn.clicked.connect(self.open_settings)
-        self.statusBar().addPermanentWidget(self.settings_btn)
         self._refresh_gear()
 
     def _refresh_gear(self):
-        """Same blue as the primary buttons (the theme's accent); re-tinted when the theme flips."""
-        self.settings_btn.setIcon(gear_icon(theme.tokens().accent, 20))
+        """Match the primary button text colour; re-tint when the theme flips."""
+        self.settings_btn.setIcon(gear_icon(theme.tokens().accent_text, 24))
+
+    def eventFilter(self, obj, ev):
+        if obj is getattr(self, "add_btn", None) and ev.type() == QEvent.Resize:
+            side = ev.size().height()
+            self.settings_btn.setFixedSize(side, side)
+        return super().eventFilter(obj, ev)
 
     def changeEvent(self, ev):
         super().changeEvent(ev)
@@ -187,6 +195,8 @@ class MainWindow(QMainWindow):
         self.add_btn.clicked.connect(self.add_application)
         self.add_btn.setCursor(Qt.PointingHandCursor)
         header.addWidget(self.add_btn)
+        self._build_settings_gear()
+        header.addWidget(self.settings_btn)
         root.addLayout(header)
 
         self.filter_row = QWidget()
@@ -258,6 +268,7 @@ class MainWindow(QMainWindow):
     # -- cards --------------------------------------------------------------------------
     def _make_card(self, entry: AppEntry) -> AppCard:
         card = AppCard(entry, file_state(entry), self._busy.get(entry.id), self.grid_host)
+        card.detailsRequested.connect(self.show_details)
         card.launchRequested.connect(self.launch)
         card.editRequested.connect(self.edit_application)
         card.removeRequested.connect(self.remove_application)
@@ -295,6 +306,7 @@ class MainWindow(QMainWindow):
             self._cards[self._cards.index(old)] = new
             new.setVisible(self._matches(entry))
         self._refresh_header()
+        self._refresh_details()
 
     def _set_busy(self, app_id: str, text: str | None, fraction: float | None = None, rebuild=False):
         if text is None:
@@ -306,6 +318,38 @@ class MainWindow(QMainWindow):
             card.set_busy(text, fraction)
         else:
             self._refresh_card(app_id)
+
+        self._refresh_details()
+
+    def _refresh_details(self):
+        for dialog in list(self._details.values()):
+            dialog.refresh()
+
+    def show_details(self, app_id: str):
+        if not self.service.get(app_id):
+            return
+        if app_id not in self._details:
+            from .details_dialog import DetailsDialog
+            dialog = DetailsDialog(self.service, app_id, self._busy, self)
+            dialog.actionRequested.connect(self._details_action)
+            dialog.finished.connect(lambda _: self._details.pop(app_id, None))
+            dialog.finished.connect(dialog.deleteLater)
+            self._details[app_id] = dialog
+        dialog = self._details[app_id]
+        dialog.show()
+        dialog.raise_()
+        dialog.activateWindow()
+
+    def _details_action(self, action, app_id):
+        actions = {
+            "launch": self.launch, "check": lambda i: self.check_updates([i], user_initiated=True),
+            "update": self.start_update, "folder": self.show_in_file_manager,
+            "edit": self.edit_application, "backups": self.show_backups,
+            "release": self.open_release_page, "locate": self.locate_file,
+            "executable": self.make_executable,
+        }
+        actions[action](app_id)
+        self._refresh_details()
 
     # -- data ---------------------------------------------------------------------------
     def reload(self):
@@ -331,6 +375,7 @@ class MainWindow(QMainWindow):
         self.banner.setVisible(bool(missing))
         self._refresh_header()
         self._apply_filter()
+        self._refresh_details()
 
     def _refresh_categories(self, apps: list[AppEntry]):
         """Rebuild the category list from the library, keeping the current choice if it still exists."""
@@ -975,4 +1020,6 @@ class MainWindow(QMainWindow):
                 j.cancel.set()
             self.install_pool.waitForDone(8000)
         QSettings().setValue("geometry", self.saveGeometry())
+        for dialog in list(self._details.values()):
+            dialog.close()
         super().closeEvent(ev)

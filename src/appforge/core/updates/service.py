@@ -43,7 +43,7 @@ class UpdateService:
         entry.metadata["update"] = {**prev, "message": outcome.message} if prev else {
             "message": outcome.message, "tag": outcome.tag, "release_url": outcome.release_url,
             "asset": outcome.asset, "ambiguous": outcome.ambiguous, "candidates": outcome.candidates,
-            "assets": outcome.release_assets}
+            "assets": outcome.release_assets, "prereleases_only": outcome.prereleases_only}
         return self.db.update(entry)
 
     # -- notifications (Phase 5) ---------------------------------------------------------

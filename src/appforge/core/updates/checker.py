@@ -5,6 +5,7 @@ import time
 from dataclasses import dataclass, field
 
 from ..models import UpdateStatus
+from ..formats.appimage import version_from_filename
 from .assets import choose_asset
 from .github import GitHubError
 from .providers import client_for, parse_source
@@ -23,6 +24,7 @@ class CheckOutcome:
     candidates: list[dict] = field(default_factory=list)       # AppImage candidates
     release_assets: list[dict] = field(default_factory=list)   # every asset of the chosen release
     checked_at: float = field(default_factory=time.time)
+    prereleases_only: bool = False
 
 
 def check_for_update(*, repo_url: str, installed_version: str | None, current_filename: str,
@@ -41,26 +43,31 @@ def check_for_update(*, repo_url: str, installed_version: str | None, current_fi
     except GitHubError as exc:
         return CheckOutcome(UpdateStatus.FAILED, str(exc))
 
-    candidates_seen = False
+    published = [r for r in releases if not r.draft]
+    eligible = [r for r in published if include_prereleases or not r.prerelease]
+    prereleases_only = bool(published) and not eligible
     chosen = None
-    for rel in releases:                     # GitHub lists newest first
-        if rel.draft or (rel.prerelease and not include_prereleases):
-            continue
+    for rel in eligible:                     # provider APIs list newest first
         choice = choose_asset(rel, current_filename=current_filename, app_name=app_name,
                               pattern=asset_pattern, format_id=format_id)
         if choice:
             chosen = (rel, choice)
             break
-        candidates_seen = candidates_seen or bool(rel.assets)
     if chosen is None:
-        newest = next((r for r in releases if not r.draft and (include_prereleases or not r.prerelease)), None)
+        newest = next(iter(eligible), None)
         what = "AppImage" if format_id == "appimage" else "matching Linux executable (raw binaries only)"
-        msg = (f"No {what} was found in the recent releases of this repository." if newest
-               else "This repository has no published releases.")
+        if prereleases_only:
+            newest = published[0]
+            msg = ('Only pre-releases are available. Enable "Include pre-releases when checking '
+                   'for updates" in Edit to check them.')
+        else:
+            msg = (f"No {what} was found in the recent releases of this repository." if newest
+                   else "This repository has no published releases.")
         return CheckOutcome(UpdateStatus.UNAVAILABLE, msg,
                             release_url=newest.html_url if newest else None,
                             tag=newest.tag if newest else None,
-                            release_assets=[a.to_dict() for a in (newest.assets if newest else [])])
+                            release_assets=[a.to_dict() for a in (newest.assets if newest else [])],
+                            prereleases_only=prereleases_only)
 
     rel, choice = chosen
     latest = display_version(rel.tag)
@@ -68,6 +75,9 @@ def check_for_update(*, repo_url: str, installed_version: str | None, current_fi
                 asset=choice.asset.to_dict(), ambiguous=choice.ambiguous,
                 candidates=[a.to_dict() for a in choice.candidates],
                 release_assets=[a.to_dict() for a in rel.assets])
+    # Existing records may predate numbered-nightly filename detection. Use only
+    # the known filename fallback when the installed version has not been set.
+    installed_version = installed_version or version_from_filename(current_filename)
     if not installed_version:
         return CheckOutcome(UpdateStatus.UNAVAILABLE,
                             "The installed version is unknown. Set it in Edit to enable update checks.", **base)
