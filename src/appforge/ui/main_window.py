@@ -170,16 +170,19 @@ class MainWindow(QMainWindow):
         titles.setSpacing(2)
         titles.addWidget(QLabel("Library", objectName="title"))
         sub = QHBoxLayout()
-        sub.setSpacing(2)
+        sub.setSpacing(header.spacing())
         self.count_lbl = QLabel(objectName="subtitle")
         sub.addWidget(self.count_lbl)
-        self.check_btn = QPushButton("Check for updates", objectName="ghost")
+        self.check_btn = QPushButton("Check for updates", objectName="primary")
         self.check_btn.setCursor(Qt.PointingHandCursor)
         self.check_btn.clicked.connect(lambda: self.check_updates(user_initiated=True))
         sub.addWidget(self.check_btn)
-        self.discover_btn = QPushButton("Discover apps…", objectName="ghost")
+        self.discover_btn = QPushButton("Discover apps…", objectName="primary")
         self.discover_btn.clicked.connect(self.discover_applications)
         sub.addWidget(self.discover_btn)
+        self.storage_btn = QPushButton("Storage…", objectName="primary")
+        self.storage_btn.clicked.connect(self.show_storage)
+        sub.addWidget(self.storage_btn)
         sub.addStretch(1)
         titles.addLayout(sub)
         header.addLayout(titles)
@@ -850,6 +853,13 @@ class MainWindow(QMainWindow):
             else f"Removed {entry.name} from the application menu", 4000)
 
     # -- other actions ------------------------------------------------------------------
+    def show_storage(self):
+        from .storage_dialog import StorageDialog
+        dialog = StorageDialog(self.service, self.updates.backups, self._busy, self)
+        dialog.exec()
+        self.reload()
+        dialog.deleteLater()
+
     def discover_applications(self):
         from .discovery_dialog import DiscoveryDialog
         dialog = DiscoveryDialog(self.service, self)

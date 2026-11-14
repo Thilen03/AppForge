@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img alt="version" src="https://img.shields.io/badge/version-0.5.7-2B63D9">
+  <img alt="version" src="https://img.shields.io/badge/version-0.5.8-2B63D9">
   <img alt="platform" src="https://img.shields.io/badge/platform-Linux-informational">
   <img alt="python" src="https://img.shields.io/badge/python-3.10%2B-blue">
   <img alt="Qt" src="https://img.shields.io/badge/Qt-6%20(PySide6)-41cd52">
@@ -117,6 +117,28 @@ See the [0.5.6 release notes](releases/RELEASE_NOTES_v0.5.6.md) for this update.
 
 See the [library transfer guide](docs/LIBRARY_TRANSFER.md) for conflicts, limits and
 what is included.
+
+### Storage manager (new in 0.5.8)
+
+- Open **Storage…** from the library for a modern donut-style pie chart of application
+  files and saved backups, storage totals, app/backup counts and the biggest consumers.
+- Sort the application table by current file size, backup size or combined usage.
+  Filter to apps with backups, then select an app to review backup versions, dates
+  and sizes. Column headers also support sorting.
+- Select individual backups or **Select older than retention**, review estimated
+  savings, then confirm **Delete selected…**. Your retention setting stays unchanged;
+  unlimited retention selects no old backups automatically.
+- Measurement and cleanup run in background workers with progress and **Stop**.
+  **Refresh** rechecks disk usage. Missing files and inaccessible folders produce
+  notices and incomplete totals rather than blocking the library.
+- Only regular files in the selected app's expected backup directory are eligible.
+  Symlinks and installed application files are protected; changed backups require
+  a new preview. Shared hard links count toward logical sizes but show zero estimated
+  savings until they have a single link. Sizes cover registered executable files and
+  managed backups, rather than whole application data folders or filesystem capacity.
+
+See the [0.5.8 release notes](releases/RELEASE_NOTES_v0.5.8.md) and the
+[storage guide](docs/STORAGE.md) for safety and measurement details.
 
 ### Library and launcher
 - **Add apps from anywhere**: by file picker or by dragging `.AppImage` files onto the window. Files are never

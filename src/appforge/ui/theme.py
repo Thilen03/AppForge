@@ -151,6 +151,14 @@ def stylesheet(t: Tokens) -> str:
     QListWidget#discoveryRoots {{ outline: none; }}
     QListWidget#discoveryRoots::item {{ padding: 4px 10px; }}
 
+    QTreeWidget {{ background: {t.surface}; alternate-background-color: {t.surface_hover};
+                   border: 1px solid {t.border}; border-radius: 10px; outline: none; }}
+    QTreeWidget::item {{ padding: 7px 8px; border: none; }}
+    QTreeWidget::item:selected {{ background: {t.accent_soft}; color: {t.text}; }}
+    QHeaderView::section {{ background: {t.surface_hover}; color: {t.muted};
+                            border: none; border-bottom: 1px solid {t.border};
+                            padding: 8px; font-size: 11px; font-weight: 600; }}
+
     QLabel#iconTile {{ background: {t.bg}; border-radius: 14px; }}
     QLabel#previewTile {{ background: {t.surface}; border: 1px solid {t.border}; border-radius: 18px; }}
 

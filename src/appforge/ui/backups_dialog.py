@@ -111,7 +111,11 @@ class BackupsDialog(QDialog):
         fresh = self.backups.library.get(self.entry.id)
         if fresh:
             self.entry = fresh
-        records = self.backups.list_backups(self.entry.id)
+        try:
+            records = self.backups.list_backups(self.entry.id)
+        except LibraryError as exc:
+            records = []
+            self._say(str(exc))
         v = self.entry.installed_version
         self.sub.setText(f"{self.entry.name}  ·  installed: {v if v else 'unknown version'}")
         self.list.clear()
@@ -190,7 +194,11 @@ class BackupsDialog(QDialog):
 
     def _apply_retention(self):
         keep = self.keep.value()
-        doomed = self.backups.excess(self.entry.id, keep)
+        try:
+            doomed = self.backups.excess(self.entry.id, keep)
+        except LibraryError as exc:
+            self._say(str(exc))
+            return
         if doomed:
             box = QMessageBox(QMessageBox.Question, "Delete older backups",
                               f"This deletes {len(doomed)} older backup{'s' if len(doomed) != 1 else ''} "

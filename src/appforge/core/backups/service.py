@@ -18,10 +18,12 @@ import logging
 import os
 import re
 import shutil
+import stat
 import time
 from dataclasses import dataclass
 from pathlib import Path
 
+from .files import backup_directory, backup_name, delete_managed_backup
 from ..library import LibraryError, LibraryService
 from ..models import AppEntry
 from ..updates.installer import (
@@ -131,7 +133,7 @@ class BackupService:
         recs = self._reconcile(entry)                       # newest first
         removed, remaining = [], list(recs[:keep])
         for rec in recs[keep:]:
-            if self._delete_file(rec["file"]):
+            if self._delete_for_entry(entry, rec["file"]):
                 removed.append(rec["file"])
             else:
                 remaining.append(rec)                       # couldn't delete: keep tracking it
@@ -145,7 +147,7 @@ class BackupService:
         rec = next((r for r in recs if _same(r["file"], file)), None)
         if rec is None:
             raise LibraryError("That backup no longer exists.")
-        if not self._delete_file(rec["file"]):
+        if not self._delete_for_entry(entry, rec["file"]):
             raise LibraryError("Couldn't delete that backup file.")
         self._store(entry, [r for r in recs if r is not rec])
 
@@ -237,7 +239,10 @@ class BackupService:
     def _reconcile(self, entry: AppEntry) -> list[dict]:
         """Records whose file exists, plus adopted orphans; newest first. Persists any change."""
         stored = list(entry.backup_info.get("backups", []))
-        found = scan_backup_records(entry)
+        try:
+            found = scan_backup_records(entry)
+        except (OSError, ValueError) as exc:
+            raise LibraryError(f"Backup folder unavailable: {exc}") from exc
         if found != stored:
             self._store(entry, found)
         return found
@@ -258,39 +263,52 @@ class BackupService:
             out.append(BackupRecord(r["file"], r.get("version"), float(r.get("created") or 0), size))
         return out
 
-    @staticmethod
-    def _delete_file(path: str) -> bool:
-        if not is_backup_file(path):                         # never delete outside a backups folder
-            log.warning("Refusing to delete non-backup path %s", path)
-            return False
+    def _delete_for_entry(self, entry, path):
         try:
-            Path(path).unlink(missing_ok=True)
+            delete_managed_backup(entry, path,
+                                  [e.path for e in self.library.list_applications()])
             return True
-        except OSError:
-            log.warning("Could not delete backup %s", path, exc_info=True)
+        except (OSError, ValueError):
+            log.warning("Refusing or unable to delete backup %s", path, exc_info=True)
             return False
 
 
-def scan_backup_records(entry: AppEntry) -> list[dict]:
+def scan_backup_records(entry: AppEntry, cancel=None) -> list[dict]:
     """Read backup records from disk without changing SQLite; safe for workers."""
-    stored = list(entry.backup_info.get("backups", []))
-    found: list[dict] = []
-    seen: set[str] = set()
-    for rec in stored:
-        f = rec.get("file")
-        if f and os.path.abspath(f) not in seen and os.path.isfile(f):
-            seen.add(os.path.abspath(f))
-            found.append(rec)
+    stored = {}
+    for record in entry.backup_info.get("backups", []):
+        if not isinstance(record, dict) or not isinstance(record.get("file"), str):
+            continue
+        try:
+            stored[backup_name(entry, record["file"])] = record
+        except ValueError:
+            continue
+    found = []
     target = Path(entry.path)
-    bdir = backup_dir_for(target)
-    if bdir.is_dir():
-        for p in sorted(bdir.iterdir()):
-            if (p.suffix.lower() in _BACKUP_SUFFIXES and p.is_file()
-                    and os.path.abspath(p) not in seen):
-                seen.add(os.path.abspath(p))
-                found.append({"file": str(p), "version": _version_from_name(p.name, _stem(target)),
-                              "created": p.stat().st_mtime})
-    found.sort(key=lambda r: float(r.get("created") or 0), reverse=True)
+    try:
+        with backup_directory(entry) as fd:
+            for name in os.listdir(fd):
+                if cancel is not None and cancel.is_set():
+                    break
+                if Path(name).suffix.lower() not in _BACKUP_SUFFIXES:
+                    continue
+                try:
+                    info = os.stat(name, dir_fd=fd, follow_symlinks=False)
+                except FileNotFoundError:
+                    continue
+                if not stat.S_ISREG(info.st_mode):
+                    continue
+                record = stored.get(name, {})
+                try:
+                    created = float(record.get("created") or info.st_mtime)
+                except (ValueError, TypeError):
+                    created = info.st_mtime
+                found.append({"file": str(backup_dir_for(target) / name),
+                              "version": record.get("version") or _version_from_name(name, _stem(target)),
+                              "created": created})
+    except FileNotFoundError:
+        pass
+    found.sort(key=lambda r: r["created"], reverse=True)
     return found
 
 
