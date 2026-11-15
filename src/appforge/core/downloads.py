@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import os
+import hashlib
+import stat
 import ctypes
 import errno
 import shutil
@@ -15,7 +17,9 @@ from .discovery import _safe_path
 from .library import LibraryError, normalize_path
 from .updates.assets import compatible_arch, host_arch, is_appimage_name, is_executable_name
 from .updates.github import Asset, GitHubError, Release
-from .updates.installer import InstallCancelled, InstallError, download_verified
+from .updates.installer import (
+    InstallCancelled, InstallError, download_verified, find_expected_checksum, validate_for_format,
+)
 from .updates.providers import client_for, parse_source
 from .updates.version import display_version, parse_version
 from .formats.appimage import version_from_filename
@@ -113,6 +117,50 @@ def _publish_exclusive(root_fd: int, temporary: str, name: str) -> None:
     os.unlink(temporary, dir_fd=root_fd)
 
 
+def _use_existing(choice: DownloadChoice, root: Path, root_fd: int, *,
+                  cancel=None, progress=None) -> DownloadResult:
+    target = root / choice.asset.name
+    if not _safe_path(target):
+        raise InstallError("The existing application must be a regular file without symlinks.")
+    fd = os.open(choice.asset.name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=root_fd)
+    try:
+        info = os.fstat(fd)
+        if not stat.S_ISREG(info.st_mode):
+            raise InstallError("The existing application must be a regular file.")
+        signature = (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns)
+        if choice.asset.size and info.st_size != choice.asset.size:
+            raise InstallError("The existing file's size does not match the selected release. Nothing was overwritten.")
+        opened = Path(f'/proc/self/fd/{fd}')
+        validate_for_format(opened, choice.format_id)
+        expected = find_expected_checksum(choice.asset.to_dict(), [a.to_dict() for a in choice.release.assets])
+        checksum = "not available"
+        if expected:
+            algo, want = expected
+            digest = hashlib.new(algo)
+            count = 0
+            while count < info.st_size:
+                if cancel and cancel.is_set():
+                    raise InstallCancelled("File verification cancelled.")
+                chunk = os.read(fd, min(1 << 20, info.st_size - count))
+                if not chunk:
+                    break
+                digest.update(chunk)
+                count += len(chunk)
+                if progress:
+                    progress(count, info.st_size)
+            if digest.hexdigest() != want:
+                raise InstallError(f"Checksum mismatch ({algo}): the existing file does not match the selected release. "
+                                   "Nothing was overwritten.")
+            checksum = f"verified ({algo})"
+        result = DownloadResult(str(target), choice, checksum, signature)
+        validate_downloaded(result)
+        if cancel and cancel.is_set():
+            raise InstallCancelled("File verification cancelled.")
+        return result
+    finally:
+        os.close(fd)
+
+
 def download_application(choice: DownloadChoice, folder: str, *, progress=None,
                          cancel: threading.Event | None = None) -> DownloadResult:
     # Revalidate input even when invoked outside the UI.
@@ -123,8 +171,6 @@ def download_application(choice: DownloadChoice, folder: str, *, progress=None,
         raise InstallError("Choose an existing folder without symlinks or backup directories.")
     if not os.access(root, os.W_OK):
         raise InstallError("This folder is not writable. Choose another download folder.")
-    if choice.asset.size and shutil.disk_usage(root).free < choice.asset.size * 1.1:
-        raise InstallError("There isn't enough free disk space for this download.")
     if cancel and cancel.is_set():
         raise InstallCancelled("Download cancelled.")
     try:
@@ -134,7 +180,9 @@ def download_application(choice: DownloadChoice, folder: str, *, progress=None,
     temp_name = f'.appforge-{uuid.uuid4().hex}.part'
     try:
         if os.path.lexists(root / choice.asset.name):
-            raise InstallError("A file with this name already exists. Choose another folder or rename the existing file.")
+            return _use_existing(choice, root, root_fd, cancel=cancel, progress=progress)
+        if choice.asset.size and shutil.disk_usage(root).free < choice.asset.size * 1.1:
+            raise InstallError("There isn't enough free disk space for this download.")
         fd = os.open(temp_name, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600, dir_fd=root_fd)
         # A stable directory handle keeps downloads/cleanup inside the chosen directory
         # if another process renames it. Linux is the supported platform.
@@ -152,8 +200,8 @@ def download_application(choice: DownloadChoice, folder: str, *, progress=None,
             raise InstallCancelled("Download cancelled.")
         try:
             _publish_exclusive(root_fd, temp_name, choice.asset.name)
-        except FileExistsError as exc:
-            raise InstallError("A file with this name already exists; nothing was overwritten.") from exc
+        except FileExistsError:
+            return _use_existing(choice, root, root_fd, cancel=cancel, progress=progress)
         target = root / choice.asset.name
         signature = file_signature(target)
         # Renaming/linking can change ctime, but never this verified file identity.

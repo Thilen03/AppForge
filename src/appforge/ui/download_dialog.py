@@ -129,7 +129,8 @@ class DownloadApplicationDialog(QDialog):
         self.progress.hide()
         layout.addWidget(self.progress)
         note = QLabel('Existing files are never overwritten. Nothing is run. A completed download '
-                      'is kept if you cancel the final Add form.', objectName='hint')
+                      'is kept if you cancel the final Add form. If the selected file already exists, '
+                      'AppForge checks it and continues with it.', objectName='hint')
         note.setWordWrap(True)
         layout.addWidget(note)
         footer = QHBoxLayout()
@@ -228,7 +229,8 @@ class DownloadApplicationDialog(QDialog):
         self._downloading = True
         self._start(_Job(lambda cancel, progress: download_application(choice, folder, cancel=cancel,
                                                                        progress=progress)),
-                    f'Downloading {choice.asset.name}…')
+                    f'Checking {choice.asset.name}…' if os.path.lexists(Path(folder) / choice.asset.name)
+                    else f'Downloading {choice.asset.name}…')
 
     def _start(self, job, message):
         self.job = job
@@ -244,7 +246,7 @@ class DownloadApplicationDialog(QDialog):
         self.progress.setRange(0, 1000 if total else 0)
         if total:
             self.progress.setValue(min(1000, int(done * 1000 / total)))
-        self.status.setText(f'Downloading… {done / (1024 * 1024):.1f} MB'
+        self.status.setText(f'Preparing application… {done / (1024 * 1024):.1f} MB'
                             + (f' / {total / (1024 * 1024):.1f} MB' if total else ''))
 
     def _done(self, result):

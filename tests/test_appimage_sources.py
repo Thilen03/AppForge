@@ -3,6 +3,7 @@ import struct
 from pathlib import Path
 
 import pytest
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QMessageBox
 
 from test_gui import qapp  # noqa: F401
@@ -188,7 +189,7 @@ def test_discovery_sources_can_be_accepted_changed_cleared_and_validated(qapp, t
     assert not dialog._selected()
     dialog.table.cellWidget(1, 5).setText('https://codeberg.org/manual/repo')
     dialog.table.cellWidget(2, 5).clear()
-    paths = [c.path for c in dialog.candidates]
+    paths = [dialog.table.item(row, 0).data(Qt.UserRole) for row in range(dialog.table.rowCount())]
     dialog._select(True)
     monkeypatch.setattr(QMessageBox, 'question', lambda *a: QMessageBox.Yes)
     dialog.table.cellWidget(0, 5).setText('not a source')

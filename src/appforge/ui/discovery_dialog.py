@@ -21,6 +21,11 @@ from .icons import placeholder_pixmap
 from .workers import DiscoveryJob
 
 
+class _ResultItem(QTableWidgetItem):
+    def __lt__(self, other):
+        return self.text().casefold() < other.text().casefold()
+
+
 class DiscoveryDialog(QDialog):
     preferencesChanged = Signal()
 
@@ -29,6 +34,8 @@ class DiscoveryDialog(QDialog):
         self.service = service
         self.job = None
         self.candidates = []
+        self._candidate_by_path = {}
+        self._rendering = False
         self._closing = False
         self._importing = False
         self._cancel_import = False
@@ -68,6 +75,12 @@ class DiscoveryDialog(QDialog):
         for button in (self.add_folder_btn, self.remove_folder_btn, self.defaults_btn, self.scan_btn):
             row.addWidget(button)
         layout.addLayout(row)
+        self.search_edit = QLineEdit(placeholderText="Search scanned applications…")
+        self.search_edit.setAccessibleName("Search scanned applications")
+        self.search_edit.setClearButtonEnabled(True)
+        layout.addWidget(self.search_edit)
+        self.result_count = QLabel("0 applications", objectName="hint")
+        layout.addWidget(self.result_count)
         self.table = QTableWidget(0, 6)
         self.table.setHorizontalHeaderLabels(
             ["Application", "Version", "Format", "Location", "Status", "Update source (editable)"])
@@ -79,10 +92,15 @@ class DiscoveryDialog(QDialog):
         self.table.horizontalHeader().setSectionResizeMode(5, QHeaderView.Interactive)
         self.table.setColumnWidth(5, 250)
         self.table.itemChanged.connect(lambda *_: self._actions())
+        self.table.sortItems(0, Qt.AscendingOrder)
+        self.table.setSortingEnabled(True)
+        self.table.model().layoutChanged.connect(self._filter_results)
+        self.search_edit.textChanged.connect(self._filter_results)
         layout.addWidget(self.table, 1)
         choices = QHBoxLayout()
         self.select_btn = QPushButton("Select all")
         self.select_btn.clicked.connect(lambda: self._select(True))
+        self.select_btn.setToolTip("Check all eligible applications in the visible results.")
         self.clear_btn = QPushButton("Select none")
         self.clear_btn.clicked.connect(lambda: self._select(False))
         self.ignore_btn = QPushButton("Ignore selected")
@@ -165,20 +183,57 @@ class DiscoveryDialog(QDialog):
     def _eligible(self, c):
         return not c.registered and not c.ignored
 
+    def _rows(self):
+        for row in range(self.table.rowCount()):
+            item = self.table.item(row, 0)
+            if item is not None:
+                candidate = self._candidate_by_path.get(item.data(Qt.UserRole))
+                if candidate is not None:
+                    yield row, candidate
+
+    def _visible_eligible(self):
+        return [c for row, c in self._rows() if not self.table.isRowHidden(row) and self._eligible(c)]
+
     def _selected(self):
-        return [c for i, c in enumerate(self.candidates) if self._eligible(c)
-                and self.table.item(i, 0).checkState() == Qt.Checked]
+        return [c for row, c in self._rows() if not self.table.isRowHidden(row) and self._eligible(c)
+                and self.table.item(row, 0).checkState() == Qt.Checked]
+
+    def _filter_results(self, *_):
+        if self._rendering:
+            return
+        query = self.search_edit.text().strip().casefold()
+        shown = 0
+        for row in range(self.table.rowCount()):
+            text = " ".join(self.table.item(row, col).text() for col in range(self.table.columnCount())
+                            if self.table.item(row, col) is not None)
+            matches = not query or query in text.casefold()
+            self.table.setRowHidden(row, not matches)
+            shown += int(matches)
+        total = self.table.rowCount()
+        self.result_count.setText(f"Showing {shown} of {total} applications" if shown or not query
+                                  else f"No matching applications · {total} scanned")
+        self.import_all_btn.setText("Import all matching" if query else "Import all eligible")
+        self._actions()
+
+    def _source_changed(self, path, value):
+        self._source_choices[path] = value
+        for row, c in self._rows():
+            if c.path == path:
+                # The backing item follows its editor when Qt sorts the rows.
+                self.table.item(row, 5).setText(value)
+                break
+        self._filter_results()
 
     def _actions(self):
         busy = self.job is not None or self._importing
         for widget in (self.roots, self.add_folder_btn, self.remove_folder_btn, self.defaults_btn,
-                       self.scan_btn, self.table, self.select_btn, self.clear_btn,
+                       self.scan_btn, self.search_edit, self.table, self.select_btn, self.clear_btn,
                        self.reset_ignore_btn, self.desktop_cb):
             widget.setEnabled(not busy)
         selected = bool(self._selected())
         self.import_btn.setEnabled(not busy and selected)
         self.ignore_btn.setEnabled(not busy and selected)
-        self.import_all_btn.setEnabled(not busy and any(self._eligible(c) for c in self.candidates))
+        self.import_all_btn.setEnabled(not busy and bool(self._visible_eligible()))
         self.cancel_btn.setVisible(busy)
 
     def start_scan(self):
@@ -190,8 +245,10 @@ class DiscoveryDialog(QDialog):
             return
         self._save_folders()
         self.candidates = []
+        self._candidate_by_path.clear()
         self._source_choices.clear()
         self.table.setRowCount(0)
+        self._filter_results()
         self.errors.hide()
         self.progress.setRange(0, 0)
         self.progress.show()
@@ -209,6 +266,7 @@ class DiscoveryDialog(QDialog):
     def _scanned(self, result):
         self.job = None
         self.candidates = result.candidates
+        self._candidate_by_path = {c.path: c for c in self.candidates}
         self._render()
         self.progress.hide()
         state = "Scan cancelled" if result.cancelled else "Scan complete"
@@ -222,7 +280,13 @@ class DiscoveryDialog(QDialog):
             super().reject()
 
     def _render(self):
+        checked = {self.table.item(row, 0).data(Qt.UserRole) for row in range(self.table.rowCount())
+                   if self.table.item(row, 0) is not None
+                   and self.table.item(row, 0).checkState() == Qt.Checked}
+        self._rendering = True
         self.table.blockSignals(True)
+        self.table.setSortingEnabled(False)
+        self.table.clearContents()
         self.table.setRowCount(len(self.candidates))
         for row, c in enumerate(self.candidates):
             md = c.metadata
@@ -230,11 +294,12 @@ class DiscoveryDialog(QDialog):
                 "Script" if md.extra.get("executable_kind") == "script" else "ELF binary")
             status = "Already registered" if c.registered else "Ignored" if c.ignored else "New"
             for col, value in enumerate((md.name_suggestion, md.version or "Unknown", kind, c.path, status)):
-                item = QTableWidgetItem(value)
+                item = _ResultItem(value)
                 item.setToolTip("\n".join(md.warnings) if col == 0 else value)
                 if col == 0:
                     item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
-                    item.setCheckState(Qt.Unchecked)
+                    item.setData(Qt.UserRole, c.path)
+                    item.setCheckState(Qt.Checked if c.path in checked and self._eligible(c) else Qt.Unchecked)
                     pixmap = QPixmap()
                     if md.icon_data:
                         pixmap.loadFromData(md.icon_data)
@@ -254,14 +319,20 @@ class DiscoveryDialog(QDialog):
                                "Optional repository URL. Review, change or clear before importing."))
             source.setEnabled(self._eligible(c))
             source.textChanged.connect(
-                lambda value, path=c.path: self._source_choices.__setitem__(path, value))
+                lambda value, path=c.path: self._source_changed(path, value))
+            self.table.setItem(row, 5, _ResultItem(source.text()))
             self.table.setCellWidget(row, 5, source)
+        self.table.setSortingEnabled(True)
         self.table.blockSignals(False)
+        self._rendering = False
+        self._filter_results()
 
     def _select(self, checked):
-        for row, c in enumerate(self.candidates):
-            if self._eligible(c):
+        blocked = self.table.blockSignals(True)
+        for row, c in self._rows():
+            if not self.table.isRowHidden(row) and self._eligible(c):
                 self.table.item(row, 0).setCheckState(Qt.Checked if checked else Qt.Unchecked)
+        self.table.blockSignals(blocked)
         self._actions()
 
     def _ignore(self):
@@ -285,7 +356,7 @@ class DiscoveryDialog(QDialog):
     def _import(self, all_eligible):
         if self.job is not None or self._importing:
             return
-        chosen = [c for c in self.candidates if self._eligible(c)] if all_eligible else self._selected()
+        chosen = self._visible_eligible() if all_eligible else self._selected()
         if not chosen:
             return
         try:

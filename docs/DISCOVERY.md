@@ -20,7 +20,19 @@ here too. See the [download guide](DOWNLOADING.md).
 
 The scanner recognizes AppImages and executable ELF binaries and shebang scripts.
 AppImages can be discovered without an executable bit. Plain binaries and scripts
-must be executable. Application files are inspected without being launched.
+must be executable. Discovery first filters filenames: AppImages (`.AppImage`,
+case-insensitive), extensionless executables, versioned names such as `tool-1.2.3`,
+and common binary/script suffixes: `.run`, `.bin`, `.elf`, `.out`, `.sh`, `.bash`,
+`.dash`, `.zsh`, `.fish`, `.ksh`, `.csh`, `.tcsh`, `.py`, `.pyw`, `.pl`, `.rb`,
+`.lua`, `.tcl`, `.php`, `.js`, `.r`, `.x86`, `.i386`, `.i686`, `.x86_64`, `.x64`,
+`.amd64`, `.aarch64`, and `.arm64`. Contents must still identify an AppImage,
+ELF binary or shebang script; extensions alone do not qualify a file.
+Unrelated extensions such as `.extm` (ROMs), `.iso`, `.zip`, and `.so` are skipped
+before content inspection, even if marked executable. For a supported executable
+with an unusual filename, use **Add Application → Add a local file…** with **All files** instead.
+The scanner still traverses subfolders to find matching files; the progress count
+counts only files that pass the filename/permission filter. Application files are
+inspected without being launched.
 
 ## Watch folders for new apps
 
@@ -63,7 +75,20 @@ choices apply to new imports only. Missing metadata may
 appear as **Unknown**. Overlapping folders and hard links do not create repeated
 results; already-registered applications cannot be imported again.
 
-- Check individual new results, or use **Select all** and **Select none**.
+Use **Search scanned applications…** above the results to filter by application
+name, filename/location, version, format, status or update source. Search ignores
+letter case and updates as you type; use the clear button to show all results.
+The count above the table shows how many applications match.
+
+Results start sorted A–Z by **Application**, ignoring letter case. Click a column
+heading to sort its text; click again to reverse the order. Checkmarks and edited
+update sources stay attached to the correct application when sorting or searching.
+Searching also works when reviewing apps found by folder watching.
+
+- Check individual new results, or use **Select all** and **Select none** for the
+  visible results. Hidden checkmarks are retained when you change the search.
+- **Import selected**, **Ignore selected**, and **Import all matching** affect only
+  visible eligible matches while searching. Clear the search to work with all results.
 - Choose **Import selected** or **Import all eligible** and confirm before importing.
 - Choose whether to add imported applications to the desktop application menu.
 - Use **Stop importing** to stop a bulk import between applications. Applications

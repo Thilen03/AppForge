@@ -31,7 +31,7 @@ def test_scan_formats_metadata_and_read_only(tmp_path, monkeypatch):
     assert {c.path for c in result.candidates} == {str(script), str(elf)}
     assert {c.metadata.extra['executable_kind'] for c in result.candidates} == {'elf', 'script'}
     assert next(c for c in result.candidates if c.path == str(script)).metadata.version == '1.2'
-    assert updates and result.visited == 4 and not result.errors
+    assert updates and result.visited == 2 and not result.errors
     for p, original in before.items():
         assert (p.read_bytes(), p.stat().st_mode, p.stat().st_mtime_ns) == original
 
@@ -279,3 +279,200 @@ def test_main_window_discovery_entry_refreshes_library(qapp, service, tmp_path, 
     assert len(window._cards) == 1
     window.close()
     window.deleteLater()
+
+
+def test_dialog_scans_all_saved_roots_regardless_of_watch_checkboxes(qapp, tmp_path, service):
+    from appforge.ui.discovery_dialog import DiscoveryDialog
+    selected = program(tmp_path / 'applications' / 'tool')
+    other = program(tmp_path / 'emulators' / 'other-tool')
+    dlg = DiscoveryDialog(service)
+    dlg.roots.clear()
+    dlg._add_root(str(selected.parent), watched=True)
+    dlg._add_root(str(other.parent))
+    dlg.start_scan()
+    wait(qapp, lambda: dlg.job is None)
+    assert {c.path for c in dlg.candidates} == {str(selected), str(other)}
+    dlg.close()
+    dlg.deleteLater()
+
+
+def test_scan_skips_roms_and_data_before_format_reads(tmp_path, monkeypatch):
+    import appforge.core.discovery as discovery
+    app = program(tmp_path / 'emulator.AppImage')
+    for i in range(200):
+        program(tmp_path / 'roms' / f'game-{i}.extm')
+    for name in ('game.iso', 'archive.zip', 'data.txt', 'part.AppImage.part', 'library.so',
+                 'game-1.2.extm', 'game-1.2-beta.1.extm'):
+        program(tmp_path / name)
+    program(tmp_path / 'not-executable.sh', mode=0o644)
+    original = discovery.detect_format
+    inspected = []
+    def detect(path):
+        inspected.append(path)
+        return original(path)
+    monkeypatch.setattr(discovery, 'detect_format', detect)
+    result = scan([str(tmp_path)])
+    assert inspected == [app]
+    assert [c.path for c in result.candidates] == [str(app)]
+    assert result.visited == 1 and not result.errors
+
+
+@pytest.mark.parametrize('name', [
+    'tool', 'tool-1.2.3', 'tool-1.2.3-beta.1', 'tool.AppImage', 'tool.APPIMAGE',
+    'tool.run', 'tool.bin', 'tool.elf', 'tool.out', 'tool.sh', 'tool.bash',
+    'tool.py', 'tool.pl', 'tool.rb', 'tool.x86_64', 'tool.aarch64',
+])
+def test_scan_common_executable_names(tmp_path, name):
+    app = program(tmp_path / name)
+    assert [c.path for c in scan([str(tmp_path)]).candidates] == [str(app)]
+
+
+def test_matching_extension_does_not_make_data_an_application(tmp_path):
+    for name in ('fake.AppImage', 'fake.bin', 'fake.sh', 'fake'):
+        program(tmp_path / name, data=b'ROM data, not executable content')
+    assert not scan([str(tmp_path)]).candidates
+
+
+@pytest.fixture
+def results_dialog(qapp, service, tmp_path):
+    from appforge.ui.discovery_dialog import DiscoveryDialog
+    for name in ('zulu-3.0.sh', 'Bravo-1.0.sh', 'alpha-2.0.sh'):
+        program(tmp_path / name)
+    result = scan([str(tmp_path)])
+    names = {'zulu-3.0.sh': 'zulu', 'Bravo-1.0.sh': 'Bravo', 'alpha-2.0.sh': 'alpha'}
+    from pathlib import Path
+    for c in result.candidates:
+        c.metadata.name_suggestion = names[Path(c.path).name]
+    result.candidates.sort(key=lambda c: c.path, reverse=True)
+    dlg = DiscoveryDialog(service, preview=result)
+    yield dlg
+    dlg.close()
+    dlg.deleteLater()
+    qapp.processEvents()
+
+
+def visible_paths(dlg):
+    from PySide6.QtCore import Qt
+    return [dlg.table.item(row, 0).data(Qt.UserRole) for row in range(dlg.table.rowCount())
+            if not dlg.table.isRowHidden(row)]
+
+
+def result_row(dlg, path):
+    from PySide6.QtCore import Qt
+    return next(row for row in range(dlg.table.rowCount()) if dlg.table.item(row, 0).data(Qt.UserRole) == path)
+
+
+def test_results_search_fields_clear_and_no_matches(results_dialog):
+    dlg = results_dialog
+    alpha = next(c.path for c in dlg.candidates if c.metadata.name_suggestion == 'alpha')
+    for query in (' ALPHA ', 'alpha-2.0.sh', '2.0', 'script'):
+        dlg.search_edit.setText(query)
+        assert alpha in visible_paths(dlg)
+    dlg.search_edit.setText('alpha-2.0.sh')
+    assert visible_paths(dlg) == [alpha]
+    assert dlg.result_count.text() == 'Showing 1 of 3 applications'
+    dlg.search_edit.setText('nothing-matches')
+    assert not visible_paths(dlg) and 'No matching' in dlg.result_count.text()
+    assert not dlg.import_btn.isEnabled() and not dlg.import_all_btn.isEnabled()
+    dlg.search_edit.clear()
+    assert len(visible_paths(dlg)) == 3
+    assert dlg.import_all_btn.isEnabled()
+
+
+def test_header_click_sorts_and_filter_tracks_paths(results_dialog, qapp):
+    from PySide6.QtCore import QPoint, Qt
+    from PySide6.QtTest import QTest
+    dlg = results_dialog
+    dlg.show()
+    qapp.processEvents()
+    def names():
+        return [dlg.table.item(row, 0).text() for row in range(dlg.table.rowCount())]
+    assert names() == ['alpha', 'Bravo', 'zulu']
+    dlg.search_edit.setText('alpha')
+    header = dlg.table.horizontalHeader()
+    QTest.mouseClick(header.viewport(), Qt.LeftButton, Qt.NoModifier,
+                     QPoint(header.sectionViewportPosition(0) + header.sectionSize(0) // 2, header.height() // 2))
+    qapp.processEvents()
+    assert names() == ['zulu', 'Bravo', 'alpha']
+    assert len(visible_paths(dlg)) == 1 and 'alpha-' in visible_paths(dlg)[0]
+    QTest.mouseClick(header.viewport(), Qt.LeftButton, Qt.NoModifier,
+                     QPoint(header.sectionViewportPosition(0) + header.sectionSize(0) // 2, header.height() // 2))
+    qapp.processEvents()
+    assert names() == ['alpha', 'Bravo', 'zulu']
+    dlg.search_edit.clear()
+    dlg.table.sortItems(1, Qt.AscendingOrder)
+    assert [dlg.table.item(row, 1).text() for row in range(3)] == ['1.0', '2.0', '3.0']
+
+
+def test_sorting_keeps_sources_and_selection_with_correct_import(results_dialog, qapp, service, monkeypatch):
+    from PySide6.QtCore import Qt
+    from PySide6.QtWidgets import QMessageBox
+    dlg = results_dialog
+    alpha = next(c.path for c in dlg.candidates if c.metadata.name_suggestion == 'alpha')
+    row = result_row(dlg, alpha)
+    dlg.table.cellWidget(row, 5).setText('https://github.com/example/alpha')
+    dlg.table.item(row, 0).setCheckState(Qt.Checked)
+    dlg.table.sortItems(0, Qt.DescendingOrder)
+    assert [c.path for c in dlg._selected()] == [alpha]
+    dlg.table.sortItems(5, Qt.DescendingOrder)
+    row = result_row(dlg, alpha)
+    assert dlg.table.cellWidget(row, 5).text() == 'https://github.com/example/alpha'
+    # Editing the active sort column must keep the editor, source and app together.
+    dlg.table.cellWidget(row, 5).setText('https://codeberg.org/example/alpha')
+    assert [c.path for c in dlg._selected()] == [alpha]
+    dlg.search_edit.setText('CODEBERG')
+    assert visible_paths(dlg) == [alpha]
+    dlg.desktop_cb.setChecked(False)
+    monkeypatch.setattr(QMessageBox, 'question', lambda *a: QMessageBox.Yes)
+    dlg._import(False)
+    wait(qapp, lambda: not dlg._importing)
+    entries = service.list_applications()
+    assert len(entries) == 1 and entries[0].path == alpha
+    assert entries[0].github_repo == 'https://codeberg.org/example/alpha'
+    row = result_row(dlg, alpha)
+    assert not dlg.table.item(row, 0).flags() & Qt.ItemIsEnabled
+
+
+@pytest.mark.parametrize('action', ['selected', 'all', 'ignore'])
+def test_filtered_bulk_actions_do_not_affect_hidden_checked_apps(results_dialog, qapp, service, monkeypatch, action):
+    from PySide6.QtWidgets import QMessageBox
+    dlg = results_dialog
+    dlg._select(True)
+    dlg.search_edit.setText('Bravo')
+    bravo = visible_paths(dlg)[0]
+    assert [c.path for c in dlg._selected()] == [bravo]
+    dlg._select(False)
+    assert not dlg._selected()
+    dlg.search_edit.clear()
+    assert len(dlg._selected()) == 2  # Hidden checkboxes were preserved.
+    dlg.search_edit.setText('Bravo')
+    dlg._select(True)
+    monkeypatch.setattr(QMessageBox, 'question', lambda *a: QMessageBox.Yes)
+    dlg.desktop_cb.setChecked(False)
+    if action == 'ignore':
+        dlg._ignore()
+        assert dlg.ignored == {bravo}
+        assert not service.list_applications()
+        dlg._reset_ignored()
+        assert visible_paths(dlg) == [bravo]
+    else:
+        assert dlg.import_all_btn.text() == 'Import all matching'
+        dlg._import(action == 'all')
+        wait(qapp, lambda: not dlg._importing)
+        assert [entry.path for entry in service.list_applications()] == [bravo]
+    dlg.search_edit.clear()
+    assert len(dlg._selected()) == 2
+
+
+def test_rescan_reapplies_search_and_sort(results_dialog, qapp, tmp_path):
+    from PySide6.QtCore import Qt
+    dlg = results_dialog
+    dlg.roots.clear()
+    dlg.roots.addItem(str(tmp_path))
+    dlg.search_edit.setText('alpha')
+    dlg.table.sortItems(0, Qt.DescendingOrder)
+    dlg.start_scan()
+    wait(qapp, lambda: dlg.job is None)
+    assert len(visible_paths(dlg)) == 1 and 'alpha-' in visible_paths(dlg)[0]
+    assert dlg.table.horizontalHeader().sortIndicatorOrder() == Qt.DescendingOrder
+    assert not dlg._selected()

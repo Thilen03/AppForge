@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import stat
 import threading
 from dataclasses import dataclass, field
@@ -14,6 +15,26 @@ from .library import LibraryError, LibraryService, inspect_file, normalize_path
 
 ROOTS_KEY = "discovery_roots"
 IGNORED_KEY = "discovery_ignored"
+
+# Discovery is deliberately narrower than the local-file picker. Do not open
+# ROMs, archives and other data just because their filesystem sets execute bits.
+EXECUTABLE_SUFFIXES = frozenset({
+    ".appimage", ".run", ".bin", ".elf", ".out",
+    ".sh", ".bash", ".dash", ".zsh", ".fish", ".ksh", ".csh", ".tcsh",
+    ".py", ".pyw", ".pl", ".rb", ".lua", ".tcl", ".php", ".js", ".r",
+    ".x86", ".i386", ".i686", ".x86_64", ".x64", ".amd64", ".aarch64", ".arm64",
+})
+_VERSIONED_EXECUTABLE = re.compile(r"[-_]\d+(?:\.\d+)+(?:[-+][A-Za-z0-9]+(?:[.-]\d+)*)?$")
+
+
+def _discovery_file(path: Path, info: os.stat_result) -> bool:
+    suffix = path.suffix.lower()
+    if suffix == ".appimage":
+        return True  # AppImages may need execute permissions repaired after import.
+    if not info.st_mode & (stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH):
+        return False
+    return (not suffix or suffix in EXECUTABLE_SUFFIXES
+            or _VERSIONED_EXECUTABLE.search(path.name) is not None)
 
 
 def default_roots() -> list[str]:
@@ -115,7 +136,7 @@ def scan(roots: Iterable[str], registered: Iterable[str] = (), ignored: Iterable
                                 visit(path)
                             continue
                         info = item.stat(follow_symlinks=False)
-                        if not stat.S_ISREG(info.st_mode):
+                        if not stat.S_ISREG(info.st_mode) or not _discovery_file(path, info):
                             continue
                         identity = _identity(info)
                         if identity in seen_files:

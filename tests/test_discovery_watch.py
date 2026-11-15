@@ -246,3 +246,14 @@ def test_unchanged_non_apps_are_not_reopened(tmp_path, monkeypatch):
     monkeypatch.setattr(discovery, 'detect_format', lambda path: pytest.fail('Unchanged file reopened'))
     result, _ = scan_watched([str(tmp_path)], previous=state)
     assert not result.candidates
+
+
+def test_watching_does_not_observe_or_cache_unrelated_files(tmp_path):
+    app = program(tmp_path / 'emulator')
+    for i in range(50):
+        program(tmp_path / 'roms' / f'game-{i}.extm')
+    _, state = scan_watched([str(tmp_path)])
+    assert set(state.observations) == {str(app)}
+    result, state = scan_watched([str(tmp_path)], previous=state)
+    assert [c.path for c in result.candidates] == [str(app)]
+    assert set(state.metadata) == {str(app)}

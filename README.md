@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img alt="version" src="https://img.shields.io/badge/version-0.6.3-2B63D9">
+  <img alt="version" src="https://img.shields.io/badge/version-0.6.4-2B63D9">
   <img alt="platform" src="https://img.shields.io/badge/platform-Linux-informational">
   <img alt="python" src="https://img.shields.io/badge/python-3.10%2B-blue">
   <img alt="Qt" src="https://img.shields.io/badge/Qt-6%20(PySide6)-41cd52">
@@ -25,7 +25,8 @@ AppForge reads their metadata without running them.
 
 - **Add locally or download from a link.** Choose a release file and save it to a
   discovery folder, or add an existing file by browsing, discovery or AppImage drag-and-drop.
-  Watch selected discovery folders and review new arrivals before adding them.
+  Search discovery results and click column headings to sort them. Watch selected
+  discovery folders and review new arrivals before adding them.
 - **Keep apps updated.** GitHub, GitLab.com, Codeberg and self-hosted Forgejo/Gitea/GitLab
   sources; embedded AppImage source suggestions, release-asset matching, optional nightlies,
   per-app pause/skip controls and Update All.
@@ -41,7 +42,7 @@ AppForge reads their metadata without running them.
 - **Stay in the background.** Scheduled checks, notifications, optional tray mode and
   login startup, light/dark themes, customizable card badge colors and AppForge self-updates.
 
-What's new: [AppForge 0.6.3 release notes](releases/RELEASE_NOTES_v0.6.3.md).
+What's new: [AppForge 0.6.4 release notes](releases/RELEASE_NOTES_v0.6.4.md).
 
 ## Install
 
@@ -61,9 +62,12 @@ are bundled. If FUSE is unavailable, launch with `--appimage-extract-and-run`; s
 
 1. Click **Add Application** and choose **Add a local file…** or **Download from a link…**.
    For a local binary or script, select *All files* in the file picker. **Discover apps…**
-   finds existing applications in folders you choose.
+   scans all saved discovery folders for AppImages and common Linux executables,
+   skipping unrelated files such as ROMs. Checkboxes control background watching only.
 2. For downloads, paste a repository/release link, select a file and destination, then
    review the Add form. **Add folder…** saves a new destination for discovery too.
+   If the selected file already exists, AppForge checks it and continues to the Add
+   form automatically, including after cancellation or restarting AppForge.
 3. Review the name, icon, category and optional **Add to the application menu** choice.
    Local AppImages may suggest an update-source repository; review, change or clear it.
 4. Launch from the card; its arrow selects or edits launch profiles.

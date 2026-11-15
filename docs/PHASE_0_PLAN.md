@@ -1,5 +1,144 @@
 # Phase 0 inspection and implementation plan
 
+## Confirmed 0.6.4 release preparation
+
+User explicitly requested prepare release 0.6.4. Previous release is HEAD
+93e7450 (0.6.3). Reviewed source/doc/test diffs, current README, public notes,
+prior release notes and tags (local tags still end at v0.5.4); roadmap.md is
+unavailable. pyproject.toml, __init__.py and README already consistently declare
+confirmed 0.6.4, so preserve that version. No further source/version changes are
+needed. Repository identity is /home/thilen/appforge, main, origin/main and
+https://github.com/Thilen03/AppForge.git. Git metadata remains read-only; staged
+diff is empty and no staging, commits, fetches, pushes, tags or uploads were made.
+Finalize only releases/RELEASE_NOTES_v0.6.4.md with verified discovery filename
+filtering, automatic checked existing-download continuation across sessions,
+search/counts, case-insensitive header sorting and safe visible-match actions.
+Keep prior notes, no inferred release date, no database/dependency changes.
+Current README/DISCOVERY/DOWNLOADING already describe the implemented behavior;
+wrap the DISCOVERY paragraph and add normal-user installation/upgrade guidance
+to the 0.6.4 notes. Fresh full regression with the existing local fixture runtime
+and .venv-build dependencies: 864 passed, 12 restricted TCP/Unix socket skips,
+one existing Qt deprecation warning. Startup selftest and git diff --check passed.
+Version declarations, README badge/link and notes heading agree on 0.6.4;
+15 local documentation links resolve. Earlier feature validation includes modal
+cancel/retry/existing-file flows, real sort-header clicks and discovery layouts
+in both themes.
+Initial dist/ inventory was empty, recorded in
+/tmp/appforge-064-preparation-assets-before.json. An AppImage appeared while
+checks were running; this preparation did not build or modify it. The new file
+is dist/AppForge-0.6.4-x86_64.AppImage, 84,736,504 bytes, observed SHA-256
+6782ca3f8f3b1dc1285976a0ce64abe510d39aa00cf43e809d3dc3bce803d8bd.
+Its appearance prevents claiming an unchanged inventory across preparation;
+source provenance and manual testing are not inferred from its name or hash.
+Observed file metadata is in /tmp/appforge-064-preparation-observed-asset.json.
+SOURCE 0.6.4 is prepared. Publication still requires the user's explicit
+confirmation of building from the prepared source and personally testing that
+exact binary. Nothing was committed or published.
+
+## 0.6.4 discovery search and sorting plan
+
+Add a clearable results search above DiscoveryDialog's existing table; match
+case-insensitively across displayed fields including filename/location and edited
+update source. Enable clickable case-insensitive text sorting, initially by app
+name ascending. Bind each row to Candidate.path rather than candidate list order
+so sorting cannot change selection/import/ignore/source identity. Keep checked
+rows and source edits through filtering and rerenders. Select/clear/import/ignore
+operate on visible eligible matches; show a matching/total count and contextual
+import-all wording. Preserve existing watch-only root checkboxes and all-root
+manual scans. No scanner, database or dependency changes. Update focused UI tests,
+README, DISCOVERY guide and the same 0.6.4 notes. Validate sort/filter interactions,
+bulk actions and source edits, rescanning/watched previews, regression suite,
+selftest and populated/empty/no-match layouts in both themes. No build/publication.
+
+Implemented clearable live results search, matching/total counts, default
+case-insensitive A–Z sorting and clickable text sorting on all result columns.
+Rows carry candidate paths; actions resolve those identities after sorting.
+Backing source items follow their editors, including edits to the active sort
+column. Filtering hides rows without discarding checks or edits; bulk select,
+clear, import and ignore apply only to visible eligible results. Import-all reads
+"Import all matching" during search. Search/order persist through rescans and
+rerenders; roots remain all-scanned/watch-only. README, DISCOVERY and the existing
+0.6.4 notes document these changes.
+131 focused discovery/watch/source tests passed. New tests cover actual heading
+clicks in both directions, all-field/filename search, clearing/no matches,
+source editing while sorted, correct app/source import, hidden checked rows,
+filtered select/clear/import-all/ignore/reset, and rescan behavior. Updated one
+existing source-import test to capture paths from displayed rows rather than
+assuming filesystem candidate order after default sorting.
+Inspected populated, filtered and no-match layouts in both themes. Startup
+selftest and git diff --check passed. Full regression with existing local runtime
+and .venv-build dependencies: 864 passed, 12 restricted TCP/Unix socket skips,
+one existing Qt deprecation warning. SOURCE is ready for user build/manual testing.
+Source stays at confirmed 0.6.4; no build, dist changes, Git mutation or publication.
+
+## 0.6.4 existing-download continuation correction
+
+User clarified that same-name files must work automatically across sessions,
+without manual local-file selection. Replace the previous session-only cache with
+on-disk validation: open the existing regular file without following symlinks,
+check selected asset size/format/published checksum, and retain an identity
+signature for final Add validation. Preserve contents and permissions. Missing
+checksums remain explicitly unavailable; never claim checksum verification from
+a filename. Reuse existing format/checksum readers and the ordinary Add form.
+Handle a same-name file appearing during download the same way without overwrite.
+Remove obsolete cache wiring, update collision/retry/modal tests and rewrite current
+docs/0.6.4 notes to reflect automatic reuse. Validate focused and full regressions,
+startup selftest and both themes. No version bump, build or publication.
+
+Implemented existing-file validation in core/downloads.py before download space
+checks or temporary-file creation, and after concurrent no-replace collisions.
+An anchored directory handle and O_NOFOLLOW/nonblocking file descriptor reject
+symlinks, directories and FIFOs. Check published size, shared format validation
+and shared published-checksum lookup, then hash locally with progress/cancellation.
+Retain the original file identity and check for changes before returning a
+DownloadResult to the normal Add form. Preserve file contents and permissions.
+No session cache or MainWindow state is needed. Without a published checksum,
+report it as unavailable and continue after size/format checks, as downloads do.
+Updated dialog hints/progress, README, DOWNLOADING and existing 0.6.4 notes.
+60 focused download tests passed, including actual modal Add flows for new,
+cancel/retry and pre-existing files without session history; real AppImage reuse;
+SHA-256/SHA-512/sidecar/missing checksums; modified, invalid, symlink, directory and
+FIFO paths; cancellation; and valid/invalid concurrent collisions. Startup selftest
+and git diff --check passed. Inspected the dialog in both light and dark themes.
+Full regression with the existing local test runtime and .venv-build dependencies:
+857 passed, 12 restricted TCP/Unix socket skips, one existing Qt deprecation warning.
+SOURCE 0.6.4 is ready to build and manually test. No dist changes, release AppImage
+build/manual testing, Git mutations or publication. Git metadata remains read-only.
+
+## 0.6.4 discovery bug-fix plan
+
+User confirmed 0.6.4 for discovery fixes, then clarified that manual scans must
+continue scanning every saved folder and checkboxes must remain watch-only.
+Restore that behavior and leave DiscoveryDialog unchanged. Reuse the shared
+read-only scanner and existing format readers. Add an early filename/permission
+filter before metadata inspection and watched observations, accepting common Linux
+executable suffixes, extensionless and version-suffixed executables; still validate
+AppImage/ELF/shebang contents. Unknown suffixes (including ROMs) are excluded even
+if marked executable; users can add unusually named supported executables with
+the local-file picker. Update core/discovery.py, discovery tests, public
+README/discovery docs, version declarations and only the new 0.6.4 notes.
+Validate all saved roots regardless of checkbox state, ROM exclusion before format
+reads, supported names/permissions, watch compatibility, regression suite and
+startup selftest. No schema changes, builds or publication. roadmap.md is absent.
+
+Implemented the shared discovery filter and kept DiscoveryDialog identical to
+HEAD. Regression coverage proves manual scanning includes checked and unchecked
+roots; executable-marked .extm and version-named ROMs are excluded before format
+reads; valid common executable names still work; data with executable suffixes
+is rejected; watching does not retain unrelated observations/metadata.
+Updated source version from 0.6.3 to the confirmed 0.6.4, README, DISCOVERY guide
+and releases/RELEASE_NOTES_v0.6.4.md. No release date was inferred.
+Validation: 44 focused discovery/watch tests passed. Initial system-Python runs
+hit blocked fixture runtime downloads and missing PySquashfsImage. Reusing
+.venv-build/lib/python3.14/site-packages on PYTHONPATH and
+APPIMAGE_RUNTIME_FILE=/tmp/appforge-test-runtime resolved those environment
+issues: full suite 843 passed, 12 restricted TCP/Unix socket skips, one existing
+Qt deprecation warning. Startup selftest and git diff --check passed.
+SOURCE 0.6.4 is ready for the user to build and manually test as
+AppForge-0.6.4-x86_64.AppImage. Existing dist files were not modified. No release
+binary was built or manually tested; publication remains pending. Git metadata
+is read-only; no staging, commit, push, tag or upload was attempted.
+
 ## Confirmed 0.6.3 release preparation
 
 User requested prepare release 0.6.3. Verified previous release at HEAD 315bf4b

@@ -30,9 +30,13 @@ directly.
 
 The destination uses the release asset's filename. Existing files, directories and
 symlinks are never overwritten, even if another process creates a file while the
-transfer is running. Choose another folder or rename the existing file yourself
-if there is a conflict. Saved files are made executable; downloading and inspecting
-an app never runs it.
+transfer is running. If a regular file with the selected name already exists,
+AppForge checks its size, format and any available published checksum, then
+continues to the Add form using that file without downloading it again. This
+works across restarts and requires no manual file selection. Invalid or mismatched
+files are reported and left untouched; directories and symlinks cannot be reused.
+New downloads are made executable; reusing an existing file preserves its permissions.
+Downloading and inspecting an app never runs it.
 
 ## Validation and cancellation
 
@@ -46,8 +50,11 @@ Cancel stops an in-progress transfer and removes its temporary file. A current
 network request may take until its timeout to finish. Closing the download dialog
 waits for the worker's completion without blocking the interface. A completed file
 is kept if you close during completion or cancel the final Add form; no library
-entry is created until you approve that form. You can add the saved file locally
-later. A file changed after downloading must be selected again as a local file.
+entry is created until you approve that form. Retrying **Download and continue**
+automatically checks and uses the saved file, including downloads from earlier
+sessions. When no published checksum is available, the Add form reports that;
+filename and format checks alone cannot prove a file matches the selected release.
+A file changed after checking is rejected by the final Add form.
 
 This flow uses supported repository release APIs; it does not scrape arbitrary
 websites or unpack `.zip`, `.tar.gz`, `.deb` or `.rpm` files. A release link shows

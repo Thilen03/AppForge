@@ -139,7 +139,7 @@ def test_existing_files_and_concurrent_collisions_are_never_overwritten(tmp_path
             return result
         monkeypatch.setattr(downloads, 'download_verified', collide)
     mock_download(monkeypatch)
-    with pytest.raises(installer.InstallError, match='exists'):
+    with pytest.raises(installer.InstallError):
         download_application(picked, str(tmp_path))
     assert target.read_bytes() == (b'keep' if kind == 'symlink' else b'original')
     assert other.read_bytes() == b'keep'
@@ -171,6 +171,9 @@ def test_real_appimage_download_uses_shared_validation(fixtures, tmp_path, monke
     mock_download(monkeypatch, body)
     result = download_application(picked, str(tmp_path))
     assert Path(result.path).read_bytes() == body and result.checksum == 'verified (sha256)'
+    monkeypatch.setattr(installer, '_open', lambda *a, **kw: pytest.fail('AppImage downloaded again'))
+    existing = download_application(picked, str(tmp_path))
+    assert existing.signature == result.signature and existing.checksum == 'verified (sha256)'
 
 
 @pytest.fixture
@@ -301,12 +304,24 @@ def test_main_window_local_and_drag_drop_preserve_existing_add_form(qapp, servic
     win.close()
 
 
-def test_main_window_link_route_downloads_reviews_and_adds(qapp, service, tmp_path, monkeypatch):
+@pytest.mark.parametrize('mode', ['download', 'cancel_retry', 'previous_session'])
+def test_main_window_link_route_downloads_reviews_and_adds(qapp, service, tmp_path, monkeypatch, mode):
+    cancel_first = mode == 'cancel_retry'
     mock_download(monkeypatch)
+    transfers = []
+    open_asset = installer._open
+    def count_transfer(*args, **kwargs):
+        transfers.append(True)
+        return open_asset(*args, **kwargs)
+    monkeypatch.setattr(installer, '_open', count_transfer)
     folder = tmp_path / 'apps'
     folder.mkdir()
     save_paths(service.db, ROOTS_KEY, [str(folder)])
     monkeypatch.setattr(AddSourceDialog, 'exec', lambda self: self._choose('link') or QDialog.Accepted)
+    if mode == 'previous_session':
+        saved = folder / 'tool-linux-x86_64'
+        saved.write_bytes(BODY)
+        saved.chmod(0o755)
     original_download_exec = DownloadApplicationDialog.exec
     original_review_exec = AddApplicationDialog.exec
     timers = []
@@ -322,13 +337,18 @@ def test_main_window_link_route_downloads_reviews_and_adds(qapp, service, tmp_pa
         timers.append(timer)
         QTimer.singleShot(0, dlg.find_releases)
         return original_download_exec(dlg)
+    reviews = []
     def review_exec(dlg):
+        reviews.append(dlg)
         dlg.menu_cb.setChecked(False)
         timer = QTimer(dlg)
         def advance():
             if dlg.metadata:
                 timer.stop()
-                dlg._accept()
+                if cancel_first and len(reviews) == 1:
+                    dlg.reject()
+                else:
+                    dlg._accept()
         timer.timeout.connect(advance)
         timer.start(10)
         timers.append(timer)
@@ -342,7 +362,13 @@ def test_main_window_link_route_downloads_reviews_and_adds(qapp, service, tmp_pa
     watchdog.timeout.connect(lambda: [d.reject() for d in win.findChildren(QDialog)])
     watchdog.start(5000)
     win.add_application()
+    if cancel_first:
+        assert not service.list_applications()
+        assert (folder / 'tool-linux-x86_64').read_bytes() == BODY
+        win.add_application()
     watchdog.stop()
+    assert len(transfers) == (0 if mode == 'previous_session' else 1)
+    assert len(reviews) == (2 if cancel_first else 1)
     assert wait_for(qapp, lambda: not win._busy)
     entries = service.list_applications()
     assert len(entries) == 1 and entries[0].path == str(folder / 'tool-linux-x86_64')
@@ -372,8 +398,7 @@ def test_publish_fallback_remains_exclusive(tmp_path, monkeypatch):
     mock_download(monkeypatch)
     result = download_application(choice(), str(tmp_path))
     assert Path(result.path).read_bytes() == BODY
-    with pytest.raises(installer.InstallError, match='exists'):
-        download_application(choice(), str(tmp_path))
+    assert download_application(choice(), str(tmp_path)).signature == result.signature
 
 
 def test_cancellation_during_transfer_removes_temporary_file(tmp_path, monkeypatch):
@@ -406,3 +431,92 @@ def test_replaced_download_is_not_reported_as_verified(tmp_path, monkeypatch):
 
 def test_sha512_lists_are_not_executable_candidates():
     assert not download_choices(SOURCE, [release('SHA512SUMS', 'sha512sum.txt')])
+
+
+@pytest.mark.parametrize('digest_kind', ['sha256', 'sha512', 'missing', 'sidecar'])
+def test_existing_file_continues_without_session_record_or_asset_transfer(tmp_path, monkeypatch, digest_kind):
+    picked = choice()
+    target = tmp_path / picked.asset.name
+    target.write_bytes(BODY)
+    target.chmod(0o644)
+    before = (target.read_bytes(), target.stat())
+    if digest_kind == 'missing':
+        picked.asset.digest = None
+    elif digest_kind == 'sha512':
+        picked.asset.digest = 'sha512:' + hashlib.sha512(BODY).hexdigest()
+    elif digest_kind == 'sidecar':
+        picked.asset.digest = None
+        picked.release.assets.append(Asset(picked.asset.name + '.sha256', 'https://x/checksum'))
+    def open_file(url, **kwargs):
+        assert digest_kind == 'sidecar' and url == 'https://x/checksum', 'Asset downloaded again'
+        return io.BytesIO(hashlib.sha256(BODY).hexdigest().encode())
+    monkeypatch.setattr(installer, '_open', open_file)
+    result = download_application(picked, str(tmp_path))
+    validate_downloaded(result)
+    assert result.choice == picked and result.path == str(target)
+    assert result.checksum == ('not available' if digest_kind == 'missing' else
+                               'verified (sha512)' if digest_kind == 'sha512' else 'verified (sha256)')
+    assert target.read_bytes() == before[0]
+    after = target.stat()
+    assert (after.st_ino, after.st_mode, after.st_mtime_ns, after.st_ctime_ns) == (
+        before[1].st_ino, before[1].st_mode, before[1].st_mtime_ns, before[1].st_ctime_ns)
+    assert not list(tmp_path.glob('.*.part'))
+
+
+@pytest.mark.parametrize('kind', ['size', 'checksum', 'format', 'directory', 'symlink', 'fifo'])
+def test_invalid_existing_file_is_preserved(tmp_path, monkeypatch, kind):
+    picked = choice()
+    target = tmp_path / picked.asset.name
+    if kind == 'directory':
+        target.mkdir()
+    elif kind == 'symlink':
+        other = tmp_path / 'other'
+        other.write_bytes(BODY)
+        target.symlink_to(other)
+    elif kind == 'fifo':
+        os.mkfifo(target)
+    else:
+        body = BODY[:-1] if kind == 'size' else b'x' * len(BODY) if kind == 'format' else BODY
+        target.write_bytes(body)
+        if kind == 'checksum':
+            picked.asset.digest = 'sha256:' + '0' * 64
+    before = target.lstat()
+    monkeypatch.setattr(installer, '_open', lambda *a, **kw: pytest.fail('Unexpected network request'))
+    with pytest.raises(installer.InstallError):
+        download_application(picked, str(tmp_path))
+    after = target.lstat()
+    assert (before.st_ino, before.st_mode, before.st_size, before.st_mtime_ns) == (
+        after.st_ino, after.st_mode, after.st_size, after.st_mtime_ns)
+
+
+def test_existing_file_verification_cancels_and_rejects_changes(tmp_path, monkeypatch):
+    picked = choice()
+    target = tmp_path / picked.asset.name
+    target.write_bytes(BODY)
+    cancel = threading.Event()
+    with pytest.raises(installer.InstallCancelled):
+        download_application(picked, str(tmp_path), cancel=cancel, progress=lambda *_: cancel.set())
+    assert target.read_bytes() == BODY
+    def change(*_):
+        target.write_bytes(BODY + b'changed')
+    with pytest.raises(LibraryError, match='changed'):
+        download_application(picked, str(tmp_path), progress=change)
+    assert target.read_bytes() == BODY + b'changed'
+
+
+def test_valid_file_appearing_during_download_is_used_without_overwrite(tmp_path, monkeypatch):
+    mock_download(monkeypatch)
+    picked = choice()
+    target = tmp_path / picked.asset.name
+    download = downloads.download_verified
+    def collide(*args, **kwargs):
+        result = download(*args, **kwargs)
+        target.write_bytes(BODY)
+        target.chmod(0o644)
+        return result
+    monkeypatch.setattr(downloads, 'download_verified', collide)
+    result = download_application(picked, str(tmp_path))
+    validate_downloaded(result)
+    assert result.signature == downloads.file_signature(target)
+    assert target.read_bytes() == BODY and target.stat().st_mode & 0o777 == 0o644
+    assert not list(tmp_path.glob('.*.part'))
