@@ -201,7 +201,11 @@ def test_checker_routes_by_provider_and_uses_injected_client():
     out = check_for_update(repo_url="https://gitlab.com/g/s/p", installed_version="1.0.0",
                            current_filename="App.AppImage", app_name="App", client=fake)
     assert out.status is UpdateStatus.UPDATE_AVAILABLE and fake.calls == [("g/s", "p")]
-    bad = check_for_update(repo_url="https://example.com/a/b", installed_version="1", current_filename="a",
+    custom = check_for_update(repo_url="https://example.com/a/b", installed_version="1",
+                              current_filename="App.AppImage", app_name="App", client=fake)
+    assert custom.status is UpdateStatus.UPDATE_AVAILABLE and fake.calls[-1] == ("a", "b")
+    assert custom.notes["source"] == "https://example.com/a/b"
+    bad = check_for_update(repo_url="http://example.com/a/b", installed_version="1", current_filename="a",
                            app_name="a", client=fake)
     assert bad.status is UpdateStatus.FAILED and "isn't valid" in bad.message
 
@@ -313,7 +317,7 @@ class _Server:
         self.httpd.server_close()
 
 
-def test_install_executable_update_validates_backs_up_with_bak_suffix(tmp_path):
+def test_install_executable_update_validates_backs_up_with_bak_suffix(tmp_path, local_tcp):
     target = make_exec(tmp_path / "bin", "tool", ELF + b"old")
     new = ELF + b"new-version"
     srv = _Server({"/tool-linux-amd64": new, "/page": b"<html>not a binary, just a long enough page</html>"})

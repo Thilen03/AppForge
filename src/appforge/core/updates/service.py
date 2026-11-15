@@ -7,6 +7,7 @@ import time
 from ..backups import BackupService
 from ..library import LibraryService
 from ..models import AppEntry, UpdateStatus
+from ..update_policy import PAUSED_KEY, SKIPPED_KEY, updates_paused, updates_suppressed
 from .checker import CheckOutcome
 from .installer import InstallResult
 from .version import display_version
@@ -30,11 +31,38 @@ class UpdateService:
         self.db = library.db
         self.backups = BackupService(library)
 
-    # -- checks -------------------------------------------------------------------------
-    def apply_check(self, app_id: str, outcome: CheckOutcome) -> AppEntry | None:
+    def set_paused(self, app_id: str, paused: bool) -> AppEntry | None:
         entry = self.db.get(app_id)
         if entry is None:
             return None
+        if paused:
+            entry.metadata[PAUSED_KEY] = True
+        else:
+            entry.metadata.pop(PAUSED_KEY, None)
+        return self.db.update(entry)
+
+    def skip_version(self, app_id: str) -> AppEntry | None:
+        entry = self.db.get(app_id)
+        if entry is None or not can_update(entry):
+            return None
+        tag = (entry.metadata.get("update") or {}).get("tag")
+        if not tag or not entry.github_repo:
+            return None
+        entry.metadata[SKIPPED_KEY] = {"source": entry.github_repo, "tag": tag}
+        return self.db.update(entry)
+
+    def clear_skipped_version(self, app_id: str) -> AppEntry | None:
+        entry = self.db.get(app_id)
+        if entry is None:
+            return None
+        entry.metadata.pop(SKIPPED_KEY, None)
+        return self.db.update(entry)
+
+    # -- checks -------------------------------------------------------------------------
+    def apply_check(self, app_id: str, outcome: CheckOutcome) -> AppEntry | None:
+        entry = self.db.get(app_id)
+        if entry is None or updates_paused(entry):
+            return entry
         entry.update_status = outcome.status
         entry.last_update_check = outcome.checked_at
         if outcome.status is not UpdateStatus.FAILED:
@@ -51,7 +79,8 @@ class UpdateService:
     @staticmethod
     def should_notify(entry: AppEntry) -> bool:
         """True when an update is available that the user hasn't been told about yet."""
-        return (entry.update_status is UpdateStatus.UPDATE_AVAILABLE and bool(entry.latest_version)
+        return (not updates_suppressed(entry) and entry.update_status is UpdateStatus.UPDATE_AVAILABLE
+                and bool(entry.latest_version)
                 and entry.metadata.get(NOTIFIED_KEY) != entry.latest_version)
 
     def mark_notified(self, app_id: str) -> None:
@@ -124,6 +153,8 @@ class UpdateService:
 
 def can_update(entry: AppEntry) -> bool:
     """True when an update (or a retry of a failed one) can be started for this entry."""
+    if updates_suppressed(entry):
+        return False
     info = entry.metadata.get("update") or {}
     if not info.get("asset") or entry.latest_version is None:
         return False

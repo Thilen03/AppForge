@@ -165,7 +165,7 @@ class Server:
 
 
 @pytest.fixture()
-def world(tmp_path, fixtures, new_appimage):
+def world(local_tcp, tmp_path, fixtures, new_appimage):
     app_dir = tmp_path / "Emulators"
     app_dir.mkdir()
     target = app_dir / "Dolphin.AppImage"

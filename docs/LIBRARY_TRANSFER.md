@@ -16,8 +16,8 @@ the preferences above them.
 
 The export includes application IDs, names, absolute paths, formats, installed
 versions, descriptions, date added, repositories, categories, menu categories,
-prerelease preferences, file-matching patterns, launcher preferences and embedded
-icons. Missing/unreadable or unsupported icons are omitted with a warning; the
+prerelease preferences, file-matching patterns, launcher preferences, command-line
+arguments, working directories, terminal preferences and embedded icons. Missing/unreadable or unsupported icons are omitted with a warning; the
 application still exports.
 
 Application executables, backups, global Settings preferences, AppForge access
@@ -93,3 +93,7 @@ Locate file when necessary.
 Existing databases need no migration. Import does not restore global preferences
 or overwrite saved tokens. Check for updates after import to obtain fresh release
 metadata and available download files.
+
+Launch arguments are included as plain text. Custom working-directory paths stay
+absolute and may need changing on another computer. Older AppForge builds may
+reject files with the new launch-option fields. See [Launch options](LAUNCH_OPTIONS.md).

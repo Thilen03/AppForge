@@ -14,6 +14,7 @@ from ..core.formats import get_format
 from ..core.library import DESKTOP_FLAG, FileState
 from ..core.models import AppEntry, UpdateStatus
 from ..core.updates.service import can_update
+from ..core.update_policy import updates_paused, version_skipped, SKIPPED_KEY
 from . import theme
 from .icons import app_pixmap
 from .popups import RoundedMenu
@@ -110,6 +111,9 @@ class AppCard(QFrame):
     backupsRequested = Signal(str)
     desktopToggleRequested = Signal(str)
     favoriteRequested = Signal(str, bool)
+    pauseUpdatesRequested = Signal(str, bool)
+    skipVersionRequested = Signal(str)
+    clearSkippedVersionRequested = Signal(str)
 
     def __init__(self, entry: AppEntry, state: FileState, busy: tuple[str, float | None] | None = None,
                  parent: QWidget | None = None, *, favorite: bool = False):
@@ -131,6 +135,10 @@ class AppCard(QFrame):
         e = self.entry
         info = e.metadata.get("update") or {}
         msg = info.get("message") or ""
+        if updates_paused(e):
+            return "Update paused", "paused", "Update checks and installations are paused. Resume updates from the card menu."
+        if version_skipped(e):
+            return "Version skipped", "muted", f"Skipping {info.get('tag')}. Newer releases will still be checked."
         if not e.github_repo:
             return "No update source", "muted", "Add a repository URL as update source in Edit to enable updates."
         if e.update_status is UpdateStatus.UNAVAILABLE and info.get("prereleases_only"):
@@ -287,13 +295,25 @@ class AppCard(QFrame):
                     lambda: self.favoriteRequested.emit(e.id, not self.favorite))
         if e.github_repo:
             m.addSeparator()
-            m.addAction("Check for updates", lambda: self.checkRequested.emit(e.id))
+            check = m.addAction("Check for updates", lambda: self.checkRequested.emit(e.id))
+            check.setEnabled(not updates_paused(e))
             if info.get("tag"):
                 m.addAction("Release notes…", lambda: self.releaseNotesRequested.emit(e.id))
             if info.get("release_url"):
                 m.addAction("View release page", lambda: self.releasePageRequested.emit(e.id))
             if info.get("assets"):
                 m.addAction("Choose release asset…", lambda: self.chooseAssetRequested.emit(e.id))
+        m.addSeparator()
+        self._policy_actions = []
+        paused = updates_paused(e)
+        self._policy_actions.append(m.addAction("Resume updates" if paused else "Pause updates",
+            lambda: self.pauseUpdatesRequested.emit(e.id, not paused)))
+        if can_update(e) and info.get("tag") and e.github_repo:
+            self._policy_actions.append(m.addAction("Skip this version",
+                lambda: self.skipVersionRequested.emit(e.id)))
+        if e.metadata.get(SKIPPED_KEY):
+            self._policy_actions.append(m.addAction("Clear skipped version",
+                lambda: self.clearSkippedVersionRequested.emit(e.id)))
         m.addSeparator()
         m.addAction("Backups && rollback…", lambda: self.backupsRequested.emit(e.id))
         on_menu = bool(e.metadata.get(DESKTOP_FLAG))
@@ -320,6 +340,8 @@ class AppCard(QFrame):
     def set_busy(self, text: str | None, fraction: float | None = None):
         """Show a progress row instead of the status chips. ``text=None`` restores the chips."""
         busy = text is not None
+        for action in self._policy_actions:
+            action.setEnabled(not busy)
         self._chips_w.setVisible(not busy)
         self._busy_w.setVisible(busy)
         if self._update_btn:

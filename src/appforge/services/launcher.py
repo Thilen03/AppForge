@@ -4,12 +4,13 @@ from __future__ import annotations
 import logging
 import os
 import stat
+import shutil
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
 from ..core.envvars import env_of
-from ..core.formats import get_format
+from ..core.launch_options import TERMINAL, LaunchOptionsError, options_of, command_for, directory_for
 from ..core.library import FileState, file_state
 from ..core.models import AppEntry
 from ..core.paths import logs_dir
@@ -66,6 +67,23 @@ def make_executable(path: str | os.PathLike) -> None:
             | (stat.S_IXOTH if mode & stat.S_IROTH else 0))
 
 
+def terminal_command(argv: list[str], env: dict[str, str]) -> list[str]:
+    """Prefer the desktop terminal helper, then known terminals; never invoke a shell."""
+    candidates = [("xdg-terminal-exec", [])]
+    desktop = env.get("XDG_CURRENT_DESKTOP", "").lower()
+    if "kde" in desktop:
+        candidates.append(("konsole", ["-e"]))
+    candidates += [("gnome-terminal", ["--"]), ("konsole", ["-e"]),
+                   ("xfce4-terminal", ["-x"]), ("kitty", ["--"]),
+                   ("alacritty", ["-e"]), ("foot", ["--"]), ("xterm", ["-e"])]
+    for program, flags in candidates:
+        executable = shutil.which(program, path=env.get("PATH", os.defpath))
+        if executable:
+            return [executable, *flags, *argv]
+    raise LaunchError("No supported terminal was found. Install a terminal such as Konsole, "
+                      "or turn off Run in terminal in Launch options.")
+
+
 def launch(entry: AppEntry) -> LaunchHandle:
     state = file_state(entry)
     if state is FileState.MISSING:
@@ -75,17 +93,29 @@ def launch(entry: AppEntry) -> LaunchHandle:
     if state is FileState.NOT_EXECUTABLE:
         raise LaunchError(f"“{entry.name}” is not marked as executable.", state)
 
-    fmt = get_format(entry.format)
-    path = Path(entry.path)
-    cmd = fmt.launch_command(path) if fmt else [str(path)]
+    try:
+        options = options_of(entry)
+        cmd = command_for(entry, options)
+        directory = directory_for(entry, options)
+    except LaunchOptionsError as exc:
+        raise LaunchError(f"Invalid launch options for “{entry.name}”: {exc}") from exc
+    try:
+        directory_exists = Path(directory).is_dir()
+    except OSError as exc:
+        raise LaunchError(f"Could not access the working directory for “{entry.name}”: {exc}") from exc
+    if not directory_exists:
+        raise LaunchError(f"The working directory for “{entry.name}” was not found:\n{directory}\n"
+                          "Choose another folder in Launch options, or leave it blank.")
     log_path = logs_dir() / f"{entry.id}.log"
     # the user's own variables go on top of the cleaned environment, so they always win
     env = {**clean_environment(), **env_of(entry)}
+    if options.get(TERMINAL):
+        cmd = terminal_command(cmd, env)
     try:
         with open(log_path, "wb") as logf:
             proc = subprocess.Popen(  # noqa: S603 - the user explicitly asked to run this file
                 cmd,
-                cwd=str(path.parent),
+                cwd=directory,
                 env=env,
                 stdin=subprocess.DEVNULL,
                 stdout=logf,

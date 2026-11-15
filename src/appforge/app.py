@@ -151,7 +151,6 @@ def main(argv: list[str] | None = None) -> int:
 
     theme.apply_theme(app)
     install_popup_rounding(app)
-    app.styleHints().colorSchemeChanged.connect(lambda *_: theme.apply_theme(app))
 
     # Lets the desktop match AppForge's window to a launcher, which is what makes "Pin to Task Manager"
     # appear when right-clicking its taskbar entry (an AppImage has no .desktop file of its own).
@@ -168,6 +167,8 @@ def main(argv: list[str] | None = None) -> int:
     except Exception:  # noqa: BLE001 - never block startup on launcher housekeeping
         logging.getLogger(__name__).warning("Launcher sync failed", exc_info=True)
     window = MainWindow(service, auto_check=True, tray_icon=app.windowIcon())
+    app.styleHints().colorSchemeChanged.connect(
+        lambda *_: theme.apply_theme(app, window.settings.theme_mode))
     from .core import autostart
     if window.settings.start_at_login:
         try:

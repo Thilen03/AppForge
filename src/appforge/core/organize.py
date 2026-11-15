@@ -1,8 +1,7 @@
 """Categories, filtering and sorting of the library (Phase 5). Qt-free and database-free.
 
-Category of an app = the one the user chose (``metadata["category"]``), otherwise the main one from the
-application's own ``.desktop`` ``Categories`` (``metadata["categories"]``, read from inside the
-AppImage), otherwise "Other". The user's choice is never overwritten by a metadata refresh.
+The selected desktop category also organizes the library. Legacy library-only
+categories remain readable; otherwise derive from embedded metadata or use Other.
 """
 from __future__ import annotations
 
@@ -11,18 +10,20 @@ from dataclasses import dataclass
 from typing import Callable, Iterable
 
 from .models import AppEntry, UpdateStatus
+from .update_policy import updates_suppressed
+from .desktop import MENU_CATEGORIES, menu_category_of
 
 CATEGORY_KEY = "category"
 OTHER = "Other"
 MAX_CATEGORY_LEN = 40
 
-# freedesktop "Main Categories" -> label shown in AppForge (order = priority when an app lists several)
-_MAIN = (
-    ("Development", "Development"), ("Graphics", "Graphics"), ("AudioVideo", "Multimedia"),
-    ("Audio", "Multimedia"), ("Video", "Multimedia"), ("Emulator", "Emulators"), ("Game", "Games"), ("Network", "Internet"),
-    ("Office", "Office"), ("Education", "Education"), ("Science", "Science"), ("System", "System"),
-    ("Settings", "System"), ("Utility", "Utilities"),
-)
+_LABELS = dict(MENU_CATEGORIES)
+# Embedded subcategories use the same main-category labels as the dropdown.
+_ALIASES = {"Audio": "AudioVideo", "Video": "AudioVideo", "Emulator": "Game"}
+_MAIN = tuple((key, _LABELS[_ALIASES.get(key, key)]) for key in (
+    "Development", "Graphics", "AudioVideo", "Audio", "Video", "Emulator", "Game", "Network",
+    "Office", "Education", "Science", "System", "Settings", "Utility",
+))
 DEFAULT_CATEGORIES = tuple(dict.fromkeys(label for _, label in _MAIN)) + (OTHER,)
 
 
@@ -42,6 +43,9 @@ def derived_category(entry: AppEntry) -> str:
 
 
 def category_of(entry: AppEntry) -> str:
+    chosen = menu_category_of(entry)
+    if chosen:
+        return _LABELS[chosen]
     return clean_category(entry.metadata.get(CATEGORY_KEY)) or derived_category(entry)
 
 
@@ -92,10 +96,10 @@ def matches(entry: AppEntry, flt: Filter, *, file_ok: Callable[[AppEntry], bool]
     if flt.category and category_of(entry) != flt.category:
         return False
     if flt.status == UPDATES:
-        return entry.update_status is UpdateStatus.UPDATE_AVAILABLE
+        return entry.update_status is UpdateStatus.UPDATE_AVAILABLE and not updates_suppressed(entry)
     if flt.status == ATTENTION:
         healthy_file = file_ok(entry) if file_ok else os.access(entry.path, os.X_OK)
-        return (not healthy_file) or entry.update_status is UpdateStatus.FAILED
+        return (not healthy_file) or (entry.update_status is UpdateStatus.FAILED and not updates_suppressed(entry))
     if flt.status == UNLINKED:
         return not entry.github_repo
     return True
@@ -111,7 +115,7 @@ def sort_entries(entries: Iterable[AppEntry], key: str = SORT_NAME) -> list[AppE
     if key == SORT_RECENT:
         return sorted(items, key=lambda e: (-e.added_at, e.name.lower()))
     if key == SORT_STATUS:
-        return sorted(items, key=lambda e: (_STATUS_RANK.get(e.update_status, 9), by_name(e)))
+        return sorted(items, key=lambda e: (9 if updates_suppressed(e) else _STATUS_RANK.get(e.update_status, 9), by_name(e)))
     return sorted(items, key=by_name)
 
 

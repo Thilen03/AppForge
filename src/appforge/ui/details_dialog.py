@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
 from ..core.details import FileDetails, inspect_details
 from ..core.models import UpdateStatus
 from ..core.updates.service import can_update
+from ..core.update_policy import updates_paused, version_skipped, updates_suppressed
 from .icons import app_pixmap
 
 
@@ -135,6 +136,10 @@ class DetailsDialog(QDialog):
             UpdateStatus.UP_TO_DATE: "Up to date", UpdateStatus.UPDATE_AVAILABLE: "Update available",
             UpdateStatus.CHECKING: "Checking…", UpdateStatus.FAILED: "Failed", UpdateStatus.UNAVAILABLE: "Unavailable",
         }.get(entry.update_status, "Unknown")
+        if updates_paused(entry):
+            status = "Update paused"
+        elif version_skipped(entry):
+            status = "Version skipped"
         busy = self.busy.get(self.app_id)
         info = entry.metadata.get("update") or {}
         values = {
@@ -145,13 +150,13 @@ class DetailsDialog(QDialog):
             "Last checked": date_text(entry.last_update_check) if entry.last_update_check else "Never checked",
             "Channel": "Stable and prereleases" if entry.metadata.get("include_prereleases") else "Stable",
         }
-        if not busy and info.get("message"):
+        if not busy and not updates_suppressed(entry) and info.get("message"):
             values["Update status"] += f" — {info['message']}"
         for key, value in values.items():
             self.fields[key].setText(value)
         for button in self.buttons.values():
             button.setEnabled(not busy)
-        self.buttons["check"].setEnabled(bool(entry.github_repo) and not busy)
+        self.buttons["check"].setEnabled(bool(entry.github_repo) and not updates_paused(entry) and not busy)
         self.buttons["update"].setEnabled(can_update(entry) and not busy)
         self.buttons["notes"].setEnabled(bool(entry.github_repo and info.get("tag")))
         self.buttons["release"].setEnabled(bool(info.get("release_url")))

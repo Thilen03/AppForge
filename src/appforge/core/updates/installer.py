@@ -75,7 +75,9 @@ def _download(url: str, fd: int, expected: int, progress: Progress | None,
     sha = hashlib.sha256()
     done = 0
     try:
-        with _open(url) as resp, os.fdopen(fd, "wb") as out:
+        # Own the descriptor before opening the URL: connection failures must
+        # close the temporary file too, especially after repeated retries.
+        with os.fdopen(fd, "wb") as out, _open(url) as resp:
             total = int(resp.headers.get("Content-Length") or expected or 0)
             last = 0.0
             while True:

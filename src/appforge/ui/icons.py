@@ -6,7 +6,7 @@ import math
 from pathlib import Path
 
 from PySide6.QtCore import QPointF, QRectF, Qt
-from PySide6.QtGui import QColor, QFont, QIcon, QImage, QPainter, QPainterPath, QPixmap
+from PySide6.QtGui import QColor, QFont, QIcon, QImage, QPainter, QPainterPath, QPen, QPixmap
 from PySide6.QtSvg import QSvgRenderer
 
 _HUES = (212, 172, 262, 28, 330, 142, 48, 196)
@@ -108,4 +108,33 @@ def gear_icon(color: str, size: int = 20) -> QIcon:
     icon = QIcon()
     for dpr in (1.0, 2.0, 3.0):
         icon.addPixmap(gear_pixmap(color, size, dpr))
+    return icon
+
+
+def theme_icon(dark: bool, color: str, size: int = 24) -> QIcon:
+    """Sun in dark mode, crescent moon in light mode: the next appearance."""
+    icon = QIcon()
+    for dpr in (1.0, 2.0, 3.0):
+        pm = QPixmap(int(size * dpr), int(size * dpr))
+        pm.fill(Qt.transparent)
+        painter = QPainter(pm)
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.scale(size * dpr / 24, size * dpr / 24)
+        painter.setPen(QPen(QColor(color), 1.8, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
+        painter.setBrush(Qt.NoBrush)
+        if dark:
+            painter.drawEllipse(QPointF(12, 12), 4, 4)
+            for i in range(8):
+                angle = i * math.pi / 4
+                painter.drawLine(QPointF(12 + 7 * math.cos(angle), 12 + 7 * math.sin(angle)),
+                                 QPointF(12 + 9.5 * math.cos(angle), 12 + 9.5 * math.sin(angle)))
+        else:
+            moon = QPainterPath()
+            moon.addEllipse(QRectF(3, 3, 18, 18))
+            cutout = QPainterPath()
+            cutout.addEllipse(QRectF(9, -1, 18, 18))
+            painter.drawPath(moon.subtracted(cutout))
+        painter.end()
+        pm.setDevicePixelRatio(dpr)
+        icon.addPixmap(pm)
     return icon

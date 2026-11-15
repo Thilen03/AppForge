@@ -26,7 +26,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from ..envvars import env_of
-from ..formats import get_format
+from ..launch_options import TERMINAL, LaunchOptionsError, options_of, command_for, directory_for
 from ..models import AppEntry
 from ..paths import applications_dir
 
@@ -113,9 +113,15 @@ def _categories(raw: str | None) -> str:
 
 
 def menu_category_of(entry: AppEntry) -> str | None:
-    """The main category the user picked for the application menu, or ``None`` = automatic."""
+    """Shared category, including recognizable library-only choices from older versions."""
     value = entry.metadata.get(MENU_CATEGORY_KEY)
-    return value if value in _MAIN_KEYS else None
+    if isinstance(value, str) and value in _MAIN_KEYS:
+        return value
+    legacy = " ".join(str(entry.metadata.get("category") or "").split()).casefold()
+    for key, label in MENU_CATEGORIES:
+        if legacy in (key.casefold(), label.casefold()):
+            return key
+    return None
 
 
 def _entry_categories(entry: AppEntry) -> str:
@@ -147,8 +153,11 @@ def render_entry(entry: AppEntry) -> str:
     path = Path(entry.path)
     if any(ord(c) < 32 or ord(c) == 127 for c in entry.path):
         raise DesktopError("The file path contains control characters, so it can't be used in a launcher.")
-    fmt = get_format(entry.format)
-    argv = fmt.launch_command(path) if fmt else [str(path)]
+    try:
+        options = options_of(entry)
+        argv = command_for(entry, options)
+    except LaunchOptionsError as exc:
+        raise DesktopError(f"Invalid launch options: {exc}") from exc
     env = env_of(entry)
     if env:   # same as KDE's menu editor: Exec=env NAME=value … command
         argv = ["env", *(f"{k}={v}" for k, v in env.items()), *argv]
@@ -175,9 +184,9 @@ def render_entry(entry: AppEntry) -> str:
     lines += [
         f"Exec={exec_line}",
         f"TryExec={_escape_value(str(path))}",
-        f"Path={_escape_value(str(path.parent))}",
+        f"Path={_escape_value(directory_for(entry, options))}",
         f"Icon={_escape_value(icon)}",
-        "Terminal=false",
+        f"Terminal={str(options.get(TERMINAL, False)).lower()}",
         f"Categories={_entry_categories(entry)}",
     ]
     wm_class = _escape_value(entry.metadata.get("startup_wm_class") or "")

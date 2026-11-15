@@ -35,6 +35,18 @@ class AppSettings:
     def _set_bool(self, key: str, value: bool) -> None:
         self.db.set_setting(key, "1" if value else "0")
 
+    @property
+    def theme_mode(self) -> str:
+        """Follow the desktop until the user explicitly chooses light or dark."""
+        value = self.db.get_setting("theme_mode")
+        return value if value in ("light", "dark") else "system"
+
+    @theme_mode.setter
+    def theme_mode(self, value: str) -> None:
+        if value not in ("system", "light", "dark"):
+            raise ValueError("Theme must be system, light or dark.")
+        self.db.set_setting("theme_mode", value)
+
     # -- update checks ------------------------------------------------------------------
     @property
     def auto_check(self) -> bool:

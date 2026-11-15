@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img alt="version" src="https://img.shields.io/badge/version-0.5.9-2B63D9">
+  <img alt="version" src="https://img.shields.io/badge/version-0.6.0-2B63D9">
   <img alt="platform" src="https://img.shields.io/badge/platform-Linux-informational">
   <img alt="python" src="https://img.shields.io/badge/python-3.10%2B-blue">
   <img alt="Qt" src="https://img.shields.io/badge/Qt-6%20(PySide6)-41cd52">
@@ -48,6 +48,21 @@ Built with **Python**, **PySide6 (Qt 6)** and **SQLite**. Developed on CachyOS /
 runs on any recent Linux desktop.
 
 ## Features
+
+The library opens wide enough for four application cards when your screen allows,
+with balanced spacing on both sides. On smaller screens, cards wrap to fit.
+Scroll through larger libraries with the mouse wheel or trackpad; the library
+scrollbar stays hidden.
+
+### Shared categories (new in 0.6.0)
+
+Add and Edit now have one working **Category** dropdown for both AppForge and the
+desktop application menu. Choose a standard category such as Games, Internet or
+Multimedia; the same choice controls AppForge's grouping, filters and category
+searches. Existing custom categories are preserved until you select a replacement.
+
+See the [0.6.0 release notes](releases/RELEASE_NOTES_v0.6.0.md) and the
+[category guide](docs/CATEGORIES.md) for details.
 
 ### Application discovery (new in 0.5.5)
 
@@ -189,20 +204,63 @@ See the [0.5.9 release notes](releases/RELEASE_NOTES_v0.5.9.md) for this update.
   current Python environment and source folder, which must remain available.
 - Settings scrolls on smaller screens while Save and Cancel stay visible.
 
+### Advanced launch options (new in 0.6.0)
+
+- In Add or Edit, click **Launch options…** to set command-line arguments,
+  choose a working directory, or enable **Run in terminal** for scripts and CLI tools.
+- Quote argument values containing spaces, for example `--profile "Work profile"`.
+  Arguments are passed directly, without shell expansion. Leave the working
+  directory blank to keep using the application's folder.
+- Options apply to AppForge, tray launches and desktop-menu launchers, and survive
+  restarts, updates and rollback. Library export/import includes them.
+- Choose **Use options**, then save the parent Add/Edit dialog. Both forms scroll
+  on smaller screens while their Save/Cancel buttons remain available.
+
+See the [launch options guide](docs/LAUNCH_OPTIONS.md) for terminal support,
+argument syntax and working-directory behavior.
+
 ### Library and launcher
 - **Add apps from anywhere**: by file picker or by dragging `.AppImage` files onto the window. Files are never
   moved or copied. To add a plain executable or script, choose *All files* in the file picker.
 - **Reads the AppImage without running it**: name, version, description and icon are extracted from inside the file.
   File names such as `Dolphin-Emu-5.0-x86_64.AppImage` are cleaned up to a sensible suggested name ("Dolphin Emu").
 - **Application cards** show icon, name, version, format, update status and file location.
+  Badges share a soft tinted background, colored outline and matching text in both
+  themes: green for up to date, blue for available updates, yellow for paused
+  updates, red for errors and gray for unavailable or skipped updates.
 - **Launch from a card.** Apps are started detached, so they keep running if you close AppForge. If an app exits
-  right after launch, AppForge shows its output and keeps a log.
+  right after launch, AppForge shows its output and keeps a log. For terminal launches,
+  application output appears in the terminal; AppForge may only capture terminal-process
+  output and exit status. See the [launch options guide](docs/LAUNCH_OPTIONS.md).
 - **Search, categories, filters and sorting**: filter by category or by status (updates available, needs attention,
   no update source) and sort by name, date added or update status.
-- **Light and dark theme** that follows your system.
+- **One shared category**: the **Category** dropdown in Add/Edit uses the standard KDE/desktop
+  menu categories. Your choice groups the app in AppForge and places its launcher in the same
+  category when menu integration is enabled. **Automatic** uses the application's metadata.
+  Existing menu choices take precedence over old library-only categories. Older custom categories
+  are preserved until you choose a replacement. See the [category guide](docs/CATEGORIES.md).
+- **Light and dark theme**: click the sun/moon button immediately to the right of
+  Settings to switch instantly. The sun switches to light mode; the moon switches
+  to dark mode. Your choice is remembered across restarts. Until you choose a mode,
+  AppForge follows your desktop's appearance.
 - **Standalone executables too**: besides AppImages you can add any single Linux program (ELF binary) or `#!`
   script. They get cards, launchers, update checks, backups and rollback just like AppImages. For updates, the
   release must publish the raw binary (see [Current limitations](#current-limitations)).
+
+### Per-app update controls (new in 0.6.0)
+
+- In a card's three-dot menu, choose **Pause updates** to stop update checks and
+  installations for that app. Its status becomes a yellow **Update paused** badge.
+  Choose **Resume updates** to enable updates and check again.
+- When an update is available, choose **Skip this version** to hide that exact
+  release from update buttons, Update All and notifications. Checks continue so a
+  newer release can still be offered. **Clear skipped version** undoes the skip.
+- Both choices survive restarts. Paused and skipped releases do not count toward
+  available updates in the library or tray. Launching and rollback remain available.
+- These controls cannot be changed while that app is checking or updating; let the
+  current operation finish first. These local choices are not included in library exports.
+
+See the [update controls guide](docs/UPDATE_CONTROLS.md) for details.
 
 ### Updates
 - **Link a repository** to any app and AppForge checks its releases for a newer version. Supported sources:
@@ -237,7 +295,7 @@ See the [0.5.9 release notes](releases/RELEASE_NOTES_v0.5.9.md) for this update.
   GNOME overview and can be pinned. It keeps working without AppForge running.
 - The launcher is keyed on the library id, so renaming, changing the icon, moving the file or updating only rewrites
   its contents. **Pins and favourites survive.** The entry is hidden while the file is missing or not executable.
-- Choose the **menu category** (Development, Games, Graphics, Internet, Multimedia, Office, ...) and set
+- Choose the shared **Category** (Development, Games, Graphics, Internet, Multimedia, Office, ...) and set
   **environment variables** (`NAME=value`, one per line) per app. They are applied both in the launcher and when you
   press *Launch* inside AppForge.
 - AppForge repairs missing or outdated launchers at startup and only deletes `.desktop` files it created itself
@@ -345,6 +403,27 @@ Set `APPFORGE_DATA_DIR` to use a throw-away library for experiments. Launchers t
 The script creates a build virtualenv, runs PyInstaller (bundling Python and Qt), assembles an AppDir and runs
 `appimagetool` (downloaded on first use into `build/tools/`, or use your own on `PATH`). It needs `squashfs-tools`
 (`sudo pacman -S squashfs-tools`) and `curl`.
+
+## Development checks
+
+With `requirements-dev.txt` installed in your active Python environment, run:
+
+```bash
+PYTHONPATH=src QT_QPA_PLATFORM=offscreen python -m pytest -q -ra
+PYTHONPATH=src QT_QPA_PLATFORM=offscreen python -m appforge --selftest
+```
+
+Real AppImage fixtures need `appimagetool` and `squashfs-tools`. Set `APPIMAGETOOL`
+to select the tool and, for offline fixture creation, `APPIMAGE_RUNTIME_FILE` to
+a local Type 2 runtime. Fixture launch tests use extraction mode and need no FUSE
+mount. Tests requiring real local sockets report explicit skips when the host
+prohibits them; rerun those tests on a normal Linux host before release approval.
+
+Integration tests cover populated database upgrades, restart persistence,
+discovery, updates, rollback, storage cleanup, library transfer and background
+tray actions. See the [Phase 7 verification report](docs/PHASE_7_PLAN.md) for
+results and the remaining desktop checklist. Automated checks do not replace
+manual testing of the final AppImage on your desktop.
 
 ## Troubleshooting
 

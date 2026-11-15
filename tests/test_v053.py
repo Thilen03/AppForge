@@ -7,6 +7,7 @@ import tempfile
 import threading
 import time
 import unittest
+import pytest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
@@ -27,6 +28,7 @@ class InstanceGuardTests(unittest.TestCase):
         self.lock = os.path.join(self.tmp, "a.lock")
         self.sock = os.path.join(self.tmp, "a.sock")
 
+    @pytest.mark.usefixtures('local_unix')
     def test_second_launch_signals_first_and_exits(self):
         first = InstanceGuard(self.lock, self.sock)
         self.assertTrue(first.acquire())

@@ -45,8 +45,14 @@ def build(dest_dir: Path, name: str, display: str, version: str | None, color: s
             '</releases></component>')
     out = dest_dir / (filename or f"{display}-x86_64.AppImage")
     env = dict(os.environ, ARCH="x86_64", APPIMAGE_EXTRACT_AND_RUN="1")
-    subprocess.run([APPIMAGETOOL, "--no-appstream", str(appdir), str(out)], check=True, env=env,
-                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    command = [APPIMAGETOOL, "--no-appstream"]
+    # Optional local runtime keeps fixture creation independent of GitHub access.
+    if runtime := os.environ.get("APPIMAGE_RUNTIME_FILE"):
+        command += ["--runtime-file", runtime]
+    result = subprocess.run([*command, str(appdir), str(out)], env=env,
+                            capture_output=True, text=True)
+    if result.returncode:
+        raise RuntimeError(f"AppImage fixture creation failed:\n{result.stdout}\n{result.stderr}")
     shutil.rmtree(appdir)
     return out
 

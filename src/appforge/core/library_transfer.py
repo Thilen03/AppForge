@@ -20,6 +20,7 @@ from .envvars import MAX_VARS, validate_pair
 from .formats import detect_format
 from .library import ICON_EXTS, MAX_ICON_BYTES, LibraryError, normalize_path, normalize_repo
 from .models import AppEntry, new_id
+from .launch_options import ARGUMENTS, DIRECTORY, TERMINAL, LAUNCH_KEYS, MAX_ARGUMENT_TEXT, LaunchOptionsError, validate_launch_options
 from .organize import MAX_CATEGORY_LEN
 
 FORMAT = "appforge-library"
@@ -28,9 +29,9 @@ MAX_BYTES = 32 * 1024 * 1024
 MAX_APPS = 10000
 _ID = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
 META_TEXT = {"category": MAX_CATEGORY_LEN, "categories": 2048, "menu_category": 40,
-             "asset_pattern": 1024, "executable_kind": 16, "generic_name": 512,
+             ARGUMENTS: MAX_ARGUMENT_TEXT, DIRECTORY: 4096, "asset_pattern": 1024, "executable_kind": 16, "generic_name": 512,
              "startup_wm_class": 512, "desktop_exec": 8, "installed_version_source": 32}
-META_BOOL = {"include_prereleases", "desktop_entry", "custom_icon"}
+META_BOOL = {TERMINAL, "include_prereleases", "desktop_entry", "custom_icon"}
 FIELDS = {"id", "name", "path", "format", "installed_version", "github_repo", "description",
           "added_at", "metadata", "icon"}
 
@@ -119,6 +120,13 @@ def validate_record(raw: object) -> dict:
         raise TransferError("Invalid installed-version source.")
     if 'desktop_exec' in md and md['desktop_exec'] not in ('%f', '%F', '%u', '%U'):
         raise TransferError("Only a desktop file argument marker can be imported.")
+    try:
+        launch_options = validate_launch_options({k: v for k, v in md.items() if k in LAUNCH_KEYS})
+    except LaunchOptionsError as exc:
+        raise TransferError(str(exc)) from exc
+    for key in LAUNCH_KEYS:
+        md.pop(key, None)
+    md.update(launch_options)
     result['metadata'] = md
     icon = raw.get('icon')
     if icon is not None:

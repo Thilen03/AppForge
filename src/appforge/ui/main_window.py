@@ -27,13 +27,14 @@ from ..core.tray import TrayShortcuts
 from ..core.updates.assets import is_appimage_name
 from ..core.updates.installer import InstallCancelled, InstallResult
 from ..core.updates.service import UpdateService, can_update
+from ..core.update_policy import updates_paused, updates_suppressed
 from ..services import launcher
 from ..services.notifier import send_desktop_notification, summarize_updates
-from .app_card import AppCard
+from .app_card import AppCard, CARD_W
 from .backups_dialog import BackupsDialog
 from .dialogs import FILE_FILTER, AddApplicationDialog, AssetPickerDialog, EditApplicationDialog
 from .flow_layout import FlowLayout
-from .icons import gear_icon, placeholder_pixmap
+from .icons import gear_icon, placeholder_pixmap, theme_icon
 from . import theme
 from .popups import RoundedComboBox
 from .settings_dialog import SettingsDialog
@@ -43,6 +44,7 @@ from .workers import CheckJob, InstallJob, SelfInstallJob, SelfUpdateJob
 
 log = logging.getLogger(__name__)
 STALE_AFTER = 30 * 60   # re-check automatically at startup if the last check is older than this
+CARD_GAP = 18
 BACKGROUND_TICK_MS = 10 * 60 * 1000   # how often the idle checker looks at whether a check is due
 
 
@@ -82,6 +84,7 @@ class MainWindow(QMainWindow):
         self.service = service
         self.updates = UpdateService(service)
         self.settings = settings or AppSettings(service.db)
+        theme.apply_theme(QApplication.instance(), self.settings.theme_mode)
         self._client = github_client
         self._live = auto_check
         self._quitting = False
@@ -135,6 +138,7 @@ class MainWindow(QMainWindow):
         geo = QSettings().value("geometry")
         if geo:
             self.restoreGeometry(geo)
+        self._fit_library_width()
         self.reload()
         QGuiApplication.instance().applicationStateChanged.connect(self._on_app_state)
         self.apply_settings()
@@ -162,14 +166,49 @@ class MainWindow(QMainWindow):
         self.settings_btn.clicked.connect(self.open_settings)
         self._refresh_gear()
 
+    def _build_theme_toggle(self):
+        self.theme_btn = QToolButton(objectName="themeToggle")
+        self.theme_btn.setCursor(Qt.PointingHandCursor)
+        self.theme_btn.setAutoRaise(True)
+        self.theme_btn.setFixedSize(self.settings_btn.size())
+        self.theme_btn.setIconSize(QSize(24, 24))
+        self.theme_btn.clicked.connect(self.toggle_theme)
+        self._refresh_theme_toggle()
+
+    def _refresh_theme_toggle(self):
+        dark = theme.tokens().dark
+        label = "Switch to light mode" if dark else "Switch to dark mode"
+        self.theme_btn.setToolTip(label)
+        self.theme_btn.setAccessibleName(label)
+        self.theme_btn.setIcon(theme_icon(dark, theme.tokens().accent_text))
+
+    def toggle_theme(self):
+        mode = "light" if theme.tokens().dark else "dark"
+        self.settings.theme_mode = mode
+        theme.apply_theme(QApplication.instance(), mode)
+        self._refresh_theme_toggle()
+
+    def _fit_library_width(self):
+        # Open with four columns when the screen permits, including when an older,
+        # narrower saved geometry exists. Resizing later remains unrestricted.
+        margins = self.centralWidget().layout().contentsMargins()
+        target = 4 * CARD_W + 3 * CARD_GAP + margins.left() + margins.right()
+        available = self.screen().availableGeometry().width()
+        frame = self.frameGeometry().width() - self.width()
+        self.resize(min(max(self.width(), target), available - frame), self.height())
+
     def _refresh_gear(self):
         """Match the primary button text colour; re-tint when the theme flips."""
         self.settings_btn.setIcon(gear_icon(theme.tokens().accent_text, 24))
+        if hasattr(self, "theme_btn"):
+            self._refresh_theme_toggle()
 
     def eventFilter(self, obj, ev):
         if obj is getattr(self, "add_btn", None) and ev.type() == QEvent.Resize:
             side = ev.size().height()
             self.settings_btn.setFixedSize(side, side)
+            if hasattr(self, "theme_btn"):
+                self.theme_btn.setFixedSize(side, side)
         return super().eventFilter(obj, ev)
 
     def changeEvent(self, ev):
@@ -227,6 +266,8 @@ class MainWindow(QMainWindow):
         header.addWidget(self.add_btn)
         self._build_settings_gear()
         header.addWidget(self.settings_btn)
+        self._build_theme_toggle()
+        header.addWidget(self.theme_btn)
         root.addLayout(header)
 
         self.filter_row = QWidget()
@@ -264,8 +305,10 @@ class MainWindow(QMainWindow):
         self.scroll = QScrollArea()
         self.scroll.setWidgetResizable(True)
         self.scroll.setFrameShape(QScrollArea.NoFrame)
+        self.scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.grid_host = QWidget()
-        self.flow = FlowLayout(self.grid_host, 18, 18)
+        self.flow = FlowLayout(self.grid_host, CARD_GAP, CARD_GAP)
         self.flow.setContentsMargins(0, 4, 0, 24)
         self.scroll.setWidget(self.grid_host)
         self.stack.addWidget(self.scroll)
@@ -299,6 +342,9 @@ class MainWindow(QMainWindow):
     def _make_card(self, entry: AppEntry) -> AppCard:
         card = AppCard(entry, file_state(entry), self._busy.get(entry.id), self.grid_host,
                        favorite=entry.id in self.shortcuts.favorites)
+        card.pauseUpdatesRequested.connect(self.set_updates_paused)
+        card.skipVersionRequested.connect(self.skip_update_version)
+        card.clearSkippedVersionRequested.connect(self.clear_skipped_version)
         card.favoriteRequested.connect(self._favorite_from_tray)
         card.detailsRequested.connect(self.show_details)
         card.launchRequested.connect(self.launch)
@@ -316,6 +362,22 @@ class MainWindow(QMainWindow):
         card.backupsRequested.connect(self.show_backups)
         card.desktopToggleRequested.connect(self.toggle_desktop_entry)
         return card
+
+    def set_updates_paused(self, app_id: str, paused: bool):
+        if app_id in self._busy:
+            return
+        if self.updates.set_paused(app_id, paused):
+            self._refresh_card(app_id)
+            if not paused:
+                self.check_updates([app_id])
+
+    def skip_update_version(self, app_id: str):
+        if app_id not in self._busy and self.updates.skip_version(app_id):
+            self._refresh_card(app_id)
+
+    def clear_skipped_version(self, app_id: str):
+        if app_id not in self._busy and self.updates.clear_skipped_version(app_id):
+            self._refresh_card(app_id)
 
     def _card(self, app_id: str) -> AppCard | None:
         return next((c for c in self._cards if c.entry.id == app_id), None)
@@ -475,7 +537,7 @@ class MainWindow(QMainWindow):
         if self.tray is None:
             return
         apps = self.service.list_applications()
-        count = sum(e.update_status is UpdateStatus.UPDATE_AVAILABLE for e in apps)
+        count = sum(e.update_status is UpdateStatus.UPDATE_AVAILABLE and not updates_suppressed(e) for e in apps)
         ready = sum(can_update(e) and e.id not in self._busy and file_state(e) is FileState.OK
                     for e in apps)
         installs = [(i, status) for i, status in self._busy.items()
@@ -535,14 +597,14 @@ class MainWindow(QMainWindow):
         token = self.settings.effective_github_token()
         targets = []
         for e in self.service.list_applications():
-            if not e.github_repo or e.id in self._busy or (ids is not None and e.id not in ids):
+            if not e.github_repo or updates_paused(e) or e.id in self._busy or (ids is not None and e.id not in ids):
                 continue
             if only_stale and e.last_update_check and now - e.last_update_check < limit:
                 continue
             targets.append(e)
         if not targets:
             if user_initiated:
-                self.statusBar().showMessage("Nothing to check: add an update source (a repository URL) first.", 4000)
+                self.statusBar().showMessage("Nothing to check: add an update source or resume paused updates.", 4000)
             return
         self._user_check = self._user_check or user_initiated
         for e in targets:
@@ -570,7 +632,7 @@ class MainWindow(QMainWindow):
             self._user_check = False
             n = sum(1 for c in self._cards if can_update(c.entry) and c.entry.update_status is UpdateStatus.UPDATE_AVAILABLE)
             self.statusBar().showMessage(
-                f"{n} update{'s' if n != 1 else ''} available" if n else "Everything is up to date", 5000)
+                f"{n} update{'s' if n != 1 else ''} available" if n else "No updates available for apps with updates enabled", 5000)
 
     # -- AppForge's own updates -----------------------------------------------------------
     def _check_self_update(self):
@@ -691,7 +753,7 @@ class MainWindow(QMainWindow):
             return
         if not self.settings.notifications:
             return
-        apps = [e for e in self.service.list_applications() if e.github_repo]
+        apps = [e for e in self.service.list_applications() if e.github_repo and not updates_suppressed(e)]
         failures = [(e.id, (e.metadata.get("update") or {}).get("message", "Check failed"))
                     for e in apps if e.update_status is UpdateStatus.FAILED]
         fresh_failures = [issue for issue in failures if issue not in self._issue_notified]
@@ -713,7 +775,7 @@ class MainWindow(QMainWindow):
                 return
             incomplete = any(e.update_status is not UpdateStatus.UP_TO_DATE for e in apps)
             self._notify("AppForge", "Some update sources need attention. Open the library for details."
-                         if incomplete else "Everything is up to date." if apps else "No update sources configured.")
+                         if incomplete else "Everything is up to date." if apps else "No active update sources to check.")
 
     def _notify(self, title: str, body: str):
         if not self.settings.notifications:

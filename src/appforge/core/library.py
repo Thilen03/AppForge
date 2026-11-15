@@ -16,6 +16,7 @@ from .desktop import MENU_CATEGORIES, MENU_CATEGORY_KEY, DesktopError, DesktopSe
 from .envvars import ENV_KEY, EnvVarError, validate_pair
 from .formats import AppMetadata, FormatError, detect_format, get_format
 from .models import AppEntry, UpdateStatus
+from .launch_options import LAUNCH_KEYS, LaunchOptionsError, validate_launch_options
 from .organize import CATEGORY_KEY, clean_category
 from .relocate import find_candidates
 from .updates.providers import SUPPORTED_HINT, parse_source
@@ -135,6 +136,7 @@ class LibraryService:
         integrate_desktop: bool = False,
         menu_category: str | None = None,
         env_vars: dict[str, str] | None = None,
+        launch_options: dict | None = None,
     ) -> AppEntry:
         """Add an application. ``integrate_desktop`` also creates its application-menu launcher;
         a failure there never fails the add – check :meth:`desktop_enabled` on the result."""
@@ -143,6 +145,10 @@ class LibraryService:
             raise LibraryError("This application is already in your library.")
         menu_category = _check_menu_category(menu_category)
         env_vars = _check_env(env_vars)
+        try:
+            launch_options = validate_launch_options(launch_options if launch_options is not None else {})
+        except LaunchOptionsError as exc:
+            raise LibraryError(str(exc)) from exc
         md = metadata or inspect_file(norm)
         entry = AppEntry(
             name=(name or "").strip() or md.name_suggestion,
@@ -153,6 +159,7 @@ class LibraryService:
             description=md.description,
             metadata={**md.extra, "warnings": md.warnings},
         )
+        entry.metadata.update(launch_options)
         if menu_category:
             entry.metadata[MENU_CATEGORY_KEY] = menu_category
         if env_vars:
@@ -223,8 +230,17 @@ class LibraryService:
         category: str | None = ...,  # type: ignore[assignment]  (text = set, None/blank = automatic)
         menu_category: str | None = ...,  # type: ignore[assignment]  (freedesktop key; None = automatic)
         env_vars: dict[str, str] | None = ...,  # type: ignore[assignment]  (empty/None = none)
+        launch_options: dict = ...,  # type: ignore[assignment]  (empty = defaults)
     ) -> AppEntry:
         entry = self._require(app_id)
+        if launch_options is not ...:
+            try:
+                checked_options = validate_launch_options(launch_options)
+            except LaunchOptionsError as exc:
+                raise LibraryError(str(exc)) from exc
+            for key in LAUNCH_KEYS:
+                entry.metadata.pop(key, None)
+            entry.metadata.update(checked_options)
         if menu_category is not ...:
             chosen_menu = _check_menu_category(menu_category)
             if chosen_menu:

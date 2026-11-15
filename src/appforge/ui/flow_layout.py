@@ -61,15 +61,30 @@ class FlowLayout(QLayout):
     def _layout(self, rect, dry):
         m = self.contentsMargins()
         area = rect.adjusted(m.left(), m.top(), -m.right(), -m.bottom())
-        x, y, row_h = area.x(), area.y(), 0
+        rows = []
+        row, row_w, row_h = [], 0, 0
         for item in self._items:
             sz = item.sizeHint()
-            if x + sz.width() > area.right() + 1 and row_h > 0:
-                x = area.x()
-                y += row_h + self._v
-                row_h = 0
-            if not dry:
-                item.setGeometry(QRect(QPoint(x, y), sz))
-            x += sz.width() + self._h
+            gap = self._h if row else 0
+            if row and row_w + gap + sz.width() > area.width():
+                rows.append((row, row_w, row_h))
+                row, row_w, row_h, gap = [], 0, 0, 0
+            row.append((item, sz))
+            row_w += gap + sz.width()
             row_h = max(row_h, sz.height())
-        return y + row_h - rect.y() + m.bottom()
+        if row:
+            rows.append((row, row_w, row_h))
+        # Center the whole grid; partial final rows share its first column.
+        grid_w = max((width for _, width, _ in rows), default=0)
+        left = area.x() + max(0, (area.width() - grid_w) // 2)
+        y = area.y()
+        for index, (row, _, height) in enumerate(rows):
+            x = left
+            for item, sz in row:
+                if not dry:
+                    item.setGeometry(QRect(QPoint(x, y), sz))
+                x += sz.width() + self._h
+            y += height
+            if index < len(rows) - 1:
+                y += self._v
+        return y - rect.y() + m.bottom()

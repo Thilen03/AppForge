@@ -9,17 +9,18 @@ from PySide6.QtCore import QObject, QRunnable, QThreadPool, Qt, Signal
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
     QCheckBox, QDialog, QFileDialog, QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem,
-    QPlainTextEdit, QPushButton, QVBoxLayout, QWidget,
+    QPlainTextEdit, QPushButton, QScrollArea, QVBoxLayout, QWidget,
 )
 
-from ..core.desktop import MENU_CATEGORIES, MENU_CATEGORY_KEY
+from ..core.desktop import MENU_CATEGORIES, menu_category_of
 from ..core.envvars import ENV_KEY, EnvVarError, clean_env, format_env_text, parse_env_text
 from ..core.formats import AppMetadata, get_format
 from ..core.library import (
     LibraryError, LibraryService, inspect_file, normalize_path, normalize_repo,
 )
 from ..core.models import AppEntry
-from ..core.organize import CATEGORY_KEY, category_suggestions
+from ..core.launch_options import LAUNCH_KEYS
+from .launch_options_dialog import LaunchOptionsDialog
 from .icons import app_pixmap, placeholder_pixmap
 from .popups import RoundedComboBox
 
@@ -62,15 +63,14 @@ ENV_PLACEHOLDER = "QT_QPA_PLATFORM=xcb\nDRI_PRIME=1"
 
 
 def _menu_category_combo(current: str | None) -> RoundedComboBox:
-    """Combo with \"Automatic\" plus the KDE/freedesktop main categories (item data = desktop key)."""
+    """Automatic plus the standard desktop categories (item data = desktop key)."""
     combo = RoundedComboBox()
     combo.addItem("Automatic (from the application)", None)
     for key, label in MENU_CATEGORIES:
         combo.addItem(label, key)
     idx = combo.findData(current)
     combo.setCurrentIndex(idx if idx >= 0 else 0)
-    combo.setToolTip("The section of the KDE application launcher (and other desktop menus) this "
-                     "application is listed under.")
+    combo.setToolTip("Used in AppForge and the KDE application launcher (and other desktop menus).")
     return combo
 
 
@@ -92,12 +92,41 @@ def _env_error(edit: QPlainTextEdit) -> str | None:
         return str(exc)
 
 
+def _scrolling_body(dialog):
+    outer = QVBoxLayout(dialog)
+    outer.setContentsMargins(0, 0, 0, 0)
+    scroll = QScrollArea()
+    scroll.setWidgetResizable(True)
+    scroll.setFrameShape(QScrollArea.NoFrame)
+    scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+    content = QWidget()
+    scroll.setWidget(content)
+    outer.addWidget(scroll, 1)
+    return outer, QVBoxLayout(content)
+
+
+def _launch_options_row(dialog, layout):
+    row = QHBoxLayout()
+    row.addWidget(_field_label("Environment variables (optional)"), 1)
+    dialog.launch_options_btn = QPushButton("Launch options…")
+    dialog.launch_options_btn.setToolTip("Command-line arguments, working directory and Run in terminal")
+    def edit_options():
+        editor = LaunchOptionsDialog(dialog._launch_options, dialog)
+        if editor.exec() == QDialog.Accepted:
+            dialog._launch_options = editor.options
+    dialog.launch_options_btn.clicked.connect(edit_options)
+    row.addWidget(dialog.launch_options_btn)
+    layout.addLayout(row)
+
+
 class AddApplicationDialog(QDialog):
     def __init__(self, service: LibraryService, parent=None, initial_path: str | None = None):
         super().__init__(parent)
         self.service = service
         self.setWindowTitle("Add application")
-        self.setFixedSize(560, 770)  # never resizes while open: avoids compositor resize artefacts
+        self.resize(560, min(770, self.screen().availableGeometry().height() - 80))
+        self.setMinimumSize(520, 420)
+        self._launch_options = {}
         self.metadata: AppMetadata | None = None
         self.added: AppEntry | None = None
         self.menu_requested = False   # whether the "application menu" box was ticked on accept
@@ -110,12 +139,14 @@ class AddApplicationDialog(QDialog):
             self._set_path(initial_path)
 
     def _build(self):
-        lay = QVBoxLayout(self)
+        outer, lay = _scrolling_body(self)
         lay.setContentsMargins(24, 22, 24, 20)
         lay.setSpacing(10)
         lay.addWidget(QLabel("Add application", objectName="title"))
-        lay.addWidget(QLabel("Pick an AppImage (or a Linux program or script) anywhere on your computer. It stays where it is.",
-                             objectName="subtitle"))
+        subtitle = QLabel("Pick an AppImage (or a Linux program or script) anywhere on your computer. "
+                          "It stays where it is.", objectName="subtitle")
+        subtitle.setWordWrap(True)
+        lay.addWidget(subtitle)
         lay.addSpacing(8)
 
         lay.addWidget(_field_label("File"))
@@ -177,6 +208,7 @@ class AddApplicationDialog(QDialog):
         self.repo_edit.textChanged.connect(self._validate)
         lay.addWidget(self.repo_edit)
         self.repo_msg = QLabel(SOURCE_HINT, objectName="hint")
+        self.repo_msg.setWordWrap(True)
         lay.addWidget(self.repo_msg)
         self.menu_cb = QCheckBox("Add to the application menu")
         self.menu_cb.setToolTip("Creates a launcher in your desktop's application menu so you can start "
@@ -184,11 +216,11 @@ class AddApplicationDialog(QDialog):
         self.menu_cb.setChecked(self.service.desktop_default())
         lay.addWidget(self.menu_cb)
 
-        lay.addWidget(_field_label("Application menu category"))
+        lay.addWidget(_field_label("Category"))
         self.menu_category_cb = _menu_category_combo(None)
         lay.addWidget(self.menu_category_cb)
 
-        lay.addWidget(_field_label("Environment variables (optional)"))
+        _launch_options_row(self, lay)
         self.env_edit = _env_edit()
         self.env_edit.textChanged.connect(self._validate)
         lay.addWidget(self.env_edit)
@@ -207,7 +239,8 @@ class AddApplicationDialog(QDialog):
         self.add_btn.clicked.connect(self._accept)
         btns.addWidget(cancel)
         btns.addWidget(self.add_btn)
-        lay.addLayout(btns)
+        btns.setContentsMargins(24, 8, 24, 20)
+        outer.addLayout(btns)
 
     # -- file selection -----------------------------------------------------------------
     def _browse(self):
@@ -362,6 +395,7 @@ class AddApplicationDialog(QDialog):
                 custom_icon=self._custom_icon, integrate_desktop=self.menu_requested,
                 menu_category=self.menu_category_cb.currentData(),
                 env_vars=parse_env_text(self.env_edit.toPlainText()),
+                launch_options=self._launch_options,
             )
         except LibraryError as exc:
             self._show_file_msg(str(exc))
@@ -377,11 +411,12 @@ class EditApplicationDialog(QDialog):
     def __init__(self, service: LibraryService, entry: AppEntry, parent=None):
         super().__init__(parent)
         self.service, self.entry = service, entry
+        self._launch_options = {k: v for k, v in entry.metadata.items() if k in LAUNCH_KEYS}
         self.setWindowTitle(f"Edit {entry.name}")
         self._orig_path = entry.path
         self._new_icon: str | None = None   # path of a newly chosen image
         self._reset_icon = False            # True = go back to the AppImage's own icon
-        lay = QVBoxLayout(self)
+        outer, lay = _scrolling_body(self)
         lay.setContentsMargins(24, 22, 24, 20)
         lay.setSpacing(8)
 
@@ -416,19 +451,22 @@ class EditApplicationDialog(QDialog):
         lay.addWidget(self.name_edit)
 
         lay.addWidget(_field_label("Category"))
-        self.category_edit = RoundedComboBox()
-        self.category_edit.setEditable(True)
-        self.category_edit.addItems(category_suggestions(service.list_applications()))
-        self.category_edit.setCurrentText(entry.metadata.get(CATEGORY_KEY) or "")
-        self.category_edit.lineEdit().setPlaceholderText("Automatic (taken from the application)")
-        self.category_edit.setToolTip("Pick a category or type your own. Leave empty for automatic.")
-        lay.addWidget(self.category_edit)
-
-        lay.addWidget(_field_label("Application menu category"))
-        self.menu_category_cb = _menu_category_combo(entry.metadata.get(MENU_CATEGORY_KEY))
+        self._original_category = menu_category_of(entry)
+        self._category_changed = False
+        self.menu_category_cb = _menu_category_combo(self._original_category)
+        self.menu_category_cb.currentIndexChanged.connect(self._category_selected)
+        self.menu_category_cb.activated.connect(self._category_selected)
         lay.addWidget(self.menu_category_cb)
+        if entry.metadata.get("category") and self._original_category is None:
+            legacy_hint = QLabel(
+                f'Previous library category: {entry.metadata["category"]}. '
+                'Choose a category above to use it in both AppForge and your application menu.',
+                objectName="hint")
+            legacy_hint.setTextFormat(Qt.PlainText)
+            legacy_hint.setWordWrap(True)
+            lay.addWidget(legacy_hint)
 
-        lay.addWidget(_field_label("Environment variables (optional)"))
+        _launch_options_row(self, lay)
         self.env_edit = _env_edit(format_env_text(clean_env(entry.metadata.get(ENV_KEY))))
         self.env_edit.textChanged.connect(self._revalidate)
         lay.addWidget(self.env_edit)
@@ -486,9 +524,15 @@ class EditApplicationDialog(QDialog):
         self.save_btn.clicked.connect(self._save)
         btns.addWidget(cancel)
         btns.addWidget(self.save_btn)
-        lay.addLayout(btns)
+        btns.setContentsMargins(24, 8, 24, 20)
+        outer.addLayout(btns)
         self._path_changed()
-        self.setFixedSize(560, lay.sizeHint().height() + 70)
+        self.setMinimumSize(520, 420)
+        self.resize(560, min(lay.sizeHint().height() + 110,
+                             self.screen().availableGeometry().height() - 80))
+
+    def _category_selected(self):
+        self._category_changed = True
 
     def _choose_icon(self):
         start = str(Path(self._new_icon).parent) if self._new_icon else str(Path.home())
@@ -552,13 +596,15 @@ class EditApplicationDialog(QDialog):
         try:
             new_path = self.path_edit.text().strip()
             changes: dict = dict(name=self.name_edit.text(),
-                                 category=self.category_edit.currentText(),
                                  menu_category=self.menu_category_cb.currentData(),
                                  env_vars=parse_env_text(self.env_edit.toPlainText()),
+                                 launch_options=self._launch_options,
                                  github_repo=self.repo_edit.text(),
                                  installed_version=self.version_edit.text(),
                                  settings={"include_prereleases": self.pre_cb.isChecked(),
                                            "asset_pattern": self.pattern_edit.text()})
+            if self.menu_category_cb.currentData() is not None or self._category_changed:
+                changes["category"] = None
             if new_path and normalize_path(new_path) != self.entry.path:
                 if Path(normalize_path(new_path)).is_file():
                     changes["path"] = new_path

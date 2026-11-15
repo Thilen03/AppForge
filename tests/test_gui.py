@@ -272,9 +272,11 @@ def test_edit_dialog_saves_category(qapp, service, fixtures):
     from appforge.ui.dialogs import EditApplicationDialog
     e = service.add_application(str(fixtures["alpha"]))
     dlg = EditApplicationDialog(service, e)
-    dlg.category_edit.setCurrentText("Favourites")
+    dlg.menu_category_cb.setCurrentIndex(dlg.menu_category_cb.findData("Game"))
     dlg.save_btn.click()
-    assert service.get(e.id).metadata["category"] == "Favourites"
+    assert service.get(e.id).metadata["menu_category"] == "Game"
+    from appforge.core.organize import category_of
+    assert category_of(service.get(e.id)) == "Games"
 
 
 def test_settings_dialog_saves(qapp, service):

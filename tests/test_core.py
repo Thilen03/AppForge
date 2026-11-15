@@ -124,6 +124,8 @@ def test_launch_and_not_executable(fixtures, service, tmp_path):
     p = tmp_path / "L.AppImage"
     shutil.copy(fixtures["alpha"], p)
     e = service.add_application(str(p))
+    # Run the real fixture runtime without requiring a mounted FUSE device.
+    e.metadata['env_vars'] = {'APPIMAGE_EXTRACT_AND_RUN': '1'}
     h = launcher.launch(e)
     time.sleep(0.5)
     assert "started" in h.log_tail() or h.early_exit_code() is None
@@ -138,6 +140,7 @@ def test_launch_and_not_executable(fixtures, service, tmp_path):
 
 def test_launch_reports_early_failure(fixtures, service):
     e = service.add_application(str(fixtures["gamma"]))
+    e.metadata['env_vars'] = {'APPIMAGE_EXTRACT_AND_RUN': '1'}
     h = launcher.launch(e)
     h.process.wait(timeout=10)
     assert h.early_exit_code() == 3 and "boom" in h.log_tail()

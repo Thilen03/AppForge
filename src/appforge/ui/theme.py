@@ -1,4 +1,4 @@
-"""Light/dark design tokens and the application stylesheet. Follows the system colour scheme."""
+"""Light/dark design tokens and the application stylesheet. Supports system, light and dark appearance."""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -120,10 +120,10 @@ def stylesheet(t: Tokens) -> str:
 
     QToolButton {{ background: transparent; border: 1px solid transparent; border-radius: 8px;
                   padding: 4px; }}
-    QToolButton#gear {{ background: {t.accent}; border: 1px solid {t.accent}; }}
+    QToolButton#gear, QToolButton#themeToggle {{ background: {t.accent}; border: 1px solid {t.accent}; }}
     QToolButton:hover {{ background: {t.accent_soft}; }}
-    QToolButton#gear:hover {{ background: {t.accent_hover}; border-color: {t.accent_hover}; }}
-    QToolButton#gear:focus {{ border: 1px solid {t.accent}; }}
+    QToolButton#gear:hover, QToolButton#themeToggle:hover {{ background: {t.accent_hover}; border-color: {t.accent_hover}; }}
+    QToolButton#gear:focus, QToolButton#themeToggle:focus {{ border: 1px solid {t.accent}; }}
     QToolButton:focus {{ border: 1px solid {t.accent}; }}
     QToolButton::menu-indicator {{ image: none; }}
 
@@ -134,12 +134,15 @@ def stylesheet(t: Tokens) -> str:
     QLabel#cardMeta {{ color: {t.muted}; font-size: 12px; }}
     QLabel#cardPath {{ color: {t.muted}; font-size: 11px; }}
     QLabel#chip {{ border-radius: 9px; padding: 2px 9px; font-size: 11px; font-weight: 600;
-                  background: {t.accent_soft}; color: {t.accent}; }}
-    QLabel#chip[kind="muted"] {{ background: transparent; color: {t.muted};
-                                border: 1px solid {t.border}; }}
-    QLabel#chip[kind="danger"] {{ background: {t.danger_soft}; color: {t.danger}; }}
-    QLabel#chip[kind="ok"] {{ background: transparent; color: {t.ok}; border: 1px solid {t.ok}; }}
-    QLabel#chip[kind="update"] {{ background: {t.accent}; color: {t.accent_text}; }}
+                  background: {t.accent_soft}; color: {t.accent}; border: 1px solid {t.accent}; }}
+    QLabel#chip[kind="muted"] {{ background: {"#303744" if t.dark else "#EDF0F5"}; color: {t.muted};
+                                border-color: {t.muted}; }}
+    QLabel#chip[kind="danger"] {{ background: {t.danger_soft}; color: {t.danger}; border-color: {t.danger}; }}
+    QLabel#chip[kind="ok"] {{ background: {"#293E35" if t.dark else "#E6F3EB"};
+                             color: {t.ok}; border-color: {t.ok}; }}
+    QLabel#chip[kind="paused"] {{ background: {"#493C1C" if t.dark else "#FFF3C4"};
+        color: {"#F5CF64" if t.dark else "#806000"}; border: 1px solid {"#B89A44" if t.dark else "#D2AE3B"}; }}
+    QLabel#chip[kind="update"] {{ background: {t.accent_soft}; color: {t.accent}; border-color: {t.accent}; }}
     QPushButton#soft {{ background: {t.accent_soft}; color: {t.accent}; border: 1px solid transparent;
                        font-weight: 600; }}
     QPushButton#soft:hover {{ border: 1px solid {t.accent}; }}
@@ -182,9 +185,9 @@ def stylesheet(t: Tokens) -> str:
     """
 
 
-def apply_theme(app: QApplication) -> Tokens:
+def apply_theme(app: QApplication, mode: str = "system") -> Tokens:
     global _current
-    _current = DARK if is_dark(app) else LIGHT
+    _current = DARK if mode == "dark" or (mode != "light" and is_dark(app)) else LIGHT
     app.setStyle("Fusion")
     app.setPalette(_palette(_current))
     app.setStyleSheet(stylesheet(_current))
