@@ -23,7 +23,7 @@ def _png(path: Path, color: str, size: int = 128):
 
 def build(dest_dir: Path, name: str, display: str, version: str | None, color: str,
           run_script: str = "echo started; sleep 1", filename: str | None = None,
-          metainfo: bool = True) -> Path:
+          metainfo: bool = True, update_info: str | None = None) -> Path:
     dest_dir.mkdir(parents=True, exist_ok=True)
     appdir = dest_dir / f"{name}.AppDir"
     shutil.rmtree(appdir, ignore_errors=True)
@@ -46,6 +46,8 @@ def build(dest_dir: Path, name: str, display: str, version: str | None, color: s
     out = dest_dir / (filename or f"{display}-x86_64.AppImage")
     env = dict(os.environ, ARCH="x86_64", APPIMAGE_EXTRACT_AND_RUN="1")
     command = [APPIMAGETOOL, "--no-appstream"]
+    if update_info:
+        command += ["-u", update_info]
     # Optional local runtime keeps fixture creation independent of GitHub access.
     if runtime := os.environ.get("APPIMAGE_RUNTIME_FILE"):
         command += ["--runtime-file", runtime]

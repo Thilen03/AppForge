@@ -41,6 +41,7 @@ from .settings_dialog import SettingsDialog
 from .tray import TrayController, tray_available
 from .kwin_tray import KWinTrayBridge, plasma_wayland
 from .workers import CheckJob, InstallJob, SelfInstallJob, SelfUpdateJob
+from .discovery_watch import DiscoveryWatcher
 
 log = logging.getLogger(__name__)
 STALE_AFTER = 30 * 60   # re-check automatically at startup if the last check is older than this
@@ -84,7 +85,8 @@ class MainWindow(QMainWindow):
         self.service = service
         self.updates = UpdateService(service)
         self.settings = settings or AppSettings(service.db)
-        theme.apply_theme(QApplication.instance(), self.settings.theme_mode)
+        theme.apply_theme(QApplication.instance(), self.settings.theme_mode,
+                          self.settings.card_badge_colors)
         self._client = github_client
         self._live = auto_check
         self._quitting = False
@@ -140,6 +142,10 @@ class MainWindow(QMainWindow):
             self.restoreGeometry(geo)
         self._fit_library_width()
         self.reload()
+        self.discovery_watcher = DiscoveryWatcher(service, self)
+        self.discovery_watcher.changed.connect(self._discovery_found)
+        self.discovery_watcher.poll()
+        QApplication.instance().aboutToQuit.connect(self.discovery_watcher.stop)
         QGuiApplication.instance().applicationStateChanged.connect(self._on_app_state)
         self.apply_settings()
         QApplication.instance().aboutToQuit.connect(self._stop_kwin_bridge)
@@ -185,7 +191,7 @@ class MainWindow(QMainWindow):
     def toggle_theme(self):
         mode = "light" if theme.tokens().dark else "dark"
         self.settings.theme_mode = mode
-        theme.apply_theme(QApplication.instance(), mode)
+        theme.apply_theme(QApplication.instance(), mode, self.settings.card_badge_colors)
         self._refresh_theme_toggle()
 
     def _fit_library_width(self):
@@ -298,6 +304,12 @@ class MainWindow(QMainWindow):
         self.banner.setWordWrap(True)
         self.banner.hide()
         root.addWidget(self.banner)
+
+        self.discovery_found_btn = QPushButton(objectName="soft")
+        self.discovery_found_btn.setAccessibleName("Review new applications in watched folders")
+        self.discovery_found_btn.clicked.connect(self.review_discovered)
+        self.discovery_found_btn.hide()
+        root.addWidget(self.discovery_found_btn)
 
         self.stack = QStackedWidget()
         root.addWidget(self.stack, 1)
@@ -478,6 +490,8 @@ class MainWindow(QMainWindow):
         self._refresh_header()
         self._apply_filter()
         self._refresh_details()
+        if hasattr(self, "discovery_watcher"):
+            self.discovery_watcher.prune_registered()
 
     def _refresh_categories(self, apps: list[AppEntry]):
         """Rebuild the category list from the library, keeping the current choice if it still exists."""
@@ -887,8 +901,10 @@ class MainWindow(QMainWindow):
         dlg = SettingsDialog(self.settings, self.tray is not None, self)
         dlg.exportRequested.connect(lambda: self.open_library_transfer("export", dlg))
         dlg.importRequested.connect(lambda: self.open_library_transfer("import", dlg))
-        if dlg.exec() == SettingsDialog.Accepted:
+        if dlg.exec() == SettingsDialog.DialogCode.Accepted:
             self.apply_settings()
+            theme.apply_theme(QApplication.instance(), self.settings.theme_mode,
+                              self.settings.card_badge_colors)
             self.statusBar().showMessage("Settings saved", 3000)
 
     def open_library_transfer(self, mode, parent=None):
@@ -1157,7 +1173,30 @@ class MainWindow(QMainWindow):
     def discover_applications(self):
         from .discovery_dialog import DiscoveryDialog
         dialog = DiscoveryDialog(self.service, self)
+        if hasattr(dialog, "preferencesChanged"):
+            dialog.preferencesChanged.connect(self.discovery_watcher.poll)
         dialog.exec()
+        self.discovery_watcher.poll()
+        self.reload()
+        dialog.deleteLater()
+
+    def _discovery_found(self, result):
+        count = len(result.candidates)
+        self.discovery_found_btn.setText(
+            f"{count} new app{'s' if count != 1 else ''} found — Review…")
+        self.discovery_found_btn.setToolTip("\n".join(result.errors) or
+                                           "Review new apps before adding them to your library.")
+        self.discovery_found_btn.setVisible(bool(count))
+
+    def review_discovered(self):
+        from .discovery_dialog import DiscoveryDialog
+        self.discovery_watcher.prune_registered()
+        if not self.discovery_watcher.result.candidates:
+            return
+        dialog = DiscoveryDialog(self.service, self, preview=self.discovery_watcher.result)
+        dialog.preferencesChanged.connect(self.discovery_watcher.poll)
+        dialog.exec()
+        self.discovery_watcher.poll()
         self.reload()
         dialog.deleteLater()
 
@@ -1405,4 +1444,5 @@ class MainWindow(QMainWindow):
         for dialog in list(self._details.values()) + list(self._release_notes.values()):
             dialog.close()
         self._stop_kwin_bridge()
+        self.discovery_watcher.stop()
         super().closeEvent(ev)

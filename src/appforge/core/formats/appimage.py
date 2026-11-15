@@ -15,6 +15,9 @@ from collections import deque
 from pathlib import Path
 
 from .base import AppFormat, AppMetadata, FormatError
+from .appimage_update import (
+    SOURCE_ORIGIN_KEY, SUGGESTED_SOURCE_KEY, read_update_information, repository_metadata_url, suggest_source,
+)
 
 log = logging.getLogger(__name__)
 
@@ -237,6 +240,10 @@ def _parse_metainfo(xml_bytes: bytes) -> dict[str, str]:
         root = ET.fromstring(xml_bytes)
     except ET.ParseError:
         return out
+    # AppStream permits a namespace; keep the existing parser's local tag queries.
+    for node in root.iter():
+        if isinstance(node.tag, str):
+            node.tag = node.tag.rsplit("}", 1)[-1]
     for tag in ("name", "summary", "id"):
         el = root.find(tag)  # un-localised element only (no xml:lang attribute)
         for cand in root.findall(tag):
@@ -256,6 +263,15 @@ def _parse_metainfo(xml_bytes: bytes) -> dict[str, str]:
             best = (stamp, ver)
     if best:
         out["version"] = best[1]
+    for role, origin in (("vcs-browser", "appstream_vcs"), ("homepage", "appstream_homepage")):
+        urls = {source for node in root.findall("url") if node.get("type") == role and node.text
+                if (source := repository_metadata_url(node.text.strip(), explicit_vcs=role == "vcs-browser"))}
+        if len(urls) > 1:
+            break  # Conflicting repository links must not turn into an arbitrary suggestion.
+        if urls:
+            out[SUGGESTED_SOURCE_KEY] = urls.pop()
+            out[SOURCE_ORIGIN_KEY] = origin
+            break
     return out
 
 
@@ -305,8 +321,12 @@ class AppImageFormat(AppFormat):
             version=version_from_filename(fname),
             extra={"appimage_type": kind, "version_source": "filename" if version_from_filename(fname) else None},
         )
+        suggested = suggest_source(read_update_information(path, kind))
+        if suggested:
+            md.extra[SUGGESTED_SOURCE_KEY] = suggested
+            md.extra[SOURCE_ORIGIN_KEY] = "update_info"
         if kind == 1:
-            md.warnings.append("Type 1 AppImage: embedded metadata cannot be read, using the file name.")
+            md.warnings.append("Type 1 AppImage: embedded name and icon cannot be read, using the file name.")
             return md
 
         offset = find_squashfs_offset(path)
@@ -335,6 +355,15 @@ class AppImageFormat(AppFormat):
         if name:
             md.name_suggestion = name
         md.description = _localised(desktop, "Comment") or meta.get("summary")
+        # Do not use a bundled dependency's repository when its component differs
+        # from the application's own desktop entry.
+        desktop_name = _localised(desktop, "Name")
+        same_component = (not desktop_name or
+                          (meta.get("name") or "").casefold() == desktop_name.casefold() or
+                          (bool(meta.get("id")) and meta.get("id") == desktop.get("_appforge_desktop_id")))
+        if not md.extra.get(SUGGESTED_SOURCE_KEY) and same_component and meta.get(SUGGESTED_SOURCE_KEY):
+            md.extra[SUGGESTED_SOURCE_KEY] = meta[SUGGESTED_SOURCE_KEY]
+            md.extra[SOURCE_ORIGIN_KEY] = meta[SOURCE_ORIGIN_KEY]
 
         version = _localised(desktop, "X-AppImage-Version")
         source = "desktop"
@@ -369,6 +398,7 @@ class AppImageFormat(AppFormat):
             if data:
                 parsed = _parse_desktop(data.decode("utf-8", "replace"))
                 if parsed:
+                    parsed["_appforge_desktop_id"] = node.name.removesuffix(".desktop")
                     return parsed
         return {}
 

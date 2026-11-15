@@ -70,7 +70,9 @@ class ScanResult:
 
 def scan(roots: Iterable[str], registered: Iterable[str] = (), ignored: Iterable[str] = (),
          cancel: threading.Event | None = None,
-         progress: Callable[[int, str], None] | None = None) -> ScanResult:
+         progress: Callable[[int, str], None] | None = None, *,
+         file_filter: Callable[[Path, os.stat_result], bool] | None = None,
+         metadata_cache: dict | None = None) -> ScanResult:
     """Recursively inspect only chosen roots. All symlinks are deliberately skipped."""
     result = ScanResult()
     cancel = cancel or threading.Event()
@@ -122,13 +124,28 @@ def scan(roots: Iterable[str], registered: Iterable[str] = (), ignored: Iterable
                         result.visited += 1
                         if progress and (result.visited == 1 or result.visited % 25 == 0):
                             progress(result.visited, str(path))
-                        fmt = detect_format(path)
-                        if fmt is None or (fmt.id != "appimage" and not os.access(path, os.X_OK)):
+                        if file_filter is not None and not file_filter(path, info):
                             continue
-                        md = inspect_file(path)
-                        if _signature(path.stat()) != _signature(info) or not _safe_path(path):
+                        fingerprint = (*_signature(info), info.st_mode, info.st_ctime_ns)
+                        cached = metadata_cache.get(str(path)) if metadata_cache is not None else None
+                        if cached and cached[0] == fingerprint:
+                            md = cached[1]
+                            if md is None:
+                                continue
+                        else:
+                            fmt = detect_format(path)
+                            if fmt is None or (fmt.id != "appimage" and not os.access(path, os.X_OK)):
+                                if metadata_cache is not None:
+                                    metadata_cache[str(path)] = (fingerprint, None)
+                                continue
+                            md = inspect_file(path)
+                        after = path.stat()
+                        if ((*_signature(after), after.st_mode, after.st_ctime_ns) != fingerprint
+                                or not _safe_path(path)):
                             report(path, "File changed during inspection; scan again.")
                             continue
+                        if metadata_cache is not None:
+                            metadata_cache[str(path)] = (fingerprint, md)
                         norm = normalize_path(path)
                         result.candidates.append(Candidate(norm, md, _signature(info),
                             norm in known_paths or identity in known_ids, norm in ignored_paths))
@@ -151,7 +168,8 @@ def scan(roots: Iterable[str], registered: Iterable[str] = (), ignored: Iterable
     return result
 
 
-def import_candidate(library: LibraryService, candidate: Candidate, *, integrate_desktop=False):
+def import_candidate(library: LibraryService, candidate: Candidate, *, integrate_desktop=False,
+                     github_repo: str | None = None):
     """Register a confirmed result through the existing service; never change the app file."""
     path = Path(candidate.path)
     try:
@@ -173,4 +191,4 @@ def import_candidate(library: LibraryService, candidate: Candidate, *, integrate
     except OSError as exc:
         raise LibraryError(f"Couldn't read the discovered file: {exc}") from exc
     return library.add_application(candidate.path, metadata=candidate.metadata,
-                                   integrate_desktop=integrate_desktop)
+                                   integrate_desktop=integrate_desktop, github_repo=github_repo)

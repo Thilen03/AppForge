@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img alt="version" src="https://img.shields.io/badge/version-0.6.1-2B63D9">
+  <img alt="version" src="https://img.shields.io/badge/version-0.6.2-2B63D9">
   <img alt="platform" src="https://img.shields.io/badge/platform-Linux-informational">
   <img alt="python" src="https://img.shields.io/badge/python-3.10%2B-blue">
   <img alt="Qt" src="https://img.shields.io/badge/Qt-6%20(PySide6)-41cd52">
@@ -25,8 +25,10 @@ AppForge reads their metadata without running them.
 
 - **Add locally or download from a link.** Choose a release file and save it to a
   discovery folder, or add an existing file by browsing, discovery or AppImage drag-and-drop.
+  Watch selected discovery folders and review new arrivals before adding them.
 - **Keep apps updated.** GitHub, GitLab.com, Codeberg and self-hosted Forgejo/Gitea/GitLab
-  sources; release-asset matching, optional nightlies, per-app pause/skip controls and Update All.
+  sources; embedded AppImage source suggestions, release-asset matching, optional nightlies,
+  per-app pause/skip controls and Update All.
 - **Update safely.** File validation, published SHA-256/SHA-512 checksums, atomic
   replacement, automatic backups and rollback. New downloads never overwrite existing files.
 - **Organize and launch.** Search, categories, filters, sorting, favorites, desktop-menu
@@ -34,9 +36,9 @@ AppForge reads their metadata without running them.
 - **Manage your library.** App details, in-app release notes, export/import, storage
   overview and backup cleanup, plus tools to locate moved files and fix execute permissions.
 - **Stay in the background.** Scheduled checks, notifications, optional tray mode and
-  login startup, light/dark themes and AppForge self-updates.
+  login startup, light/dark themes, customizable card badge colors and AppForge self-updates.
 
-What's new: [AppForge 0.6.1 release notes](releases/RELEASE_NOTES_v0.6.1.md).
+What's new: [AppForge 0.6.2 release notes](releases/RELEASE_NOTES_v0.6.2.md).
 
 ## Install
 
@@ -60,7 +62,7 @@ are bundled. If FUSE is unavailable, launch with `--appimage-extract-and-run`; s
 2. For downloads, paste a repository/release link, select a file and destination, then
    review the Add form. **Add folder…** saves a new destination for discovery too.
 3. Review the name, icon, category and optional **Add to the application menu** choice.
-   Local apps can also be given an update-source repository.
+   Local AppImages may suggest an update-source repository; review, change or clear it.
 4. Launch from the card. Use **Update** or **Update All** when updates are available;
    **Backups & rollback** restores an earlier version.
 
@@ -104,7 +106,8 @@ An optional GitHub token is sent only to `api.github.com`. A token saved in Sett
 is stored **unencrypted** in the local library database (mode 0600); `GITHUB_TOKEN`
 or `GH_TOKEN` avoids storing it there.
 
-Linux only. Discovery is manual and excludes symlink paths. Tray/login behavior
+Linux only. Discovery supports manual scans and optional folder watching while AppForge
+is running; symlink paths are excluded. Tray/login behavior
 depends on desktop support. If neither usable versions nor published checksums are
 available, AppForge cannot determine whether an update is needed. Different
 checksums identify different files, not which version is newer.

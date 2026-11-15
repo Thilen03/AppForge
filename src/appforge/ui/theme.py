@@ -7,6 +7,8 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QPalette
 from PySide6.QtWidgets import QApplication
 
+from ..core.settings import CARD_BADGES, valid_badge_color
+
 
 @dataclass(frozen=True)
 class Tokens:
@@ -68,7 +70,37 @@ def _palette(t: Tokens) -> QPalette:
     return p
 
 
-def stylesheet(t: Tokens) -> str:
+def badge_colors(t: Tokens, key: str, overrides: dict[str, str]) -> tuple[str, str, str]:
+    """Background, text and border; untouched badges keep their exact old colors."""
+    color = overrides.get(key)
+    if valid_badge_color(color):
+        chosen = QColor(color)
+        # A translucent wash keeps the same outlined treatment as the defaults.
+        alpha = 40 if t.dark else 30
+        background = f"rgba({chosen.red()}, {chosen.green()}, {chosen.blue()}, {alpha})"
+        return background, color, color
+    kind = CARD_BADGES[key][1]
+    if kind == "muted":
+        return ("#303744" if t.dark else "#EDF0F5"), t.muted, t.muted
+    if kind == "danger":
+        return t.danger_soft, t.danger, t.danger
+    if kind == "ok":
+        return ("#293E35" if t.dark else "#E6F3EB"), t.ok, t.ok
+    if kind == "paused":
+        return (("#493C1C", "#F5CF64", "#B89A44") if t.dark else
+                ("#FFF3C4", "#806000", "#D2AE3B"))
+    return t.accent_soft, t.accent, t.accent
+
+
+def badge_style(t: Tokens, key: str, overrides: dict[str, str]) -> str:
+    bg, fg, border = badge_colors(t, key, overrides)
+    return f"background: {bg}; color: {fg}; border: 1px solid {border};"
+
+
+def stylesheet(t: Tokens, badge_overrides: dict[str, str] | None = None) -> str:
+    badge_rules = "\n".join(
+        f'QLabel#chip[badgeKey="{key}"] {{ {badge_style(t, key, badge_overrides or {})} }}'
+        for key in CARD_BADGES)
     return f"""
     QMainWindow, QDialog {{ background: {t.bg}; }}
     QWidget {{ color: {t.text}; }}
@@ -83,6 +115,8 @@ def stylesheet(t: Tokens) -> str:
     QLabel#hint {{ color: {t.muted}; font-size: 12px; }}
     QLabel#error {{ color: {t.danger}; font-size: 12px; }}
     QLabel#warning {{ color: {t.muted}; font-size: 12px; }}
+    QFrame#sourceDetection {{ background: {t.surface}; border: 1px solid {t.border_strong};
+                             border-radius: 10px; }}
     QLabel#emptyTitle {{ font-size: 18px; font-weight: 600; }}
     QLabel#banner {{ background: {t.danger_soft}; color: {t.text}; border: 1px solid {t.danger};
                     border-radius: 8px; padding: 8px 12px; }}
@@ -143,6 +177,7 @@ def stylesheet(t: Tokens) -> str:
     QLabel#chip[kind="paused"] {{ background: {"#493C1C" if t.dark else "#FFF3C4"};
         color: {"#F5CF64" if t.dark else "#806000"}; border: 1px solid {"#B89A44" if t.dark else "#D2AE3B"}; }}
     QLabel#chip[kind="update"] {{ background: {t.accent_soft}; color: {t.accent}; border-color: {t.accent}; }}
+    {badge_rules}
     QPushButton#soft {{ background: {t.accent_soft}; color: {t.accent}; border: 1px solid transparent;
                        font-weight: 600; }}
     QPushButton#soft:hover {{ border: 1px solid {t.accent}; }}
@@ -185,10 +220,11 @@ def stylesheet(t: Tokens) -> str:
     """
 
 
-def apply_theme(app: QApplication, mode: str = "system") -> Tokens:
+def apply_theme(app: QApplication, mode: str = "system",
+                badge_overrides: dict[str, str] | None = None) -> Tokens:
     global _current
     _current = DARK if mode == "dark" or (mode != "light" and is_dark(app)) else LIGHT
     app.setStyle("Fusion")
     app.setPalette(_palette(_current))
-    app.setStyleSheet(stylesheet(_current))
+    app.setStyleSheet(stylesheet(_current, badge_overrides))
     return _current

@@ -153,6 +153,18 @@ class AppCard(QFrame):
                                        msg or "Not checked yet."),
         }[e.update_status]
 
+    def _status_badge_key(self) -> str:
+        e = self.entry
+        if updates_paused(e):
+            return "paused"
+        if version_skipped(e):
+            return "skipped"
+        if not e.github_repo:
+            return "no_source"
+        if e.update_status is UpdateStatus.UNAVAILABLE and (e.metadata.get("update") or {}).get("prereleases_only"):
+            return "prereleases"
+        return e.update_status.value
+
     def _build(self):
         e, missing = self.entry, self.property("missing")
         root = QVBoxLayout(self)
@@ -199,14 +211,14 @@ class AppCard(QFrame):
         chips.setContentsMargins(0, 0, 0, 0)
         chips.setSpacing(6)
         fmt = get_format(e.format)
-        chips.addWidget(self._chip(fmt.display_name if fmt else e.format, "accent"))
+        chips.addWidget(self._chip(fmt.display_name if fmt else e.format, "accent", badge_key=e.format))
         if missing:
-            chips.addWidget(self._chip("File not found", "danger"))
+            chips.addWidget(self._chip("File not found", "danger", badge_key="missing"))
         elif self.state is FileState.NOT_EXECUTABLE:
-            chips.addWidget(self._chip("Not executable", "danger"))
+            chips.addWidget(self._chip("Not executable", "danger", badge_key="not_executable"))
         else:
             t, kind, tip = self._status_chip()
-            chips.addWidget(self._chip(t, kind, tip))
+            chips.addWidget(self._chip(t, kind, tip, badge_key=self._status_badge_key()))
         chips.addStretch(1)
         info.addWidget(self._chips_w)
 
@@ -278,9 +290,10 @@ class AppCard(QFrame):
             w.installEventFilter(self)  # keyboard focus also reveals the actions
 
     @staticmethod
-    def _chip(text: str, kind: str, tip: str = "") -> QLabel:
+    def _chip(text: str, kind: str, tip: str = "", *, badge_key: str = "") -> QLabel:
         c = QLabel(text, objectName="chip")
         c.setProperty("kind", kind)
+        c.setProperty("badgeKey", badge_key)
         if tip:
             c.setToolTip(tip)
         return c

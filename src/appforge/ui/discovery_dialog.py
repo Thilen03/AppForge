@@ -3,24 +3,28 @@ from __future__ import annotations
 
 import sqlite3
 
-from PySide6.QtCore import QThreadPool, QTimer, Qt
+from PySide6.QtCore import QThreadPool, QTimer, Qt, Signal
 from PySide6.QtGui import QIcon, QPixmap
 from PySide6.QtWidgets import (
     QAbstractItemView, QCheckBox, QDialog, QFileDialog, QHBoxLayout, QHeaderView,
-    QLabel, QListWidget, QMessageBox, QProgressBar, QPushButton, QTableWidget,
+    QLabel, QLineEdit, QListWidget, QListWidgetItem, QMessageBox, QProgressBar, QPushButton, QTableWidget,
     QTableWidgetItem, QTextEdit, QVBoxLayout,
 )
 
 from ..core.discovery import (
     IGNORED_KEY, ROOTS_KEY, default_roots, import_candidate, load_paths, save_paths,
 )
-from ..core.library import LibraryError, normalize_path
+from ..core.library import LibraryError, normalize_path, normalize_repo
+from ..core.formats.appimage_update import metadata_source, source_detection_message
+from ..core.discovery_watch import WATCHED_KEY
 from .icons import placeholder_pixmap
 from .workers import DiscoveryJob
 
 
 class DiscoveryDialog(QDialog):
-    def __init__(self, service, parent=None):
+    preferencesChanged = Signal()
+
+    def __init__(self, service, parent=None, *, preview=None):
         super().__init__(parent)
         self.service = service
         self.job = None
@@ -31,26 +35,32 @@ class DiscoveryDialog(QDialog):
         self._queue = []
         self._imported = 0
         self._failures = []
+        self._source_choices = {}
+        self._import_sources = {}
         self.ignored = set(load_paths(service.db, IGNORED_KEY))
         self.setWindowTitle("Discover applications")
         self.resize(960, 700)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(24, 22, 24, 20)
         layout.addWidget(QLabel("Discover applications", objectName="title"))
-        hint = QLabel("Choose folders to scan. Review the results before importing. "
+        hint = QLabel("Choose folders to scan. Check a folder to watch for new apps while AppForge is running. "
+                      "Review the results and suggested update sources before importing. "
                       "Application files are never run or changed.", objectName="subtitle")
         hint.setWordWrap(True)
         layout.addWidget(hint)
         self.roots = QListWidget(objectName="discoveryRoots")
         self.roots.setSpacing(2)
         self.roots.setMaximumHeight(126)
-        self.roots.addItems(load_paths(service.db, ROOTS_KEY, default_roots()))
+        watched = set(load_paths(service.db, WATCHED_KEY))
+        for path in load_paths(service.db, ROOTS_KEY, default_roots()):
+            self._add_root(path, path in watched)
+        self.roots.itemChanged.connect(self._save_folders)
         layout.addWidget(self.roots)
         row = QHBoxLayout()
         self.add_folder_btn = QPushButton("Add folder…")
         self.add_folder_btn.clicked.connect(self._add_folder)
         self.remove_folder_btn = QPushButton("Remove folder")
-        self.remove_folder_btn.clicked.connect(lambda: self.roots.takeItem(self.roots.currentRow()))
+        self.remove_folder_btn.clicked.connect(self._remove_folder)
         self.defaults_btn = QPushButton("Default folders")
         self.defaults_btn.clicked.connect(self._defaults)
         self.scan_btn = QPushButton("Scan folders", objectName="primary")
@@ -58,13 +68,16 @@ class DiscoveryDialog(QDialog):
         for button in (self.add_folder_btn, self.remove_folder_btn, self.defaults_btn, self.scan_btn):
             row.addWidget(button)
         layout.addLayout(row)
-        self.table = QTableWidget(0, 5)
-        self.table.setHorizontalHeaderLabels(["Application", "Version", "Format", "Location", "Status"])
+        self.table = QTableWidget(0, 6)
+        self.table.setHorizontalHeaderLabels(
+            ["Application", "Version", "Format", "Location", "Status", "Update source (editable)"])
         self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.table.verticalHeader().hide()
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
         self.table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Stretch)
+        self.table.horizontalHeader().setSectionResizeMode(5, QHeaderView.Interactive)
+        self.table.setColumnWidth(5, 250)
         self.table.itemChanged.connect(lambda *_: self._actions())
         layout.addWidget(self.table, 1)
         choices = QHBoxLayout()
@@ -107,17 +120,44 @@ class DiscoveryDialog(QDialog):
             footer.addWidget(button)
         layout.addLayout(footer)
         self._actions()
+        if preview is not None:
+            self._scanned(preview)
+            self.status.setText(f"{len(preview.candidates)} new apps found in watched folders. "
+                                "Select applications to import; nothing has been added yet.")
+
+    def _add_root(self, path, watched=False):
+        item = QListWidgetItem(path)
+        item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+        item.setCheckState(Qt.Checked if watched else Qt.Unchecked)
+        item.setToolTip("Check to watch this folder and its subfolders for new apps.")
+        self.roots.addItem(item)
+
+    def _save_folders(self, *_):
+        save_paths(self.service.db, ROOTS_KEY, self._roots())
+        save_paths(self.service.db, WATCHED_KEY,
+                   [self.roots.item(i).text() for i in range(self.roots.count())
+                    if self.roots.item(i).checkState() == Qt.Checked])
+        self.preferencesChanged.emit()
+
+    def _remove_folder(self):
+        if self.roots.currentRow() >= 0:
+            self.roots.takeItem(self.roots.currentRow())
+            self._save_folders()
 
     def _defaults(self):
+        watched = set(load_paths(self.service.db, WATCHED_KEY))
         self.roots.clear()
-        self.roots.addItems(default_roots())
+        for path in default_roots():
+            self._add_root(path, path in watched)
+        self._save_folders()
 
     def _add_folder(self):
         path = QFileDialog.getExistingDirectory(self, "Choose a folder to scan")
         if path:
             norm = normalize_path(path)
             if norm not in self._roots():
-                self.roots.addItem(norm)
+                self._add_root(norm)
+                self._save_folders()
 
     def _roots(self):
         return [self.roots.item(i).text() for i in range(self.roots.count())]
@@ -148,8 +188,9 @@ class DiscoveryDialog(QDialog):
         if not roots:
             self.status.setText("Add at least one folder first.")
             return
-        save_paths(self.service.db, ROOTS_KEY, roots)
+        self._save_folders()
         self.candidates = []
+        self._source_choices.clear()
         self.table.setRowCount(0)
         self.errors.hide()
         self.progress.setRange(0, 0)
@@ -203,6 +244,18 @@ class DiscoveryDialog(QDialog):
                     if not self._eligible(c):
                         item.setFlags(item.flags() & ~Qt.ItemIsEnabled & ~Qt.ItemIsUserCheckable)
                 self.table.setItem(row, col, item)
+            source = QLineEdit(self._source_choices.get(c.path, metadata_source(md) or ""))
+            source.setCursorPosition(0)
+            source.setPlaceholderText("No source detected" if md.format_id == "appimage" and not metadata_source(md)
+                                      else "Optional repository URL")
+            source.setAccessibleName(f"Update source for {md.name_suggestion}")
+            source.setToolTip((source.text() + "\n" if source.text() else "") +
+                              (source_detection_message(md) if md.format_id == "appimage" else
+                               "Optional repository URL. Review, change or clear before importing."))
+            source.setEnabled(self._eligible(c))
+            source.textChanged.connect(
+                lambda value, path=c.path: self._source_choices.__setitem__(path, value))
+            self.table.setCellWidget(row, 5, source)
         self.table.blockSignals(False)
 
     def _select(self, checked):
@@ -216,12 +269,14 @@ class DiscoveryDialog(QDialog):
             c.ignored = True
             self.ignored.add(c.path)
         save_paths(self.service.db, IGNORED_KEY, self.ignored)
+        self.preferencesChanged.emit()
         self._render()
         self._actions()
 
     def _reset_ignored(self):
         self.ignored.clear()
         save_paths(self.service.db, IGNORED_KEY, [])
+        self.preferencesChanged.emit()
         for c in self.candidates:
             c.ignored = False
         self._render()
@@ -233,12 +288,20 @@ class DiscoveryDialog(QDialog):
         chosen = [c for c in self.candidates if self._eligible(c)] if all_eligible else self._selected()
         if not chosen:
             return
+        try:
+            sources = {c.path: normalize_repo(self._source_choices.get(
+                c.path, metadata_source(c.metadata) or "")) for c in chosen}
+        except LibraryError as exc:
+            self.status.setText(f"Check the update sources before importing: {exc}")
+            return
         answer = QMessageBox.question(self, "Import applications?",
-            f"Add {len(chosen)} applications to your library? Their files will stay where they are.",
+            f"Add {len(chosen)} applications to your library? Their files will stay where they are.\n"
+            "The update sources shown in the preview will be saved. Clear or change them before importing if needed.",
             QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
         if answer != QMessageBox.Yes:
             return
         self._queue = list(chosen)
+        self._import_sources = sources
         self._import_total = len(chosen)
         self._imported, self._failures = 0, []
         self._importing = True
@@ -265,7 +328,8 @@ class DiscoveryDialog(QDialog):
             return
         c = self._queue.pop(0)
         try:
-            entry = import_candidate(self.service, c, integrate_desktop=self.desktop_cb.isChecked())
+            entry = import_candidate(self.service, c, integrate_desktop=self.desktop_cb.isChecked(),
+                                     github_repo=self._import_sources.get(c.path))
             c.registered = True
             self._imported += 1
             if self.desktop_cb.isChecked() and not self.service.desktop_enabled(entry):

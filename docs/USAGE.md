@@ -14,7 +14,13 @@ and update controls, see the [documentation index](../README.md#documentation).
 - **Application cards** show icon, name, version, format, update status and file location.
   Badges share a soft tinted background, colored outline and matching text in both
   themes: green for up to date, blue for available updates, yellow for paused
-  updates, red for errors and gray for unavailable or skipped updates.
+  updates, red for errors and gray for unavailable or skipped updates by default.
+  Expand **Application badge colors** at the bottom of **Settings** to choose a
+  color separately for each format and status badge. Previews show matching text
+  and outlines with a softly tinted background in both themes. The section starts
+  collapsed each time Settings opens.
+  **Reset** restores one badge; **Reset all badge colors** restores the original
+  light/dark defaults. **Save** applies and remembers changes; **Cancel** discards them.
 - **Launch from a card.** Apps are started detached, so they keep running if you close AppForge. If an app exits
   right after launch, AppForge shows its output and keeps a log. For terminal launches,
   application output appears in the terminal; AppForge may only capture terminal-process
@@ -109,6 +115,39 @@ and update controls, see the [documentation index](../README.md#documentation).
   new location to refresh the startup entry. Source installations point to their
   current Python environment and source folder, which must remain available.
 - Settings scrolls on smaller screens while Save and Cancel stay visible.
+
+## Detected update sources
+
+- The Add form has a persistent **Automatic update-source detection** panel above
+  **Add to library**. Selecting a local file starts **Checking…** with a progress
+  indicator, then reports **Update source found**, **No automatic update source
+  found**, or **Source detection failed**. The panel stays visible while scrolling
+  and editing fields. Other executable formats explain that AppImage detection
+  does not apply.
+- When adding a local AppImage, AppForge reads its embedded update information and
+  prefills a supported repository when one can be identified. The source is marked
+  as suggested; review, change or clear it before choosing **Add to library**.
+- Manual and watched-folder discovery previews include an editable **Update source**
+  column. Sources shown there are saved only when you confirm importing the apps.
+  Clear a field to import that app without an update source.
+- A source you entered yourself or selected for a repository download takes
+  precedence. Existing library entries are not automatically relinked.
+- If no supported source is found, Add explicitly says **No automatic update source
+  found**, and discovery shows **No source detected**. A filename or a GitHub download
+  alone does not identify the repository owner. Paste the repository URL manually
+  when the file contains no usable source metadata.
+- Detection also checks matching embedded AppStream component metadata: explicit
+  source-code repository URLs, then repository-root homepages on GitHub, GitLab
+  or Codeberg. Conflicting URLs and unrelated bundled components are not used.
+  Suggestions say which embedded metadata provided them.
+- Detection supports GitHub's embedded release information and recognizable HTTPS
+  release-download URLs for supported Git repositories. Generic zsync servers,
+  Pling, deprecated Bintray information, missing data and malformed data do not
+  produce repository guesses; add a source manually when appropriate.
+- Detection works offline without executing the AppImage. A suggestion comes from
+  the package and is not proof that the repository exists or is trustworthy.
+  Normal update checks still use AppForge's release APIs and full-file downloads;
+  embedded tags, filename patterns and prerelease preferences are not applied.
 
 ## Updates
 - **Link a repository** to any app and AppForge checks its releases for a newer version. Supported sources:
@@ -226,7 +265,8 @@ Set `APPFORGE_DATA_DIR` to use a throw-away library for experiments. Launchers t
 ## Current limitations
 
 - Linux only.
-- Discovery is user-initiated; it does not monitor folders continuously. Symlink paths are excluded.
+- Discovery offers manual scans and optional watching of selected discovery folders
+  while AppForge is running. New apps still require review/import. Symlink paths are excluded.
 - Discovery cancellation takes effect between file reads. Very large individual AppImages can delay it.
 - Updates for standalone executables work when a release publishes the **raw binary**; releases that only ship
   `.tar.gz`, `.zip`, `.deb` or `.rpm` show "no matching file".

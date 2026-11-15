@@ -5,8 +5,10 @@ break startup: it just falls back to the default.
 """
 from __future__ import annotations
 
+import json
 import logging
 import os
+import re
 
 from .database import Database
 from .updates.github import default_token
@@ -22,10 +24,51 @@ KEY_BACKGROUND = "run_in_background"
 INTERVAL_CHOICES = (1, 3, 6, 12, 24)      # hours offered in the settings dialog
 DEFAULT_INTERVAL = 6
 
+# Stable keys distinguish badges that happen to share the same default color.
+CARD_BADGES = {
+    "appimage": ("AppImage", "accent"),
+    "executable": ("Executable", "accent"),
+    "up_to_date": ("Up to date", "ok"),
+    "update_available": ("Update available", "update"),
+    "checking": ("Checking for updates…", "muted"),
+    "failed": ("Update failed", "danger"),
+    "unavailable": ("Update info unavailable", "muted"),
+    "no_source": ("No update source", "muted"),
+    "prereleases": ("Pre-releases available", "muted"),
+    "paused": ("Update paused", "paused"),
+    "skipped": ("Version skipped", "muted"),
+    "missing": ("File not found", "danger"),
+    "not_executable": ("Not executable", "danger"),
+}
+
+
+def valid_badge_color(value: object) -> bool:
+    return isinstance(value, str) and re.fullmatch(r"#[0-9a-fA-F]{6}", value) is not None
+
 
 class AppSettings:
     def __init__(self, db: Database):
         self.db = db
+
+    @property
+    def card_badge_colors(self) -> dict[str, str]:
+        """Only overrides are stored; absent/invalid values retain theme defaults."""
+        try:
+            values = json.loads(self.db.get_setting("card_badge_colors") or "{}")
+        except (ValueError, TypeError):
+            return {}
+        if not isinstance(values, dict):
+            return {}
+        return {key: value.upper() for key, value in values.items()
+                if key in CARD_BADGES and valid_badge_color(value)}
+
+    @card_badge_colors.setter
+    def card_badge_colors(self, values: dict[str, str]) -> None:
+        if any(key not in CARD_BADGES or not valid_badge_color(value)
+               for key, value in values.items()):
+            raise ValueError("Badge colors must use a known badge and a #RRGGBB color.")
+        self.db.set_setting("card_badge_colors", json.dumps(
+            {key: value.upper() for key, value in values.items()}, sort_keys=True))
 
     # -- helpers ------------------------------------------------------------------------
     def _bool(self, key: str, default: bool) -> bool:

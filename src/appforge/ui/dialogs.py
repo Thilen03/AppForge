@@ -9,13 +9,14 @@ from pathlib import Path
 from PySide6.QtCore import QObject, QRunnable, QThreadPool, Qt, Signal
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
-    QCheckBox, QDialog, QFileDialog, QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem,
-    QPlainTextEdit, QPushButton, QScrollArea, QVBoxLayout, QWidget,
+    QCheckBox, QDialog, QFileDialog, QFrame, QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem,
+    QPlainTextEdit, QProgressBar, QPushButton, QScrollArea, QVBoxLayout, QWidget,
 )
 
 from ..core.desktop import MENU_CATEGORIES, menu_category_of
 from ..core.envvars import ENV_KEY, EnvVarError, clean_env, format_env_text, parse_env_text
 from ..core.formats import AppMetadata, get_format
+from ..core.formats.appimage_update import metadata_source, source_detection_message
 from ..core.library import (
     LibraryError, LibraryService, inspect_file, normalize_path, normalize_repo,
 )
@@ -135,6 +136,8 @@ class AddApplicationDialog(QDialog):
         self._token = 0
         self._jobs: list[_InspectJob] = []
         self._name_touched = False
+        self._repo_touched = False
+        self._auto_repo = None
         self._custom_icon: str | None = None
         self._build()
         if downloaded:
@@ -213,6 +216,7 @@ class AddApplicationDialog(QDialog):
         lay.addWidget(_field_label("Update source (optional)"))
         self.repo_edit = QLineEdit(placeholderText="https://github.com/owner/repo  or  https://git.example.dev/owner/repo")
         self.repo_edit.textChanged.connect(self._validate)
+        self.repo_edit.textEdited.connect(self._on_repo_edited)
         lay.addWidget(self.repo_edit)
         self.repo_msg = QLabel(SOURCE_HINT, objectName="hint")
         self.repo_msg.setWordWrap(True)
@@ -236,6 +240,25 @@ class AddApplicationDialog(QDialog):
         lay.addWidget(self.env_msg)
 
         lay.addStretch(1)
+        # Keep the attempt/result visible even when optional form fields are scrolled.
+        report = QHBoxLayout()
+        report.setContentsMargins(24, 4, 24, 0)
+        self.source_panel = QFrame(objectName="sourceDetection")
+        panel = QVBoxLayout(self.source_panel)
+        panel.setContentsMargins(12, 10, 12, 10)
+        panel.setSpacing(4)
+        panel.addWidget(QLabel("Automatic update-source detection", objectName="sectionLabel"))
+        self.source_status_lbl = QLabel("Select a file to start.")
+        self.source_status_lbl.setWordWrap(True)
+        self.source_status_lbl.setTextFormat(Qt.PlainText)
+        panel.addWidget(self.source_status_lbl)
+        self.source_progress = QProgressBar(textVisible=False)
+        self.source_progress.setRange(0, 0)
+        self.source_progress.hide()
+        panel.addWidget(self.source_progress)
+        self._source_state = "waiting"
+        report.addWidget(self.source_panel)
+        outer.addLayout(report)
         btns = QHBoxLayout()
         btns.addStretch(1)
         cancel = QPushButton("Cancel")
@@ -258,6 +281,11 @@ class AddApplicationDialog(QDialog):
 
     def _set_path(self, path: str):
         path = normalize_path(path)
+        self._token += 1
+        if not self._repo_touched and self.repo_edit.text() == self._auto_repo:
+            self.repo_edit.clear()
+        self._auto_repo = None
+        self._set_source_state("waiting", "Select a file to start.")
         self.path_edit.setText(path)
         self.path_edit.setToolTip(path)
         self.metadata = None
@@ -266,10 +294,11 @@ class AddApplicationDialog(QDialog):
         self._show_file_msg("")
         self._validate()
         if self.service.find_by_path(path):
+            self._set_source_state("not_checked", "Not checked: this application is already in your library.")
             self._show_file_msg("This application is already in your library.")
             return
         self.meta_lbl.setText("Reading file…")
-        self._token += 1
+        self._set_source_state("checking", "Checking this file for an update source…")
         job = _InspectJob(self._token, path)
         job.signals.done.connect(self._on_inspected)
         self._jobs.append(job)  # keep Python wrapper alive until finished
@@ -280,6 +309,7 @@ class AddApplicationDialog(QDialog):
         if token != self._token:
             return  # a newer selection superseded this one
         if isinstance(result, str):
+            self._set_source_state("failed", f"Source detection failed: {result}")
             self._reset_details()
             self._show_file_msg(result)
             return
@@ -289,6 +319,7 @@ class AddApplicationDialog(QDialog):
             try:
                 validate_downloaded(self.downloaded)
             except LibraryError as exc:
+                self._set_source_state("failed", f"Source detection failed: {exc}")
                 self._show_file_msg(str(exc))
                 return
             from ..core.updates.version import parse_version
@@ -297,6 +328,20 @@ class AddApplicationDialog(QDialog):
             md = replace(md, version=version,
                          extra={**md.extra, "installed_version_source": "github_release"})
         self.metadata = md
+        suggested = metadata_source(md)
+        if suggested and not self._repo_touched and not self.repo_edit.text().strip():
+            self._auto_repo = suggested
+            self.repo_edit.setText(suggested)
+        if suggested:
+            kept = (" Your existing source choice has been kept."
+                    if self.repo_edit.text() != suggested else " Review the source before adding.")
+            self._set_source_state("found", f"Update source found: {suggested}" + kept)
+        elif md.format_id == "appimage":
+            self._set_source_state("not_found", source_detection_message(md))
+        else:
+            self._set_source_state("not_applicable",
+                                   "Automatic source detection is available for AppImages. "
+                                   "You can enter a repository URL manually for this file.")
         self.name_edit.setEnabled(True)
         self.icon_btn.setEnabled(True)
         if not self._name_touched or not self.name_edit.text():
@@ -312,6 +357,13 @@ class AddApplicationDialog(QDialog):
         self.warn_lbl.setVisible(bool(md.warnings))
         self._render_icon()
         self._validate()
+
+    def _set_source_state(self, state: str, message: str):
+        self._source_state = state
+        self.source_status_lbl.setText(message if len(message) <= 240 else message[:237] + "…")
+        self.source_status_lbl.setToolTip(message)
+        self.source_status_lbl.setAccessibleName(message)
+        self.source_progress.setVisible(state == "checking")
 
     def _choose_icon(self):
         start = str(Path(self._custom_icon).parent) if self._custom_icon else str(Path.home())
@@ -379,6 +431,9 @@ class AddApplicationDialog(QDialog):
     def _on_name_edited(self, _):
         self._name_touched = True
 
+    def _on_repo_edited(self, _):
+        self._repo_touched = True
+
     def _repo_error(self) -> str | None:
         try:
             normalize_repo(self.repo_edit.text())
@@ -393,7 +448,14 @@ class AddApplicationDialog(QDialog):
             self.repo_msg.setText(err)
             self.repo_msg.setObjectName("error")
         else:
-            self.repo_msg.setText(SOURCE_HINT)
+            hint = SOURCE_HINT
+            if self.metadata and self.metadata.format_id == "appimage":
+                if self._auto_repo and self.repo_edit.text() == self._auto_repo:
+                    hint = source_detection_message(self.metadata)
+                elif not self.repo_edit.text().strip():
+                    hint = ("Update source left empty. Add without automatic updates, or enter a repository URL."
+                            if metadata_source(self.metadata) else source_detection_message(self.metadata))
+            self.repo_msg.setText(hint)
             self.repo_msg.setObjectName("hint")
         self.repo_msg.style().unpolish(self.repo_msg)
         self.repo_msg.style().polish(self.repo_msg)

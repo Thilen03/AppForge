@@ -1,13 +1,16 @@
 """Settings dialog (Phase 5): update checks, notifications, background running, GitHub token."""
 from __future__ import annotations
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
-    QCheckBox, QDialog, QHBoxLayout, QLabel, QLineEdit, QPushButton, QScrollArea, QVBoxLayout, QWidget,
+    QCheckBox, QColorDialog, QDialog, QHBoxLayout, QLabel, QLineEdit, QPushButton,
+    QScrollArea, QToolButton, QVBoxLayout, QWidget,
 )
 
 from ..core import autostart
-from ..core.settings import INTERVAL_CHOICES, AppSettings
+from ..core.settings import CARD_BADGES, INTERVAL_CHOICES, AppSettings
+from . import theme
 from .popups import RoundedComboBox
 
 
@@ -121,6 +124,51 @@ class SettingsDialog(QDialog):
                             "Application files and AppForge tokens are excluded. "
                             "Transfers apply immediately, independently of Save."))
 
+        lay.addSpacing(8)
+        self.badge_toggle = QToolButton()
+        self.badge_toggle.setText("Application badge colors")
+        self.badge_toggle.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+        self.badge_toggle.setCheckable(True)
+        self.badge_toggle.setArrowType(Qt.RightArrow)
+        self.badge_toggle.setToolTip("Show or hide application badge color settings")
+        lay.addWidget(self.badge_toggle, 0, Qt.AlignLeft)
+        self.badge_section = QWidget()
+        badge_lay = QVBoxLayout(self.badge_section)
+        badge_lay.setContentsMargins(12, 0, 0, 0)
+        badge_lay.setSpacing(8)
+        badge_lay.addWidget(_hint("Choose a color for each card badge. Custom colors keep matching "
+                                 "text and outlines with a softly tinted background in both themes. "
+                                 "Defaults keep the original theme colors. Changes apply with Save."))
+        self.badge_colors = settings.card_badge_colors.copy()
+        self.badge_previews = {}
+        self.badge_buttons = {}
+        self.badge_resets = {}
+        for key, (label, _) in CARD_BADGES.items():
+            row = QHBoxLayout()
+            preview = QLabel(label, objectName="chip")
+            self.badge_previews[key] = preview
+            row.addWidget(preview)
+            row.addStretch(1)
+            choose = QPushButton()
+            choose.setAccessibleName(f"Choose color for {label}")
+            choose.clicked.connect(lambda checked=False, key=key: self._choose_badge_color(key))
+            self.badge_buttons[key] = choose
+            row.addWidget(choose)
+            reset = QPushButton("Reset")
+            reset.setAccessibleName(f"Reset color for {label}")
+            reset.clicked.connect(lambda checked=False, key=key: self._reset_badge_color(key))
+            self.badge_resets[key] = reset
+            row.addWidget(reset)
+            badge_lay.addLayout(row)
+        reset_all = QPushButton("Reset all badge colors")
+        reset_all.clicked.connect(self._reset_badge_colors)
+        badge_lay.addWidget(reset_all)
+        self._refresh_badge_colors()
+
+        lay.addWidget(self.badge_section)
+        self.badge_section.hide()
+        self.badge_toggle.toggled.connect(self._toggle_badge_colors)
+
         lay.addStretch(1)
         self.error_lbl = QLabel(objectName="error")
         self.error_lbl.setWordWrap(True)
@@ -138,6 +186,34 @@ class SettingsDialog(QDialog):
         btns.addWidget(save)
         outer.addLayout(btns)
 
+    def _toggle_badge_colors(self, expanded):
+        self.badge_section.setVisible(expanded)
+        self.badge_toggle.setArrowType(Qt.DownArrow if expanded else Qt.RightArrow)
+
+    def _refresh_badge_colors(self):
+        for key in CARD_BADGES:
+            self.badge_previews[key].setStyleSheet(
+                "QLabel { " + theme.badge_style(theme.tokens(), key, self.badge_colors) + " }")
+            color = self.badge_colors.get(key)
+            self.badge_buttons[key].setText(color or "Choose color…")
+            self.badge_buttons[key].setToolTip(color or "Using the original theme colors")
+            self.badge_resets[key].setEnabled(color is not None)
+
+    def _choose_badge_color(self, key):
+        initial = theme.badge_colors(theme.tokens(), key, self.badge_colors)[1]
+        color = QColorDialog.getColor(QColor(initial), self, f"Color for {CARD_BADGES[key][0]}")
+        if color.isValid():
+            self.badge_colors[key] = color.name().upper()
+            self._refresh_badge_colors()
+
+    def _reset_badge_color(self, key):
+        self.badge_colors.pop(key, None)
+        self._refresh_badge_colors()
+
+    def _reset_badge_colors(self):
+        self.badge_colors.clear()
+        self._refresh_badge_colors()
+
     def _save(self):
         try:
             token = self.settings.validate_github_token(self.token_edit.text())
@@ -154,4 +230,5 @@ class SettingsDialog(QDialog):
             self.settings.run_in_background = self.bg_cb.isChecked()
         self.settings.start_at_login = self.startup_cb.isChecked()
         self.settings.start_minimized = self.start_minimized_cb.isChecked()
+        self.settings.card_badge_colors = self.badge_colors
         self.accept()

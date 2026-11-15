@@ -22,10 +22,44 @@ The scanner recognizes AppImages and executable ELF binaries and shebang scripts
 AppImages can be discovered without an executable bit. Plain binaries and scripts
 must be executable. Application files are inspected without being launched.
 
+## Watch folders for new apps
+
+In **Discover apps…**, check the boxes beside the discovery folders you want to
+watch. Leave other folders unchecked for manual scanning only. Watch choices are
+saved immediately and remembered across restarts. Removing a discovery folder
+also stops watching it. Newly added folders start unchecked.
+
+While AppForge is running, selected folders and their subfolders are checked in
+the background about every 10 seconds. A file must remain unchanged between two
+checks before it is offered, so newly completed downloads normally appear within
+about 20 seconds (large folders or slow metadata reads can take longer). Existing
+unregistered apps are offered too when watching first starts. Unchanged files use
+cached inspection results. Hidden files and common temporary download suffixes
+such as `.part`, `.crdownload` and `.tmp` are skipped.
+
+The library shows **3 new apps found — Review…** with the current count. Click it
+to open the normal discovery preview with all rows unchecked, then select and
+confirm the apps you want to import. Watching never adds apps automatically.
+Registered and ignored files are excluded; the count updates as files are imported,
+ignored or removed. The count remains available if you close the preview without
+importing. Use the preview's normal ignore/reset controls for unwanted files.
+
+Watching continues when AppForge is hidden in the tray, and stops when you quit.
+It is disabled by default. Missing or temporarily inaccessible folders are retried
+on later checks; use **Scan folders** to see detailed filesystem errors. Files are
+never executed by watching, and the normal import checks still reject files that
+changed or disappeared after the preview was generated.
+
 ## Review and import
 
 Results show the application name, available icon and version, format, location,
-and status: **New**, **Already registered**, or **Ignored**. Missing metadata may
+and status: **New**, **Already registered**, or **Ignored**. An editable **Update
+source** column suggests repositories from supported embedded AppImage update
+information or matching AppStream repository metadata. **No source detected**
+means no supported source could be read; paste a repository manually if known.
+Review, replace or clear these fields before importing; a blank field
+means no update source. Invalid sources must be corrected before import. These
+choices apply to new imports only. Missing metadata may
 appear as **Unknown**. Overlapping folders and hard links do not create repeated
 results; already-registered applications cannot be imported again.
 
@@ -48,7 +82,10 @@ visible but cannot be imported, and the ignore list survives restarts.
 
 ## Scan limitations
 
-- Discovery is an explicit scan, not continuous folder monitoring.
+- Folder watching runs only while AppForge is running and only for checked
+  discovery folders. It polls periodically rather than reacting instantly.
+- Files that are still changing are deferred; a paused download that appears stable
+  between checks may be offered. Import rechecks that the file still matches the preview.
 - Symlinked files and folders, including symlinked roots or ancestor folders, are
   skipped. Select the actual folder path instead of a symlink.
 - AppForge-managed hidden backup folders are excluded from discovery.

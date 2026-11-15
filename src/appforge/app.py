@@ -168,7 +168,8 @@ def main(argv: list[str] | None = None) -> int:
         logging.getLogger(__name__).warning("Launcher sync failed", exc_info=True)
     window = MainWindow(service, auto_check=True, tray_icon=app.windowIcon())
     app.styleHints().colorSchemeChanged.connect(
-        lambda *_: theme.apply_theme(app, window.settings.theme_mode))
+        lambda *_: theme.apply_theme(app, window.settings.theme_mode,
+                                    window.settings.card_badge_colors))
     from .core import autostart
     if window.settings.start_at_login:
         try:
