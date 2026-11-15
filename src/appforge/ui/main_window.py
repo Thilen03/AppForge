@@ -16,6 +16,9 @@ from PySide6.QtWidgets import (
 )
 
 from .. import APP_DISPLAY_NAME, __version__
+from ..core.bulk import BulkActions
+from ..core.launch_profiles import DEFAULT_PROFILE
+from ..core.launch_options import LaunchOptionsError
 from ..core.library import FileState, LibraryError, LibraryService, file_state
 from ..core.models import AppEntry, UpdateStatus
 from ..core.organize import (
@@ -36,7 +39,7 @@ from .dialogs import FILE_FILTER, AddApplicationDialog, AssetPickerDialog, EditA
 from .flow_layout import FlowLayout
 from .icons import gear_icon, placeholder_pixmap, theme_icon
 from . import theme
-from .popups import RoundedComboBox
+from .popups import RoundedComboBox, RoundedMenu
 from .settings_dialog import SettingsDialog
 from .tray import TrayController, tray_available
 from .kwin_tray import KWinTrayBridge, plasma_wayland
@@ -130,6 +133,9 @@ class MainWindow(QMainWindow):
         self._busy: dict[str, tuple[str, float | None]] = {}
         self._jobs: dict[str, object] = {}
         self._batch: dict | None = None
+        self._selected: set[str] = set()
+        self._bulk_run = None
+        self._launch_profile_choices: dict[str, str] = {}
         self._user_check = False
         self.check_pool = QThreadPool()
         self.check_pool.setMaxThreadCount(4)
@@ -288,6 +294,10 @@ class MainWindow(QMainWindow):
             self.status_cb.addItem(label, key)
         fl.addWidget(self.category_cb)
         fl.addWidget(self.status_cb)
+        self.select_btn = QPushButton("Select apps", objectName="soft")
+        self.select_btn.setCheckable(True)
+        self.select_btn.toggled.connect(self._selection_mode)
+        fl.addWidget(self.select_btn)
         fl.addStretch(1)
         fl.addWidget(QLabel("Sort by", objectName="subtitle"))
         self.sort_cb = RoundedComboBox()
@@ -299,6 +309,30 @@ class MainWindow(QMainWindow):
         self.status_cb.currentIndexChanged.connect(lambda *_: self._apply_filter())
         self.sort_cb.currentIndexChanged.connect(lambda *_: self.reload())
         root.addWidget(self.filter_row)
+
+        self.selection_bar = QWidget()
+        selection = QHBoxLayout(self.selection_bar)
+        selection.setContentsMargins(0, 0, 0, 0)
+        self.selection_count = QLabel("0 selected")
+        selection.addWidget(self.selection_count)
+        self.select_visible_btn = QPushButton("Select visible")
+        self.select_visible_btn.clicked.connect(self._select_visible)
+        selection.addWidget(self.select_visible_btn)
+        self.clear_selection_btn = QPushButton("Clear")
+        self.clear_selection_btn.clicked.connect(self._clear_selection)
+        selection.addWidget(self.clear_selection_btn)
+        selection.addStretch(1)
+        self.bulk_actions_btn = QPushButton("Actions for selected", objectName="soft")
+        menu = RoundedMenu(self.bulk_actions_btn)
+        for label, action in (("Change category…", "category"),
+                              ("Update settings…", "updates"),
+                              ("Create menu shortcuts", "shortcuts"),
+                              ("Remove from library…", "remove")):
+            menu.addAction(label, lambda checked=False, a=action: self.bulk_action(a))
+        self.bulk_actions_btn.setMenu(menu)
+        selection.addWidget(self.bulk_actions_btn)
+        self.selection_bar.hide()
+        root.addWidget(self.selection_bar)
 
         self.banner = QLabel(objectName="banner")
         self.banner.setWordWrap(True)
@@ -353,7 +387,12 @@ class MainWindow(QMainWindow):
     # -- cards --------------------------------------------------------------------------
     def _make_card(self, entry: AppEntry) -> AppCard:
         card = AppCard(entry, file_state(entry), self._busy.get(entry.id), self.grid_host,
-                       favorite=entry.id in self.shortcuts.favorites)
+                       favorite=entry.id in self.shortcuts.favorites,
+                       launch_profile=self._launch_profile_choices.get(entry.id, DEFAULT_PROFILE))
+        self._launch_profile_choices[entry.id] = card.launch_profile
+        card.profileSelected.connect(lambda app_id, key: self._launch_profile_choices.__setitem__(app_id, key))
+        card.profileLaunchRequested.connect(self.launch)
+        card.editProfilesRequested.connect(self.edit_launch_profiles)
         card.pauseUpdatesRequested.connect(self.set_updates_paused)
         card.skipVersionRequested.connect(self.skip_update_version)
         card.clearSkippedVersionRequested.connect(self.clear_skipped_version)
@@ -374,7 +413,140 @@ class MainWindow(QMainWindow):
         card.prereleasesRequested.connect(self.set_prereleases_enabled)
         card.backupsRequested.connect(self.show_backups)
         card.desktopToggleRequested.connect(self.toggle_desktop_entry)
+        card.set_selection(self.select_btn.isChecked(), entry.id in self._selected)
+        card.selectionRequested.connect(self._select_app)
         return card
+
+    # -- bulk library actions -----------------------------------------------------------
+    def _selection_mode(self, enabled):
+        if not enabled:
+            self._selected.clear()
+        self.select_btn.setText("Done selecting" if enabled else "Select apps")
+        self.selection_bar.setVisible(enabled)
+        self._sync_selection()
+
+    def _select_app(self, app_id, selected):
+        if selected and self.select_btn.isChecked():
+            self._selected.add(app_id)
+        else:
+            self._selected.discard(app_id)
+        self._sync_selection()
+
+    def _select_visible(self):
+        self._selected.update(c.entry.id for c in self._cards if self._matches(c.entry))
+        self._sync_selection()
+
+    def _clear_selection(self):
+        self._selected.clear()
+        self._sync_selection()
+
+    def _sync_selection(self):
+        # Hidden entries never remain selected for an action the user can't see.
+        visible = {c.entry.id for c in self._cards if self._matches(c.entry)}
+        self._selected.intersection_update(visible)
+        for card in self._cards:
+            card.set_selection(self.select_btn.isChecked(), card.entry.id in self._selected)
+        self.selection_count.setText(f"{len(self._selected)} selected")
+        self.bulk_actions_btn.setEnabled(bool(self._selected) and self._bulk_run is None)
+        self.clear_selection_btn.setEnabled(bool(self._selected))
+
+    def bulk_action(self, action):
+        # Capture the actual IDs before entering any nested modal event loop.
+        ids = tuple(c.entry.id for c in self._cards if c.entry.id in self._selected)
+        if not ids or self._bulk_run is not None:
+            return
+        value = None
+        if action == "category":
+            from .dialogs import _menu_category_combo
+            from PySide6.QtWidgets import QDialog, QDialogButtonBox
+            dialog = QDialog(self)
+            dialog.setWindowTitle("Change category")
+            layout = QVBoxLayout(dialog)
+            layout.addWidget(QLabel(f"Choose a category for {len(ids)} selected applications."))
+            combo = _menu_category_combo(None)
+            layout.addWidget(combo)
+            buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+            buttons.accepted.connect(dialog.accept)
+            buttons.rejected.connect(dialog.reject)
+            layout.addWidget(buttons)
+            if dialog.exec() != QDialog.Accepted:
+                return
+            value = combo.currentData()
+        elif action == "updates":
+            from .bulk_dialog import BulkUpdateDialog
+            dialog = BulkUpdateDialog(len(ids), self)
+            if dialog.exec() != BulkUpdateDialog.DialogCode.Accepted:
+                return
+            value = dialog.preferences()
+        elif action == "remove":
+            box = QMessageBox(QMessageBox.Question, "Remove from library",
+                              f"Remove {len(ids)} selected applications from the library?", parent=self)
+            box.setInformativeText("Application files and backups stay on disk. AppForge's menu "
+                                   "shortcuts and stored icons are removed with the library entries.")
+            box.setDetailedText("\n".join(c.entry.name for c in self._cards if c.entry.id in ids))
+            remove = box.addButton("Remove", QMessageBox.DestructiveRole)
+            cancel = box.addButton("Cancel", QMessageBox.RejectRole)
+            box.setDefaultButton(cancel)
+            box.setEscapeButton(cancel)
+            box.exec()
+            if box.clickedButton() is not remove:
+                return
+        self._start_bulk(ids, action, value)
+
+    def _start_bulk(self, ids, action, value=None):
+        if self._bulk_run is not None:
+            return
+        ids = tuple(dict.fromkeys(ids))
+        progress = QProgressDialog("Applying changes…", "Cancel", 0, len(ids), self)
+        progress.setWindowTitle("Selected applications")
+        progress.setWindowModality(Qt.WindowModal)
+        progress.setMinimumDuration(0)
+        progress.setAutoClose(False)
+        progress.setAutoReset(False)
+        progress.setValue(0)
+        self._bulk_run = dict(ids=ids, action=action, value=value, progress=progress,
+                              done=0, success=0, errors=[], helper=BulkActions(self.service))
+        self._sync_selection()
+        QTimer.singleShot(0, self._bulk_step)
+
+    def _bulk_step(self):
+        run = self._bulk_run
+        if run is None:
+            return
+        progress = run["progress"]
+        if progress.wasCanceled() or run["done"] == len(run["ids"]):
+            self._finish_bulk()
+            return
+        app_id = run["ids"][run["done"]]
+        entry = self.service.get(app_id)
+        name = entry.name if entry else app_id
+        progress.setLabelText(f"Applying changes to {name}…")
+        try:
+            if app_id in self._busy:
+                raise LibraryError("Busy checking or updating; try again afterward.")
+            run["helper"].apply(app_id, run["action"], run["value"])
+            run["success"] += 1
+        except Exception as exc:
+            log.warning("Bulk %s failed for %s: %s", run["action"], name, exc)
+            run["errors"].append(f"{name}: {exc}")
+        run["done"] += 1
+        progress.setValue(run["done"])
+        QTimer.singleShot(0, self._bulk_step)
+
+    def _finish_bulk(self):
+        run = self._bulk_run
+        self._bulk_run = None
+        remaining = len(run["ids"]) - run["done"]
+        run["progress"].close()
+        run["progress"].deleteLater()
+        self.reload()
+        summary = (f"{run['success']} of {len(run['ids'])} applications changed. "
+                   f"{len(run['errors'])} failed or skipped; {remaining} not processed.")
+        self.statusBar().showMessage(summary, 10000)
+        if run["errors"]:
+            box = QMessageBox(QMessageBox.Warning, "Some applications weren't changed", summary, parent=self)
+            box.setDetailedText("\n".join(run["errors"]))
+            box.exec()
 
     def set_updates_paused(self, app_id: str, paused: bool):
         if app_id in self._busy:
@@ -415,6 +587,7 @@ class MainWindow(QMainWindow):
             new.setVisible(self._matches(entry))
         self._refresh_header()
         self._refresh_details()
+        self._sync_selection()
 
     def _set_busy(self, app_id: str, text: str | None, fraction: float | None = None, rebuild=False):
         if text is None:
@@ -481,6 +654,8 @@ class MainWindow(QMainWindow):
             self.flow.addWidget(card)
             self._cards.append(card)
         self.search.setEnabled(bool(apps))
+        if not apps:
+            self.select_btn.setChecked(False)
         self.filter_row.setVisible(bool(apps))
         if missing:
             self.banner.setText(
@@ -598,6 +773,7 @@ class MainWindow(QMainWindow):
             shown += vis
         self.stack.setCurrentIndex(1 if not self._cards else 2 if shown == 0 else 0)
         self.flow.invalidate()
+        self._sync_selection()
 
     def _on_app_state(self, state):
         if (state == Qt.ApplicationActive and self.isVisible()
@@ -1267,27 +1443,41 @@ class MainWindow(QMainWindow):
             self.reload()
             self.statusBar().showMessage(f"Removed {entry.name}", 4000)
 
-    def launch(self, app_id: str):
+    def edit_launch_profiles(self, app_id: str):
+        entry = self.service.get(app_id)
+        if entry is None:
+            return self.reload()
+        from .launch_profiles_dialog import LaunchProfilesDialog
+        try:
+            dialog = LaunchProfilesDialog(self.service, entry, self)
+        except LaunchOptionsError as exc:
+            QMessageBox.warning(self, "Couldn't open launch profiles", str(exc))
+            return
+        if dialog.exec() == LaunchProfilesDialog.DialogCode.Accepted:
+            self._refresh_card(app_id)
+            self.statusBar().showMessage("Launch profiles saved", 4000)
+
+    def launch(self, app_id: str, profile_id: str = DEFAULT_PROFILE):
         entry = self.service.get(app_id)
         if not entry:
             return self.reload()
         try:
-            handle = launcher.launch(entry)
+            handle = launcher.launch(entry) if profile_id == DEFAULT_PROFILE else launcher.launch(entry, profile_id)
         except launcher.LaunchError as exc:
             if exc.state is FileState.MISSING:
                 self.reload()
-            self._launch_failed(entry.id, str(exc), exc.state)
+            self._launch_failed(entry.id, str(exc), exc.state, profile_id)
             return
         self.shortcuts.launched(app_id)
         self.statusBar().showMessage(f"Launching {entry.name}…", 3000)
         QTimer.singleShot(2500, lambda: self._check_started(entry.name, handle))
 
-    def _launch_failed(self, app_id: str, message: str, state):
+    def _launch_failed(self, app_id: str, message: str, state, profile_id: str = DEFAULT_PROFILE):
         self.bring_to_front()
         if state is FileState.NOT_EXECUTABLE:
             if QMessageBox.question(self, "Not executable", message + "\n\nMake it executable and launch?") \
                     == QMessageBox.Yes:
-                self.make_executable(app_id, then_launch=True)
+                self.make_executable(app_id, then_launch=True, profile_id=profile_id)
         elif state is FileState.MISSING:
             if QMessageBox.question(self, "File not found", message + "\n\nLocate the file now?") \
                     == QMessageBox.Yes:
@@ -1306,7 +1496,7 @@ class MainWindow(QMainWindow):
                 box.setDetailedText(tail)
             box.exec()
 
-    def make_executable(self, app_id: str, then_launch: bool = False):
+    def make_executable(self, app_id: str, then_launch: bool = False, profile_id: str = DEFAULT_PROFILE):
         entry = self.service.get(app_id)
         if not entry:
             return
@@ -1317,7 +1507,7 @@ class MainWindow(QMainWindow):
             return
         self.reload()
         if then_launch:
-            self.launch(app_id)
+            self.launch(app_id, profile_id)
 
     def _choose_relocation(self, entry: AppEntry, candidates: list[Path]) -> str | None:
         """Offer files that look like the missing app. Returns a path, ``""`` for "browse", None = cancel."""
@@ -1427,6 +1617,10 @@ class MainWindow(QMainWindow):
         return True
 
     def closeEvent(self, ev):
+        if self._bulk_run is not None:
+            self._bulk_run["progress"].cancel()
+            ev.ignore()
+            return
         if self._hide_to_tray():
             ev.ignore()
             return

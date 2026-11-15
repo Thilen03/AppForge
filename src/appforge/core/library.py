@@ -17,6 +17,7 @@ from .envvars import ENV_KEY, EnvVarError, validate_pair
 from .formats import AppMetadata, FormatError, detect_format, get_format
 from .models import AppEntry, UpdateStatus
 from .launch_options import LAUNCH_KEYS, LaunchOptionsError, validate_launch_options
+from .launch_profiles import PROFILES_KEY, validate_profiles
 from .organize import CATEGORY_KEY, clean_category
 from .relocate import find_candidates
 from .updates.providers import SUPPORTED_HINT, parse_source
@@ -231,8 +232,18 @@ class LibraryService:
         menu_category: str | None = ...,  # type: ignore[assignment]  (freedesktop key; None = automatic)
         env_vars: dict[str, str] | None = ...,  # type: ignore[assignment]  (empty/None = none)
         launch_options: dict = ...,  # type: ignore[assignment]  (empty = defaults)
+        launch_profiles: list = ...,  # type: ignore[assignment]
     ) -> AppEntry:
         entry = self._require(app_id)
+        if launch_profiles is not ...:
+            try:
+                checked_profiles = validate_profiles(launch_profiles)
+            except LaunchOptionsError as exc:
+                raise LibraryError(str(exc)) from exc
+            if checked_profiles:
+                entry.metadata[PROFILES_KEY] = checked_profiles
+            else:
+                entry.metadata.pop(PROFILES_KEY, None)
         if launch_options is not ...:
             try:
                 checked_options = validate_launch_options(launch_options)

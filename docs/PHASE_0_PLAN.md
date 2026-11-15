@@ -1,5 +1,150 @@
 # Phase 0 inspection and implementation plan
 
+## Confirmed 0.6.3 release preparation
+
+User requested prepare release 0.6.3. Verified previous release at HEAD 315bf4b
+(0.6.2); active pyproject.toml, __init__.py and README already consistently name
+the confirmed 0.6.3, so no further bump. Reviewed changes since HEAD, new bulk/
+profile modules and tests, public docs, release history and local tags through
+v0.5.4. Optional roadmap.md is unavailable. Repository identity is the main
+AppForge directory, main, origin/main and the expected GitHub URL. Git metadata
+remains read-only; the index is empty and no staging/commit/fetch/push/tag/upload
+was attempted.
+
+Finalized only releases/RELEASE_NOTES_v0.6.3.md for this version, covering bulk
+categories/update preferences/menu shortcuts/library removal, click-card selection,
+progress/cancellation/busy/failure handling, and independent named launch profiles
+with Default compatibility and validated library transfers. Documented session-only
+profile choice and older-version export compatibility. README quick start and
+documentation table now point to profiles; existing USAGE/LAUNCH_OPTIONS/
+LIBRARY_TRANSFER docs cover the verified behavior. No release date was inferred;
+historical notes were preserved. No database migration or dependency changes.
+
+Fresh full release regression: 823 passed, 12 restricted local TCP/Unix socket
+skips, one existing Qt deprecation warning. Startup selftest and git diff --check
+passed; version declarations/notes heading/expected artifact agree and 18 local
+documentation links resolve. Earlier feature QA includes actual modal/editor/
+worker flows, real process launches and light/dark card/dropdown/editor inspection.
+
+Recorded the existing dist/AppForge-0.6.3-x86_64.AppImage (84,732,408 bytes) before
+preparation and verified SHA-256, size, modification time, inode and mode unchanged
+after checks. Its filename does not verify its source contents or user testing.
+SOURCE 0.6.3 is ready for the user to build and manually test as
+AppForge-0.6.3-x86_64.AppImage. Matching binary build/manual testing is unconfirmed;
+publication remains pending that explicit confirmation. No distributable was built,
+renamed or changed during release preparation.
+
+## 0.6.3 launch profiles plan
+
+Add a split Launch button with a subtle dropdown, per-card profile selection and
+Edit profiles. Existing root launch/environment metadata remains the Default
+profile (never duplicated or removed). Named profiles are independent snapshots
+in existing metadata with validated stable IDs/names, environment variables and
+launch options. New profiles copy Default; the editor supports create/rename/
+delete and saves atomically with Cancel discarding drafts. Profile choice lasts
+for this window session; tray/desktop launches keep Default. Deleted/missing
+profiles never silently launch different settings.
+
+Reuse the launcher, environment/options validation and existing desktop sync.
+Add core/launch_profiles.py and ui/launch_profiles_dialog.py; extend LibraryService,
+AppCard/MainWindow, library transfer, tests and launch docs/current 0.6.3 notes.
+Keep selection-mode button exclusions and missing-file actions. Extend export/
+import validation and environment opt-out to nested profiles. No database migration
+or dependencies. Validate real process argv/environment/cwd, terminal handling,
+Default compatibility, persistence/transfer, editor Save/Cancel/validation,
+dropdown selection/card refresh, button geometry/selection safety and light/dark
+UI. Run focused/full regressions and startup selftest. Preserve all current
+uncommitted bulk/version work and existing dist files; no publishing.
+
+Implemented core launch-profile validation/resolution, an independent draft editor
+and a split Launch button. Default is the existing root configuration; custom
+profiles have stable IDs and store complete environment/options snapshots.
+New/rename/delete, atomic Save and Cancel are supported. Card dropdown selection
+survives refreshes in this window; tray/details/desktop launch Default. Deleted
+profiles reset visible cards to Default; stale launch requests fail explicitly.
+Profile launches use the existing shell-free detached launcher and terminal route.
+Library transfers validate profiles and honor environment opt-outs at both stages.
+No database migration, dependency or executable/source changes are involved.
+README, launch/usage/transfer docs and current 0.6.3 notes describe the feature.
+
+Validation: new tests cover malformed/duplicate/reserved names and IDs, atomic
+validation, Default compatibility, persistence, real process argv/environment/cwd,
+missing profiles/folders, terminal routing, all export/import environment choices,
+editor Save/Cancel/delete/rename, real dropdown/edit flow, card refresh and
+selection-mode arrow independence. Full regression: 819 passed, 12 restricted
+TCP/Unix socket skips, one existing Qt deprecation warning. After final split-button
+height refinement and four light/dark Update/Retry geometry checks, 180 focused
+profile/bulk/launch/transfer/desktop tests passed. Startup selftest and git diff
+--check passed. Inspected cards, dropdown and editor in light/dark themes, including
+the final aligned split button beside Retry and existing card actions. Source
+remains 0.6.3; existing dist files were untouched and no AppImage build/manual
+testing, staging or publication was attempted. Git metadata remains read-only.
+
+## 0.6.3 card selection refinement
+
+User requests the entire non-button card area as a selection target. Reuse
+AppCard's checkbox signal and MainWindow selection state; handle left press/release
+on the card, including events propagated from labels and nested content, excluding
+button descendants (including disabled buttons). Keep checkbox/button actions and
+normal-mode launching. Consume the second click of a double-click in selection
+mode to avoid undoing the first selection. Update bulk UI tests, usage and the
+confirmed 0.6.3 notes; no additional version bump or dist/Git metadata changes.
+
+Implemented left-click selection across the background, title, icon, badges,
+path and nested progress content. Button hit testing also excludes disabled
+buttons; checkbox clicks still toggle exactly once. A release outside the card
+does not select, and ordinary launching outside selection mode is preserved.
+Validation: 24 bulk tests and 27 relevant UI regression tests passed, including
+card content clicks, button/favorite/checkbox independence, right-clicks and
+double-click behavior. Startup selftest and git diff --check passed. This changes
+interaction only; the existing selection appearance and layout are retained.
+No AppImage was built or changed; the refinement remains part of 0.6.3.
+
+## Bulk library actions plan
+
+Add explicit selection mode and card checkboxes in ui/main_window.py and
+ui/app_card.py, with selection retained across card refreshes and sorting but
+limited to currently matching apps. Select visible/Clear and a compact action
+menu expose shared categories, update preferences, menu shortcuts and removal.
+Use a dedicated dialog for update preferences with unchanged defaults. Reuse
+LibraryService, UpdateService and desktop categories in a Qt-free bulk helper;
+invalidate cached targets when channel/asset preferences change. No schema or
+dependency changes. Keep sources and unrelated per-app metadata intact.
+
+Process one entry per Qt event-loop turn with progress/cancellation, snapshot IDs
+before modal prompts, recheck busy/missing entries and report per-app failures.
+Confirm removal with names and preserve binaries/backups. Test selection/filter/
+refresh, mixed preferences, persistence, shortcut failures, safe removal,
+cancellation and busy races. Run relevant/full regression and startup selftest,
+inspect light/dark UI, and update README/USAGE. Versions and new release notes
+await release-version confirmation; preserve dist and read-only Git metadata.
+
+Implemented the selection toolbar, accessible card checkboxes, shared-category
+dialog and mixed-preference update dialog. BulkActions reuses existing library/
+update/desktop services; update targets are invalidated when channel or pattern
+changes. The event-loop runner snapshots IDs, checks busy status immediately
+before each entry, reports individual failures, and supports cancellation between
+entries without undoing completed work. Removal confirms names and preserves
+application files/backups. Emptying the library exits selection mode. No schema
+migration or new dependency; README and USAGE describe the workflow.
+
+Validation: 104 focused existing/new tests passed. Full regression with existing
+build dependencies and the local AppImage fixture runtime: 773 passed, 12 skips
+for restricted TCP/Unix sockets, one existing Qt deprecation warning. After final
+action-menu dispatch and empty-library refinements, all 14 bulk tests passed;
+startup selftest and git diff --check passed. Inspected selected/unselected cards
+and update settings in both light/dark themes, including the final action button.
+Active version remains 0.6.2 pending a confirmed next release version. Existing
+dist files were untouched; no build/manual AppImage test, staging or publication
+was attempted. Git metadata remains read-only in this environment.
+
+User subsequently confirmed that bulk actions belong in release 0.6.3. Updated
+pyproject.toml, src/appforge/__init__.py and README from 0.6.2 to 0.6.3, and created
+only releases/RELEASE_NOTES_v0.6.3.md for the verified bulk features. Historical
+notes remain unchanged; no publication date was inferred. Expected user build:
+AppForge-0.6.3-x86_64.AppImage. Existing dist files remain untouched; matching
+binary build/manual testing and publication are still pending.
+
 Inspected for the 0.5.5 discovery update, 14 November 2026.
 
 ## Existing architecture

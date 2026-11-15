@@ -20,6 +20,11 @@ prerelease preferences, file-matching patterns, launcher preferences, command-li
 arguments, working directories, terminal preferences and embedded icons. Missing/unreadable or unsupported icons are omitted with a warning; the
 application still exports.
 
+Named launch profiles are included with their arguments, working directory and
+terminal preference. The environment-variable opt-in applies to Default and all
+named profiles on both export and import. Older AppForge versions may reject
+exports containing launch profiles.
+
 Application executables, backups, global Settings preferences, AppForge access
 tokens, download URLs, update status and release-note caches are excluded.
 Environment variables are excluded by default. Unknown internal metadata is not

@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img alt="version" src="https://img.shields.io/badge/version-0.6.2-2B63D9">
+  <img alt="version" src="https://img.shields.io/badge/version-0.6.3-2B63D9">
   <img alt="platform" src="https://img.shields.io/badge/platform-Linux-informational">
   <img alt="python" src="https://img.shields.io/badge/python-3.10%2B-blue">
   <img alt="Qt" src="https://img.shields.io/badge/Qt-6%20(PySide6)-41cd52">
@@ -32,13 +32,16 @@ AppForge reads their metadata without running them.
 - **Update safely.** File validation, published SHA-256/SHA-512 checksums, atomic
   replacement, automatic backups and rollback. New downloads never overwrite existing files.
 - **Organize and launch.** Search, categories, filters, sorting, favorites, desktop-menu
-  shortcuts, custom icons, launch arguments, working directories and terminal support.
+  shortcuts, custom icons and named launch profiles with their own environment,
+  arguments, working directory and terminal settings.
 - **Manage your library.** App details, in-app release notes, export/import, storage
   overview and backup cleanup, plus tools to locate moved files and fix execute permissions.
+  Select several apps to change categories or update settings, create menu shortcuts,
+  or remove library entries together.
 - **Stay in the background.** Scheduled checks, notifications, optional tray mode and
   login startup, light/dark themes, customizable card badge colors and AppForge self-updates.
 
-What's new: [AppForge 0.6.2 release notes](releases/RELEASE_NOTES_v0.6.2.md).
+What's new: [AppForge 0.6.3 release notes](releases/RELEASE_NOTES_v0.6.3.md).
 
 ## Install
 
@@ -63,7 +66,8 @@ are bundled. If FUSE is unavailable, launch with `--appimage-extract-and-run`; s
    review the Add form. **Add folder…** saves a new destination for discovery too.
 3. Review the name, icon, category and optional **Add to the application menu** choice.
    Local AppImages may suggest an update-source repository; review, change or clear it.
-4. Launch from the card. Use **Update** or **Update All** when updates are available;
+4. Launch from the card; its arrow selects or edits launch profiles.
+   Use **Update** or **Update All** when updates are available;
    **Backups & rollback** restores an earlier version.
 
 For nightlies, choose **Enable pre-releases** in the app's card menu. Choosing an
@@ -91,7 +95,7 @@ AppImage or raw executable; archives and packages are not unpacked.
 | Download from a repository | [Downloading applications](docs/DOWNLOADING.md) |
 | Scan folders and import existing apps | [Discovery](docs/DISCOVERY.md) |
 | Shared library/desktop-menu categories | [Categories](docs/CATEGORIES.md) |
-| Arguments, working directories and terminal launches | [Launch options](docs/LAUNCH_OPTIONS.md) |
+| Launch profiles, arguments, working directories and terminal launches | [Launch options](docs/LAUNCH_OPTIONS.md) |
 | Pause updates and skip versions | [Update controls](docs/UPDATE_CONTROLS.md) |
 | Export and import configuration | [Library transfer](docs/LIBRARY_TRANSFER.md) |
 | Measure storage and clean up backups | [Storage](docs/STORAGE.md) |

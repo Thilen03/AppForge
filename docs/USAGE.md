@@ -25,6 +25,9 @@ and update controls, see the [documentation index](../README.md#documentation).
   right after launch, AppForge shows its output and keeps a log. For terminal launches,
   application output appears in the terminal; AppForge may only capture terminal-process
   output and exit status. See the [launch options guide](LAUNCH_OPTIONS.md).
+  Use the arrow beside **Launch** to choose a launch profile or **Edit profiles…**.
+  Default keeps the existing Add/Edit settings; named profiles can use different
+  environment variables, arguments, working directories and terminal settings.
 - **Search, categories, filters and sorting**: filter by category or by status (updates available, needs attention,
   no update source) and sort by name, date added or update status.
 - **One shared category**: the **Category** dropdown in Add/Edit uses the standard KDE/desktop
@@ -40,6 +43,36 @@ and update controls, see the [documentation index](../README.md#documentation).
   script. They get cards, launchers, update checks, backups and rollback just like AppImages. For updates, the
   release must publish the raw binary (see [Current limitations](#current-limitations)).
 
+
+## Working with several applications
+
+Click **Select apps** above the library, then click anywhere on a card except its
+buttons to select or deselect it. The corner checkbox shows the selection and
+can still be clicked directly. Card buttons keep their normal actions.
+**Select visible** selects every app matching the current search and filters;
+**Clear** deselects them. Sorting and card refreshes preserve selection. Changing
+filters deselects apps that become hidden. **Done selecting** exits selection mode.
+
+Open **Actions for selected** to:
+
+- **Change category…** — apply the shared library/menu category, or choose
+  **Automatic** to use each app's own metadata. Existing menu shortcuts are updated.
+- **Update settings…** — pause/resume checks, choose stable or pre-release/nightly
+  releases, change the release asset pattern or clear skipped versions. Fields
+  default to **Leave unchanged** so mixed settings are preserved. To restore
+  automatic asset matching, enable **Change release asset pattern** and leave it
+  blank. Repository sources remain unchanged. Channel/pattern changes clear old
+  update results; use **Check for updates** afterward.
+- **Create menu shortcuts** — add or refresh desktop-menu launchers. Missing or
+  non-executable files are reported without creating a launcher.
+- **Remove from library…** — review the confirmation and expand its details to
+  see the selected names. Application files and backups remain on disk; AppForge's
+  menu shortcuts and stored icons are removed with their entries.
+
+Actions show progress and can be cancelled between apps. Completed changes remain
+saved. Apps currently being checked or updated are skipped. Failures do not stop
+the remaining apps; the result reports failed/skipped entries and any unprocessed
+apps after cancellation. Double-clicking a card in selection mode does not launch it.
 
 ## Application details
 

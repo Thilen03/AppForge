@@ -160,10 +160,16 @@ def stylesheet(t: Tokens, badge_overrides: dict[str, str] | None = None) -> str:
     QToolButton#gear:focus, QToolButton#themeToggle:focus {{ border: 1px solid {t.accent}; }}
     QToolButton:focus {{ border: 1px solid {t.accent}; }}
     QToolButton::menu-indicator {{ image: none; }}
+    QPushButton#primary[splitLaunch="true"] {{ border-top-right-radius: 0; border-bottom-right-radius: 0; }}
+    QToolButton#launchArrow {{ background: {t.accent}; color: {t.accent_text};
+        border: 1px solid {t.accent}; border-left: 1px solid {t.accent_hover};
+        border-top-left-radius: 0; border-bottom-left-radius: 0; }}
+    QToolButton#launchArrow:hover {{ background: {t.accent_hover}; }}
 
     QFrame#card {{ background: {t.surface}; border: 1px solid {t.border}; border-radius: 14px; }}
     QFrame#card[hot="true"] {{ background: {t.surface_hover}; border: 1px solid {t.border_strong}; }}
     QFrame#card[missing="true"] {{ border: 1px dashed {t.danger}; }}
+    QFrame#card[selected="true"] {{ border: 2px solid {t.accent}; }}
     QLabel#cardName {{ font-size: 15px; font-weight: 650; }}
     QLabel#cardMeta {{ color: {t.muted}; font-size: 12px; }}
     QLabel#cardPath {{ color: {t.muted}; font-size: 11px; }}

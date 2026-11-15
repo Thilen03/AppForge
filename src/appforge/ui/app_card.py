@@ -6,13 +6,14 @@ import math
 from PySide6.QtCore import QEasingCurve, QEvent, QPoint, QPointF, QPropertyAnimation, Qt, Signal
 from PySide6.QtGui import QColor, QFontMetrics, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import (
-    QAbstractButton, QFrame, QGraphicsOpacityEffect, QHBoxLayout, QLabel, QProgressBar, QPushButton,
+    QAbstractButton, QCheckBox, QFrame, QGraphicsOpacityEffect, QHBoxLayout, QLabel, QProgressBar, QPushButton,
     QToolButton, QVBoxLayout, QWidget,
 )
 
 from ..core.formats import get_format
 from ..core.library import DESKTOP_FLAG, FileState
 from ..core.models import AppEntry, UpdateStatus
+from ..core.launch_profiles import DEFAULT_PROFILE, profile_choices
 from ..core.updates.service import can_update
 from ..core.update_policy import updates_paused, version_skipped, SKIPPED_KEY
 from . import theme
@@ -95,6 +96,10 @@ class _FavoriteStar(QAbstractButton):
 
 
 class AppCard(QFrame):
+    profileLaunchRequested = Signal(str, str)
+    profileSelected = Signal(str, str)
+    editProfilesRequested = Signal(str)
+    selectionRequested = Signal(str, bool)
     detailsRequested = Signal(str)
     launchRequested = Signal(str)
     editRequested = Signal(str)
@@ -117,18 +122,36 @@ class AppCard(QFrame):
     clearSkippedVersionRequested = Signal(str)
 
     def __init__(self, entry: AppEntry, state: FileState, busy: tuple[str, float | None] | None = None,
-                 parent: QWidget | None = None, *, favorite: bool = False):
+                 parent: QWidget | None = None, *, favorite: bool = False,
+                 launch_profile: str = DEFAULT_PROFILE):
         super().__init__(parent)
         self.entry, self.state = entry, state
         self.favorite = favorite
+        self.launch_profile = launch_profile if launch_profile in dict(profile_choices(entry)) else DEFAULT_PROFILE
         self.setObjectName("card")
         self.setFixedSize(CARD_W, CARD_H)
         self.setProperty("missing", state in (FileState.MISSING, FileState.NOT_A_FILE))
         self.setAttribute(Qt.WA_Hover, True)
         self._menu_open = False
+        self._selection_press = False
         self._build()
         if busy:
             self.set_busy(*busy)
+        self.selection_box = QCheckBox(self)
+        self.selection_box.setGeometry(4, 4, 22, 22)
+        self.selection_box.setAccessibleName(f"Select {entry.name}")
+        self.selection_box.setToolTip(f"Select {entry.name}")
+        self.selection_box.toggled.connect(lambda checked: self.selectionRequested.emit(entry.id, checked))
+        self.set_selection(False, False)
+
+    def set_selection(self, enabled: bool, selected: bool):
+        self.selection_box.blockSignals(True)
+        self.selection_box.setChecked(selected)
+        self.selection_box.blockSignals(False)
+        self.selection_box.setVisible(enabled)
+        self.setProperty("selected", selected)
+        self.style().unpolish(self)
+        self.style().polish(self)
 
     # -- construction -------------------------------------------------------------------
     def _status_chip(self) -> tuple[str, str, str]:
@@ -251,10 +274,31 @@ class AppCard(QFrame):
             self._primary.clicked.connect(lambda: self.makeExecutableRequested.emit(e.id))
         else:
             self._primary = QPushButton("Launch", objectName="primary")
-            self._primary.clicked.connect(lambda: self.launchRequested.emit(e.id))
+            self._primary.clicked.connect(self._emit_launch)
         self._primary.setCursor(Qt.PointingHandCursor)
-        self._primary.setMinimumWidth(88)
-        bottom.addWidget(self._primary)
+        if self.state is FileState.OK:
+            self._primary.setMinimumWidth(72)
+            self._primary.setProperty("splitLaunch", True)
+            launch_group = QWidget()
+            group_layout = QHBoxLayout(launch_group)
+            group_layout.setContentsMargins(0, 0, 0, 0)
+            group_layout.setSpacing(0)
+            group_layout.addWidget(self._primary)
+            self.profile_btn = QToolButton(objectName="launchArrow")
+            self.profile_btn.setArrowType(Qt.DownArrow)
+            self._primary.ensurePolished()
+            self.profile_btn.setFixedSize(26, self._primary.sizeHint().height())
+            self.profile_btn.setPopupMode(QToolButton.InstantPopup)
+            self.profile_btn.setToolTip("Choose launch profile or edit profiles")
+            self.profile_btn.setAccessibleName("Launch profiles")
+            self.profile_btn.setCursor(Qt.PointingHandCursor)
+            self.profile_btn.setMenu(self._build_profile_menu())
+            group_layout.addWidget(self.profile_btn)
+            bottom.addWidget(launch_group)
+            self._update_launch_label()
+        else:
+            self._primary.setMinimumWidth(88)
+            bottom.addWidget(self._primary)
 
         self._update_btn = None
         if self.state is FileState.OK and can_update(e):
@@ -289,6 +333,38 @@ class AppCard(QFrame):
         for w in (edit, more):
             w.installEventFilter(self)  # keyboard focus also reveals the actions
 
+    def _build_profile_menu(self):
+        from PySide6.QtGui import QActionGroup
+        menu = RoundedMenu(self.profile_btn)
+        group = QActionGroup(menu)
+        group.setExclusive(True)
+        for ident, name in profile_choices(self.entry):
+            action = menu.addAction(name.replace('&', '&&'))
+            action.setCheckable(True)
+            action.setChecked(ident == self.launch_profile)
+            group.addAction(action)
+            action.triggered.connect(lambda checked=False, key=ident: self._choose_profile(key))
+        menu.addSeparator()
+        menu.addAction("Edit profiles…", lambda: self.editProfilesRequested.emit(self.entry.id))
+        return menu
+
+    def _choose_profile(self, ident):
+        self.launch_profile = ident
+        self._update_launch_label()
+        self.profileSelected.emit(self.entry.id, ident)
+
+    def _update_launch_label(self):
+        name = dict(profile_choices(self.entry))[self.launch_profile]
+        self._primary.setToolTip(f"Launch with {name} profile")
+        self._primary.setAccessibleName(f"Launch with {name} profile")
+        self.profile_btn.setToolTip(f"Launch profile: {name}\nChoose a profile or edit profiles")
+
+    def _emit_launch(self):
+        if self.launch_profile == DEFAULT_PROFILE:
+            self.launchRequested.emit(self.entry.id)
+        else:
+            self.profileLaunchRequested.emit(self.entry.id, self.launch_profile)
+
     @staticmethod
     def _chip(text: str, kind: str, tip: str = "", *, badge_key: str = "") -> QLabel:
         c = QLabel(text, objectName="chip")
@@ -306,6 +382,7 @@ class AppCard(QFrame):
         m.setToolTipsVisible(True)
         m.addAction("Details…", lambda: self.detailsRequested.emit(e.id))
         m.addAction("Edit information…", lambda: self.editRequested.emit(e.id))
+        m.addAction("Edit launch profiles…", lambda: self.editProfilesRequested.emit(e.id))
         m.addAction("Remove from favorites" if self.favorite else "Add to favorites",
                     lambda: self.favoriteRequested.emit(e.id, not self.favorite))
         if e.github_repo:
@@ -405,6 +482,38 @@ class AppCard(QFrame):
         return super().eventFilter(obj, ev)
 
     def mouseDoubleClickEvent(self, ev):
+        if not self.selection_box.isHidden():
+            # The first click already toggled selection. Consume the second
+            # press/release so a double-click doesn't immediately undo it.
+            self._selection_press = False
+            ev.accept()
+            return
         if self.state is FileState.OK:
-            self.launchRequested.emit(self.entry.id)
+            self._emit_launch()
         super().mouseDoubleClickEvent(ev)
+
+    def _selection_hit(self, position):
+        if self.selection_box.isHidden() or not self.rect().contains(position):
+            return False
+        child = self.childAt(position)
+        while child is not None and child is not self:
+            if isinstance(child, QAbstractButton):
+                return False
+            child = child.parentWidget()
+        return True
+
+    def mousePressEvent(self, ev):
+        self._selection_press = ev.button() == Qt.LeftButton and self._selection_hit(ev.position().toPoint())
+        if self._selection_press:
+            ev.accept()
+            return
+        super().mousePressEvent(ev)
+
+    def mouseReleaseEvent(self, ev):
+        select = self._selection_press
+        self._selection_press = False
+        if select and ev.button() == Qt.LeftButton and self._selection_hit(ev.position().toPoint()):
+            self.selection_box.toggle()
+            ev.accept()
+            return
+        super().mouseReleaseEvent(ev)

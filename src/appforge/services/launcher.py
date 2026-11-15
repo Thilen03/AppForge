@@ -11,6 +11,7 @@ from pathlib import Path
 
 from ..core.envvars import env_of
 from ..core.launch_options import TERMINAL, LaunchOptionsError, options_of, command_for, directory_for
+from ..core.launch_profiles import DEFAULT_PROFILE, entry_for_profile
 from ..core.library import FileState, file_state
 from ..core.models import AppEntry
 from ..core.paths import logs_dir
@@ -84,7 +85,11 @@ def terminal_command(argv: list[str], env: dict[str, str]) -> list[str]:
                       "or turn off Run in terminal in Launch options.")
 
 
-def launch(entry: AppEntry) -> LaunchHandle:
+def launch(entry: AppEntry, profile_id: str = DEFAULT_PROFILE) -> LaunchHandle:
+    try:
+        entry = entry_for_profile(entry, profile_id)
+    except LaunchOptionsError as exc:
+        raise LaunchError(f"Invalid launch profile for “{entry.name}”: {exc}") from exc
     state = file_state(entry)
     if state is FileState.MISSING:
         raise LaunchError(f"The file for “{entry.name}” was not found:\n{entry.path}", state)

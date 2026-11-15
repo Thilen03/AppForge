@@ -21,6 +21,7 @@ from .formats import detect_format
 from .library import ICON_EXTS, MAX_ICON_BYTES, LibraryError, normalize_path, normalize_repo
 from .models import AppEntry, new_id
 from .launch_options import ARGUMENTS, DIRECTORY, TERMINAL, LAUNCH_KEYS, MAX_ARGUMENT_TEXT, LaunchOptionsError, validate_launch_options
+from .launch_profiles import PROFILES_KEY, validate_profiles
 from .organize import MAX_CATEGORY_LEN
 
 FORMAT = "appforge-library"
@@ -87,11 +88,16 @@ def validate_record(raw: object) -> dict:
         raise TransferError("Date added must be a valid timestamp.")
     result['added_at'] = added
     metadata = raw.get('metadata', {})
-    if not isinstance(metadata, dict) or set(metadata) - set(META_TEXT) - META_BOOL - {'env_vars'}:
+    if not isinstance(metadata, dict) or set(metadata) - set(META_TEXT) - META_BOOL - {'env_vars', PROFILES_KEY}:
         raise TransferError("Unsupported configuration metadata (credentials and runtime state are not imported).")
     md = {}
     for key, value in metadata.items():
-        if key in META_BOOL:
+        if key == PROFILES_KEY:
+            try:
+                md[key] = validate_profiles(value)
+            except LaunchOptionsError as exc:
+                raise TransferError(str(exc)) from exc
+        elif key in META_BOOL:
             if type(value) is not bool:
                 raise TransferError(f"{key} must be true or false.")
             md[key] = value
@@ -221,6 +227,14 @@ def export_library(entries, path, *, protected=(), include_environment=False, ca
                     md.pop('desktop_exec')
             if include_environment and entry.metadata.get('env_vars'):
                 md['env_vars'] = deepcopy(entry.metadata['env_vars'])
+            if entry.metadata.get(PROFILES_KEY):
+                try:
+                    md[PROFILES_KEY] = validate_profiles(entry.metadata[PROFILES_KEY])
+                except LaunchOptionsError as exc:
+                    raise TransferError(f"Invalid launch profiles for {entry.name}: {exc}") from exc
+                if not include_environment:
+                    for profile in md[PROFILES_KEY]:
+                        profile.pop('env_vars', None)
             raw = {k: getattr(entry, k) for k in FIELDS - {'metadata', 'icon'}}
             raw.update(metadata=md, icon=None)
             if entry.icon_path:
@@ -359,6 +373,8 @@ def prepare_import(candidate, existing, icons_dir, *, new_ids=False, environment
         record['id'] = new_id()
     if not environment:
         record['metadata'].pop('env_vars', None)
+        for profile in record['metadata'].get(PROFILES_KEY, []):
+            profile.pop('env_vars', None)
     if not launchers:
         record['metadata'].pop('desktop_entry', None)
     prepared = PreparedImport(record, missing=current.fingerprint is None,
