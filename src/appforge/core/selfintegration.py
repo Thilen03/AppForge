@@ -47,7 +47,7 @@ def render_self_entry(argv: list[str], icon: str) -> str:
         f"Exec={exec_line}",
         f"Icon={icon}",
         "Terminal=false",
-        "Categories=Utility;System;",
+        "Categories=Utility;",
         f"StartupWMClass={APP_ID}",
         SELF_MARKER,
         "",

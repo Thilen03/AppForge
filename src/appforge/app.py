@@ -144,17 +144,12 @@ def main(argv: list[str] | None = None) -> int:
     app.setDesktopFileName(APP_ID)
     app.setWindowIcon(QIcon(resource_path("appforge.png")))
 
-    from .core.desktop.selflauncher import ensure_self_launcher
     from .ui import theme
     from .ui.main_window import MainWindow
     from .ui.popups import install_popup_rounding
 
     theme.apply_theme(app)
     install_popup_rounding(app)
-
-    # Lets the desktop match AppForge's window to a launcher, which is what makes "Pin to Task Manager"
-    # appear when right-clicking its taskbar entry (an AppImage has no .desktop file of its own).
-    ensure_self_launcher(resource_path("appforge.png"))
 
     db = Database(database_path())
     service = LibraryService(db, icons_dir())

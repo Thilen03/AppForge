@@ -303,7 +303,7 @@ class AppCard(QFrame):
         self._update_btn = None
         if self.state is FileState.OK and can_update(e):
             retry = e.update_status is UpdateStatus.FAILED
-            self._update_btn = QPushButton("Retry update" if retry else "Update", objectName="soft")
+            self._update_btn = QPushButton("Retry update" if retry else "Update", objectName="primary")
             self._update_btn.setCursor(Qt.PointingHandCursor)
             self._update_btn.setToolTip(f"Update to {e.latest_version}")
             self._update_btn.clicked.connect(lambda: self.updateRequested.emit(e.id))

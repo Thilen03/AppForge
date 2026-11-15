@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..core import autostart
+from ..core.desktop import selflauncher
 from ..core.settings import CARD_BADGES, INTERVAL_CHOICES, AppSettings
 from . import theme
 from .popups import RoundedComboBox
@@ -68,6 +69,11 @@ class SettingsDialog(QDialog):
         self.auto_cb.toggled.connect(self.interval.setEnabled)
         self.interval.setEnabled(self.auto_cb.isChecked())
 
+        self.hide_notes_cb = QCheckBox("Don't show AppForge release notes after updates")
+        self.hide_notes_cb.setChecked(settings.hide_release_notes)
+        lay.addWidget(self.hide_notes_cb)
+        lay.addWidget(_hint("Untick to show the current version's notes again and enable notes for future updates."))
+
         lay.addSpacing(8)
         lay.addWidget(_label("Notifications and background"))
         self.notify_cb = QCheckBox("Notify me when an update is found")
@@ -81,6 +87,13 @@ class SettingsDialog(QDialog):
                             "from the tray icon." if tray_available else
                             "No system tray was found on this desktop, so background running is unavailable."))
 
+        lay.addSpacing(8)
+        lay.addWidget(_label("Application menu shortcut"))
+        self.launcher_cb = QCheckBox("Add AppForge to the application menu")
+        self.launcher_cb.setChecked(settings.self_launcher_enabled)
+        lay.addWidget(self.launcher_cb)
+        lay.addWidget(_hint("Tick to create AppForge's launcher, or untick to remove it. "
+                            "Changes apply when you Save. Your applications and login startup are unaffected."))
         lay.addSpacing(8)
         lay.addWidget(_label("Startup"))
         self.startup_cb = QCheckBox("Start AppForge at login")
@@ -217,14 +230,20 @@ class SettingsDialog(QDialog):
     def _save(self):
         try:
             token = self.settings.validate_github_token(self.token_edit.text())
+            if (self.launcher_cb.isChecked() != self.settings.self_launcher_enabled
+                    or (self.launcher_cb.isChecked() and not selflauncher.launcher_installed())):
+                selflauncher.set_enabled(self.launcher_cb.isChecked())
             if self.startup_cb.isChecked() or self.settings.start_at_login:
                 autostart.set_enabled(self.startup_cb.isChecked())
-        except (ValueError, autostart.AutostartError) as exc:
+        except (ValueError, autostart.AutostartError, selflauncher.SelfLauncherError) as exc:
             self.error_lbl.setText(str(exc))
             return
+        self.settings.self_launcher_enabled = self.launcher_cb.isChecked()
+        self.settings.self_launcher_prompted = True
         self.settings.set_github_token(token)
         self.settings.auto_check = self.auto_cb.isChecked()
         self.settings.check_interval_hours = int(self.interval.currentData())
+        self.settings.hide_release_notes = self.hide_notes_cb.isChecked()
         self.settings.notifications = self.notify_cb.isChecked()
         if self.bg_cb.isEnabled():
             self.settings.run_in_background = self.bg_cb.isChecked()

@@ -8,5 +8,5 @@ Icon=appforge
 Terminal=false
 StartupNotify=true
 StartupWMClass=appforge
-Categories=System;Utility;
+Categories=Utility;
 Keywords=AppImage;launcher;apps;

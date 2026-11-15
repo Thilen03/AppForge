@@ -151,6 +151,42 @@ class AppSettings:
     def start_minimized(self, value: bool) -> None:
         self._set_bool("start_minimized", bool(value))
 
+    @property
+    def self_launcher_enabled(self) -> bool:
+        from .desktop.selflauncher import launcher_installed
+        return self._bool("self_launcher_enabled", launcher_installed())
+
+    @self_launcher_enabled.setter
+    def self_launcher_enabled(self, value: bool) -> None:
+        self._set_bool("self_launcher_enabled", bool(value))
+
+    @property
+    def self_launcher_prompted(self) -> bool:
+        return self._bool("self_launcher_prompted", False)
+
+    @self_launcher_prompted.setter
+    def self_launcher_prompted(self, value: bool) -> None:
+        self._set_bool("self_launcher_prompted", bool(value))
+
+    @property
+    def hide_release_notes(self) -> bool:
+        return self._bool("hide_release_notes", False)
+
+    @hide_release_notes.setter
+    def hide_release_notes(self, value: bool) -> None:
+        # Re-enabling offers the current version again, even if already read.
+        if self.hide_release_notes and not value:
+            self.last_release_notes_version = ""
+        self._set_bool("hide_release_notes", bool(value))
+
+    @property
+    def last_release_notes_version(self) -> str:
+        return self.db.get_setting("last_release_notes_version") or ""
+
+    @last_release_notes_version.setter
+    def last_release_notes_version(self, value: str) -> None:
+        self.db.set_setting("last_release_notes_version", value)
+
     # -- GitHub token -------------------------------------------------------------------
     @property
     def github_token(self) -> str:

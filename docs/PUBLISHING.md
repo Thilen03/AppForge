@@ -45,7 +45,9 @@ will inspect the current version, previous release notes/tags and verified chang
 If no version was specified, it will propose one and wait for your confirmation.
 It updates relevant version declarations, public README/docs and tests as needed,
 and creates `releases/RELEASE_NOTES_v<version>.md` with the heading
-`# AppForge <version>`. Dates are included only when confirmed. Notes describe
+`# AppForge <version>`. Keep `src/appforge/resources/release_notes.md` identical
+to those current public notes so the packaged offline popup shows the same text.
+Dates are included only when confirmed. Notes describe
 verified user-visible changes and omit empty sections; historical notes remain
 intact. Preparation never builds or modifies AppImages or publishes anything.
 

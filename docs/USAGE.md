@@ -250,8 +250,28 @@ apps after cancellation. Double-clicking a card in selection mode does not launc
 ## AppForge itself
 - **Self-update**: AppForge checks its own releases at startup and offers *Update now* or *Later*. The update is
   verified, the old build is kept as a backup, and it is swapped in atomically.
+- **What changed after an update**: the first visible launch of each AppForge version
+  shows its bundled release notes, including when offline. Closing the popup keeps
+  notes enabled for future versions. **Don't show again** disables these popups.
+  To restore them, untick **Don't show AppForge release notes after updates** in
+  Settings and Save; the current notes open again. Login startup hidden in the tray
+  waits until you open AppForge before showing notes.
 - **Single instance**: starting AppForge while it is already running just brings the existing window forward.
-- **Pin to taskbar**: AppForge writes its own launcher so the desktop can offer "Pin to Task Manager".
+- **AppForge application menu shortcut**: on first visible launch, AppForge asks
+  whether to create its own menu launcher. Choose No to continue without it; the
+  question will not repeat. In Settings, tick **Add AppForge to the application menu**
+  and Save to add it later, or untick and Save to remove it. This also lets the
+  desktop offer "Pin to Task Manager". Existing AppForge-created launchers are
+  preserved on upgrade and placed in **Utilities**. When you launch an AppImage
+  from a different location, AppForge shows the saved and current paths and asks
+  whether to fix the shortcut. **Yes** points it at the new location; **No** leaves
+  it unchanged and asks again next launch. Unchanged locations show no repair prompt.
+  Removed shortcuts stay removed. Unrelated launchers are never overwritten or deleted.
+  This setting is independent of **Start AppForge at login**.
+  On KDE Plasma, saved menu-editor rules can override the Utilities category or
+  hide AppForge. With the shortcut enabled, open KDE Menu Editor, enable **Show
+  hidden entries** in its settings, move AppForge into **Utilities** and save.
+  AppForge preserves custom KDE menu rules.
 - **Settings** (gear icon to the right of **Add Application**): automatic checks and interval, notifications, tray behaviour,
   login startup and an optional GitHub token to raise the API rate limit.
 

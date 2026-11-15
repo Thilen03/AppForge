@@ -129,6 +129,10 @@ class MainWindow(QMainWindow):
         self.setMinimumSize(620, 420)
         self._details = {}
         self._release_notes = {}
+        self._appforge_notes = None
+        self._launcher_prompt = None
+        self._pending_launcher_move = None
+        self._launcher_move_offered = False
         self._cards: list[AppCard] = []
         self._busy: dict[str, tuple[str, float | None]] = {}
         self._jobs: dict[str, object] = {}
@@ -156,6 +160,7 @@ class MainWindow(QMainWindow):
         self.apply_settings()
         QApplication.instance().aboutToQuit.connect(self._stop_kwin_bridge)
         if auto_check:
+            self._refresh_self_launcher()
             QTimer.singleShot(1500, self._check_self_update)
             if self.settings.auto_check:
                 QTimer.singleShot(800, lambda: self.check_updates(only_stale=True))
@@ -1020,11 +1025,105 @@ class MainWindow(QMainWindow):
 
     def showEvent(self, ev):
         super().showEvent(ev)
+        if self._live:
+            QTimer.singleShot(0, self._show_startup_dialogs)
         handle = self.windowHandle()
         if handle is not None and handle is not self._tray_window_handle:
             self._tray_window_handle = handle
             handle.windowStateChanged.connect(self._native_window_state_changed)
             handle.visibilityChanged.connect(self._native_window_visibility_changed)
+
+    def _refresh_self_launcher(self):
+        from ..core.desktop import selflauncher
+        self._pending_launcher_move = None
+        if not self.settings.self_launcher_enabled:
+            return
+        # Adopt shortcuts made by earlier versions, preserving existing pins.
+        self.settings.self_launcher_enabled = True
+        self.settings.self_launcher_prompted = True
+        self._pending_launcher_move = selflauncher.moved_appimage()
+        if self._pending_launcher_move is not None:
+            return
+        try:
+            selflauncher.set_enabled(True)
+        except selflauncher.SelfLauncherError:
+            log.warning("Could not refresh AppForge's launcher", exc_info=True)
+
+    def _show_startup_dialogs(self):
+        if self._quitting or not self.isVisible() or self.isMinimized():
+            return
+        if self._launcher_prompt is not None:
+            return
+        if self._pending_launcher_move is not None and not self._launcher_move_offered:
+            old, new = self._pending_launcher_move
+            box = QMessageBox(QMessageBox.Question, "AppForge AppImage has moved",
+                              "AppForge's AppImage location has changed. Would you like to fix "
+                              "the application menu shortcut to point to its new location?",
+                              QMessageBox.Yes | QMessageBox.No, self)
+            box.setTextFormat(Qt.PlainText)
+            box.setInformativeText(f"Previous location: {old}\n\nNew location: {new}\n\n"
+                                   "Choosing No leaves the shortcut unchanged.")
+            box.setDefaultButton(QMessageBox.Yes)
+            self._launcher_prompt = box
+            self._launcher_move_offered = True
+            box.finished.connect(self._self_launcher_repair_chosen)
+            box.open()
+            return
+        if self.settings.self_launcher_prompted:
+            self._show_appforge_notes()
+            return
+        box = QMessageBox(QMessageBox.Question, "Add AppForge to the application menu?",
+                          "Would you like to create an application menu shortcut for AppForge?",
+                          QMessageBox.Yes | QMessageBox.No, self)
+        box.setInformativeText("You can add or remove this shortcut later in Settings.")
+        box.setDefaultButton(QMessageBox.Yes)
+        self._launcher_prompt = box
+        box.finished.connect(self._self_launcher_chosen)
+        box.open()
+
+    def _self_launcher_repair_chosen(self, result):
+        from ..core.desktop import selflauncher
+        box, self._launcher_prompt = self._launcher_prompt, None
+        if box is None:
+            return
+        box.deleteLater()
+        if result == QMessageBox.Yes:
+            try:
+                selflauncher.set_enabled(True)
+            except selflauncher.SelfLauncherError as exc:
+                QMessageBox.warning(self, "Could not fix shortcut", str(exc))
+            else:
+                self._pending_launcher_move = None
+        self._show_appforge_notes()
+
+    def _self_launcher_chosen(self, result):
+        from ..core.desktop import selflauncher
+        box, self._launcher_prompt = self._launcher_prompt, None
+        if box is None:
+            return
+        box.deleteLater()
+        enabled = result == QMessageBox.Yes
+        if enabled:
+            try:
+                selflauncher.set_enabled(True)
+            except selflauncher.SelfLauncherError as exc:
+                QMessageBox.warning(self, "Could not create shortcut", str(exc))
+                return
+        self.settings.self_launcher_enabled = enabled
+        self.settings.self_launcher_prompted = True
+        self._show_appforge_notes()
+
+    def _show_appforge_notes(self):
+        if (self._quitting or not self.isVisible() or self.isMinimized()
+                or self.settings.hide_release_notes
+                or self.settings.last_release_notes_version == __version__):
+            return
+        from .appforge_notes_dialog import AppForgeNotesDialog
+        if self._appforge_notes is not None:
+            self._appforge_notes.close()
+        self._appforge_notes = AppForgeNotesDialog(self.settings, self)
+        self._appforge_notes.show()
+        self.settings.last_release_notes_version = __version__
 
     def _native_window_state_changed(self, state):
         if state & Qt.WindowMinimized:
@@ -1082,6 +1181,7 @@ class MainWindow(QMainWindow):
             theme.apply_theme(QApplication.instance(), self.settings.theme_mode,
                               self.settings.card_badge_colors)
             self.statusBar().showMessage("Settings saved", 3000)
+            self._show_appforge_notes()
 
     def open_library_transfer(self, mode, parent=None):
         from .library_transfer_dialog import LibraryTransferDialog

@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img alt="version" src="https://img.shields.io/badge/version-0.6.4-2B63D9">
+  <img alt="version" src="https://img.shields.io/badge/version-0.6.5-2B63D9">
   <img alt="platform" src="https://img.shields.io/badge/platform-Linux-informational">
   <img alt="python" src="https://img.shields.io/badge/python-3.10%2B-blue">
   <img alt="Qt" src="https://img.shields.io/badge/Qt-6%20(PySide6)-41cd52">
@@ -41,8 +41,11 @@ AppForge reads their metadata without running them.
   or remove library entries together.
 - **Stay in the background.** Scheduled checks, notifications, optional tray mode and
   login startup, light/dark themes, customizable card badge colors and AppForge self-updates.
+  Read bundled release notes after each AppForge update, with an option to hide them.
+  Choose whether to add AppForge to Utilities on first launch or in Settings. If its
+  AppImage moves, AppForge asks before updating the shortcut to the new location.
 
-What's new: [AppForge 0.6.4 release notes](releases/RELEASE_NOTES_v0.6.4.md).
+What's new: [AppForge 0.6.5 release notes](releases/RELEASE_NOTES_v0.6.5.md).
 
 ## Install
 

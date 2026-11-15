@@ -782,3 +782,125 @@ SOURCE 0.6.2 is ready for the user to rebuild and manually test as
 AppForge-0.6.2-x86_64.AppImage. Matching binary build/manual testing is unconfirmed;
 release publication remains pending that explicit confirmation. No distributable
 was built, renamed or changed during preparation.
+
+## 0.6.5 card actions and AppForge release notes
+
+Use the existing primary button style for Update/Retry update. Add an offline
+AppForge notes dialog using the existing safe Markdown document and link handler.
+Bundle current public notes as package data; test equality to prevent drift.
+Store suppression and last-shown version in existing settings (no migration).
+Show once per version only when the real main window becomes visible; hidden
+login startup defers it. Settings can undo suppression and replay current notes.
+Update active version, README and usage guide; preserve historical notes and dist.
+Validate preferences, startup/restart gating, settings cancellation, both themes,
+focused/full tests and startup selftest. No roadmap file is available.
+
+Implemented 0.6.5 with solid primary Update/Retry update buttons, a bundled safe
+Markdown notes dialog, persistent suppression/last-shown-version preferences and
+Settings replay. Existing package-data/PyInstaller resource inclusion covers the
+notes; a test keeps them identical to the public 0.6.5 notes. README, usage and
+publishing guidance updated. No database migration or dependency changes.
+Validation: 64 focused tests passed; after the final Settings layout adjustment,
+26 relevant tests passed. Full regression with existing .venv-build dependencies
+on PYTHONPATH and /tmp/appforge-test-runtime: 871 passed, 12 restricted TCP/Unix
+socket skips, one existing Qt deprecation warning. The initial system-Python full
+run was interrupted after missing PySquashfsImage caused fixture-related failures;
+the complete rerun above uses the already installed project dependencies. Startup
+selftest and diff whitespace check passed. Visually inspected card, offline notes
+and Settings screenshots in light/dark themes. Source 0.6.5 is ready for the user
+to build and manually test. No AppImages built/modified and no Git metadata writes,
+commits or publishing performed; Git metadata remains read-only in this environment.
+
+## 0.6.5 optional AppForge launcher
+
+Replace bootstrap's unconditional self launcher creation with persistent opt-in.
+Use desktop/selflauncher for safe create/remove operations and existing source/
+AppImage startup commands. Preserve existing owned shortcuts on upgrade; never
+overwrite/delete foreign entries or follow symlinks. Ask once on first visible
+startup, before bundled notes, and allow later creation/removal through Settings.
+Refresh only opted-in shortcuts after moving/updating. Extend existing settings
+without migration, keep this ongoing update at 0.6.5, and update current notes,
+README and usage. Test decisions, refresh/removal persistence, file ownership,
+errors and source/AppImage commands, then run regression and startup selftest.
+
+Implemented opt-in bootstrap and a once-only first-visible-start prompt ahead of
+release notes. Settings now creates/removes the AppForge menu shortcut with Save;
+Cancel leaves it unchanged. Existing managed entries are adopted and refreshed;
+explicitly disabled shortcuts are never recreated. The strict selflauncher API
+uses the existing stable AppImage/source startup command, atomic writes, ownership
+markers and symlink checks, and reports errors. Foreign entries and user files
+are preserved; corrupt entries do not crash preferences. Updated README, usage,
+public 0.6.5 notes and their bundled copy. Version remains 0.6.5 as this is a
+continuation of the same development update; no migration/dependency changes.
+Validation: 56 focused tests passed, one restricted socket skip. Final full
+regression (including two additional corruption/prompt-error tests): 885 passed,
+12 restricted TCP/Unix socket skips and one existing Qt deprecation warning.
+Startup selftest and whitespace checks passed. Inspected the prompt and Settings
+in both light/dark themes at 560x660. Source is ready to build and manually test;
+no release AppImages were built or touched, and no Git metadata writes, commits
+or publication were performed.
+
+## 0.6.5 Utilities and moved-AppImage consent
+
+Use Utility as AppForge's sole main category in packaged and generated entries.
+Compare the current APPIMAGE path with the owned launcher's saved executable before
+startup refresh. Queue a first-visible-window repair prompt for changed paths;
+never rewrite that shortcut before Yes. No leaves it intact and asks next launch,
+not repeatedly in the same session. Keep ordinary same-path starts quiet, preserve
+opt-outs/foreign entries, and avoid implicit repair on unrelated Settings saves.
+Extend launcher tests for unchanged/moved/renamed/declined/repaired paths, failures
+and categories; update current 0.6.5 notes and usage, then validate startup and UI.
+
+Implemented Utilities-only categories in the packaged entry and both AppForge
+entry renderers. Startup detects an owned shortcut's changed AppImage path before
+any refresh and defers a plain-text Yes/No repair prompt until the window is visible.
+The prompt shows old/new locations; Yes uses the existing guarded atomic writer,
+No preserves the entry and repeats only next session. Same-path starts do not
+rewrite unchanged entries/icons or show a repair prompt. Same-path legacy category
+entries migrate to Utilities. Disabled shortcuts stay disabled; unrelated Settings
+saves no longer rewrite an enabled existing launcher. Updated README, usage and
+public/bundled 0.6.5 notes. Existing historical notes and versions preserved.
+Validation: 66 focused checks passed with one socket skip before adding the legacy
+category migration case. Final full suite including that case: 894 passed, 12
+restricted TCP/Unix socket skips, one existing Qt deprecation warning. Startup
+selftest, packaged desktop-file-validate and whitespace checks passed. Inspected
+repair prompts in light/dark themes. Source remains 0.6.5 and is ready for user
+build/manual testing; no distributable AppImage or Git metadata was modified, and
+no commit, push or publishing was performed.
+
+## Confirmed 0.6.5 release preparation
+
+User explicitly requested prepare release 0.6.5. Previous release is HEAD
+b403e3f (0.6.4); local tags still end at v0.5.4. Source declarations and README
+already agree on confirmed 0.6.5. Repository identity verified as
+/home/thilen/appforge, main, origin/main, https://github.com/Thilen03/AppForge.git.
+Git metadata is read-only; staged diff is empty. Preserve all existing changes,
+historical notes and dist files. No roadmap file is available. Review changes
+against 0.6.4 and finalize only current public/bundled notes with verified blue
+Update/Retry update buttons, offline per-version notes and opt-out/replay,
+optional Utilities shortcut and moved-AppImage repair consent. Add user-facing
+KDE custom-menu override limitation and installation/upgrade guidance, without a
+date or speculative claims. No source behavior/version changes needed. Run notes/
+launcher checks and startup/desktop validation; reuse the completed full regression
+for this unchanged source (894 passed, 12 socket skips, one Qt warning). Initial
+dist AppImage inventory is empty, recorded in
+/tmp/appforge-065-release-assets-before.json. No building, staging or publishing.
+
+Preparation complete: active declarations/README and current public/bundled notes
+agree on 0.6.5. Finalized notes include verified features, normal-user upgrade
+guidance and the confirmed KDE custom-menu override limitation; no release date
+was inferred. Added the same KDE guidance to USAGE. No behavior/version changes
+were needed. Thirty focused notes/launcher tests passed, startup selftest and
+packaged desktop-file-validate passed, git diff --check passed and 17 local docs
+links resolve. Latest full regression for the unchanged application source remains
+894 passed, 12 restricted TCP/Unix socket skips and one existing Qt warning.
+Initial dist inventory was empty. An AppImage appeared during preparation:
+dist/AppForge-0.6.5-x86_64.AppImage, 84,748,792 bytes, SHA-256
+677d597f4140692195ea47b415f66f9332a0c3f86afb76dabe30ff4432b5ad4c.
+Observed metadata is recorded in /tmp/appforge-065-release-assets-observed.json.
+This preparation did not build, rename or modify that asset. Concurrent appearance
+prevents claiming an unchanged inventory; its source/notes agreement and manual
+testing are unconfirmed. SOURCE 0.6.5 is ready for the user to build and manually
+test as AppForge-0.6.5-x86_64.AppImage. Publication is not approved or ready until
+that matching build and personal testing are explicitly confirmed. Git metadata
+remains read-only; no staging, commit, fetch, push, tag or upload was performed.
