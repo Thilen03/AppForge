@@ -3,11 +3,13 @@ all database writes happen on the main thread."""
 from __future__ import annotations
 
 import threading
+import logging
 
 from PySide6.QtCore import QObject, QRunnable, Signal
 
 from ..core.selfupdate import check_self_update, install_self_update
-from ..core.updates.checker import check_for_update
+from ..core.updates.checker import CheckOutcome, check_for_update
+from ..core.models import UpdateStatus
 from ..core.updates.installer import InstallError, install_update
 
 
@@ -22,7 +24,12 @@ class CheckJob(QRunnable):
         self.app_id, self.kwargs, self.signals = app_id, kwargs, JobSignals()
 
     def run(self):
-        self.signals.done.emit(self.app_id, check_for_update(**self.kwargs))
+        try:
+            result = check_for_update(**self.kwargs)
+        except Exception as exc:  # a provider/file error must always release the busy state
+            logging.getLogger(__name__).exception("Update check failed for %s", self.app_id)
+            result = CheckOutcome(UpdateStatus.FAILED, f"Update check failed: {exc}")
+        self.signals.done.emit(self.app_id, result)
 
 
 class InstallJob(QRunnable):

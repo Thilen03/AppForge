@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import time
 
 from ..backups import BackupService
@@ -11,6 +12,7 @@ from ..update_policy import PAUSED_KEY, SKIPPED_KEY, updates_paused, updates_sup
 from .checker import CheckOutcome
 from .installer import InstallResult
 from .version import display_version
+from ..formats.appimage import version_from_filename
 
 log = logging.getLogger(__name__)
 NOTIFIED_KEY = "notified_version"     # entry.metadata: latest version the user was already told about
@@ -18,11 +20,24 @@ NOTIFIED_KEY = "notified_version"     # entry.metadata: latest version the user 
 
 def pattern_from_asset(asset_name: str, tag: str | None) -> str:
     """Turn a chosen asset name into a reusable glob by replacing its version with ``*``."""
+    versions = [version_from_filename(asset_name)]
     if tag:
-        for v in (tag, display_version(tag)):
-            if v and v in asset_name:
-                return asset_name.replace(v, "*", 1)
-    return asset_name
+        versions += [tag, display_version(tag)]
+    for version in versions:
+        if not version:
+            continue
+        match = re.search(r"(?<![A-Za-z0-9])v?(?P<version>" + re.escape(version)
+                          + r")(?![A-Za-z0-9])", asset_name)
+        if match:
+            # Escape literal glob metacharacters, including bracketed flavors.
+            before, after = asset_name[:match.start("version")], asset_name[match.end("version"):]
+            return _literal_pattern(before) + "*" + _literal_pattern(after)
+    return _literal_pattern(asset_name)
+
+
+def _literal_pattern(text: str) -> str:
+    return "".join({"[": "[[]", "*": "[*]", "?": "[?]"}.get(c, c) for c in text)
+
 
 
 class UpdateService:
@@ -72,7 +87,7 @@ class UpdateService:
             "message": outcome.message, "tag": outcome.tag, "release_url": outcome.release_url,
             "asset": outcome.asset, "ambiguous": outcome.ambiguous, "candidates": outcome.candidates,
             "assets": outcome.release_assets, "prereleases_only": outcome.prereleases_only,
-            "notes": outcome.notes}
+            "notes": outcome.notes, "comparison": outcome.comparison}
         return self.db.update(entry)
 
     # -- notifications (Phase 5) ---------------------------------------------------------

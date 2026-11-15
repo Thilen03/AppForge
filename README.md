@@ -10,330 +10,111 @@
 </p>
 
 <p align="center">
-  <img alt="version" src="https://img.shields.io/badge/version-0.6.0-2B63D9">
+  <img alt="version" src="https://img.shields.io/badge/version-0.6.1-2B63D9">
   <img alt="platform" src="https://img.shields.io/badge/platform-Linux-informational">
   <img alt="python" src="https://img.shields.io/badge/python-3.10%2B-blue">
   <img alt="Qt" src="https://img.shields.io/badge/Qt-6%20(PySide6)-41cd52">
 </p>
 
----
-
-## Why AppForge?
-
-AppImages are great: download one file, make it executable, run it. But once you have a dozen of them scattered across
-`~/Downloads`, `~/Applications` and `/opt`, a few problems show up:
-
-- They don't appear in your application menu, so you can't search for or pin them.
-- Nothing tells you when a new version is out, and updating means re-downloading and renaming files by hand.
-- If an update breaks something, the old version is gone.
-
-AppForge solves this. You point it at your AppImages (wherever they are, nothing is moved or copied) and it gives you a
-modern card-based library with launching, update checks, safe updates with automatic backups, one-click rollback, and
-proper application-menu launchers.
-
-**It isn't limited to AppImages.** Any standalone Linux program works too: a single ELF binary (for example a
-downloaded CLI tool or game launcher) or a script starting with `#!`. They get the same library card, launcher,
-update checks, backups and rollback.
-
-| Supported type | What it is |
-| --- | --- |
-| AppImage | `.AppImage` files; name, version, description and icon are read from inside the file |
-| Linux executable | A single ELF binary, no installer or archive needed |
-| Script | A file starting with `#!` (shell, Python, ...) |
-
-For plain executables and scripts, the name and version are taken from the file name (nothing is run to inspect them)
-and AppForge shows a generated icon unless you pick one in *Edit*.
-
-Built with **Python**, **PySide6 (Qt 6)** and **SQLite**. Developed on CachyOS / Arch Linux with KDE Plasma, but it
-runs on any recent Linux desktop.
+AppForge keeps portable Linux apps in one library: launch them, add desktop-menu
+shortcuts, check for updates and restore previous versions. It supports AppImages,
+standalone ELF binaries and `#!` scripts. Existing local files stay where they are;
+AppForge reads their metadata without running them.
 
 ## Features
 
-The library opens wide enough for four application cards when your screen allows,
-with balanced spacing on both sides. On smaller screens, cards wrap to fit.
-Scroll through larger libraries with the mouse wheel or trackpad; the library
-scrollbar stays hidden.
+- **Add locally or download from a link.** Choose a release file and save it to a
+  discovery folder, or add an existing file by browsing, discovery or AppImage drag-and-drop.
+- **Keep apps updated.** GitHub, GitLab.com, Codeberg and self-hosted Forgejo/Gitea/GitLab
+  sources; release-asset matching, optional nightlies, per-app pause/skip controls and Update All.
+- **Update safely.** File validation, published SHA-256/SHA-512 checksums, atomic
+  replacement, automatic backups and rollback. New downloads never overwrite existing files.
+- **Organize and launch.** Search, categories, filters, sorting, favorites, desktop-menu
+  shortcuts, custom icons, launch arguments, working directories and terminal support.
+- **Manage your library.** App details, in-app release notes, export/import, storage
+  overview and backup cleanup, plus tools to locate moved files and fix execute permissions.
+- **Stay in the background.** Scheduled checks, notifications, optional tray mode and
+  login startup, light/dark themes and AppForge self-updates.
 
-### Shared categories (new in 0.6.0)
-
-Add and Edit now have one working **Category** dropdown for both AppForge and the
-desktop application menu. Choose a standard category such as Games, Internet or
-Multimedia; the same choice controls AppForge's grouping, filters and category
-searches. Existing custom categories are preserved until you select a replacement.
-
-See the [0.6.0 release notes](releases/RELEASE_NOTES_v0.6.0.md) and the
-[category guide](docs/CATEGORIES.md) for details.
-
-### Application discovery (new in 0.5.5)
-
-See the [0.5.5 release notes](releases/RELEASE_NOTES_v0.5.5.md) and the
-[discovery guide](docs/DISCOVERY.md) for the full workflow and limitations.
-
-- Click **Discover apps…** beside the update-check control to scan `~/Applications`, `~/Downloads`,
-  `/opt`, or folders you add. Remove any folder you do not want scanned; choices are saved.
-- Scans run in a background worker with progress and cancellation. The preview shows application
-  name, icon when available, version, format, file location and registration status.
-- Check individual results, use **Select all** / **Select none**, then **Import selected**, or use
-  **Import all eligible**. A confirmation is required before anything is registered.
-- **Ignore selected** remembers unwanted file paths across scans and restarts. **Reset ignored files**
-  makes them eligible again. Registered and ignored results remain visible but cannot be imported.
-- Discovery reads files without running or changing them. It skips all symlinks (including folder
-  aliases), hidden `.<name>.backups` directories, and non-executable ELF binaries/scripts. AppImages
-  can be discovered without an executable bit; the existing **Make executable** action remains available.
-- Overlapping folders and hard links are deduplicated. Imports recheck file identity and reject
-  changed, missing or already-registered files. Desktop-menu integration is optional.
-- Cancelling a scan retains any results found so far. Closing during a scan requests cancellation and
-  waits for the current metadata read to finish. Bulk imports can be stopped between applications.
-
-### Application details (new in 0.5.6)
-
-See the [0.5.6 release notes](releases/RELEASE_NOTES_v0.5.6.md) for this update.
-
-- Choose **Details…** from an application's card menu to see its description, format,
-  installed version, location, file size and date added, alongside update status,
-  repository, last check, update channel and backup storage information.
-- Launch, check for updates, update, edit, open the installation folder, or manage
-  backups using the same actions as the library. **Release notes…** opens the
-  in-app viewer; **View release page** opens the known release in your browser.
-- Details refresh after library changes and every few seconds. **Refresh** also
-  rechecks the file and backups. Missing files offer **Locate file…**; files without
-  execute permission offer **Make executable**. Filesystem inspection runs in the
-  background and never launches an application.
-
-### Release notes (new in 0.5.7)
-
-- Choose **Release notes…** from a card menu or application details after checking
-  for updates. **Update All** also offers release notes before you approve updates.
-- Read the selected release's version, title, publication date, stable/prerelease
-  status and formatted description in a scrollable viewer. HTTP(S) links open in
-  your browser; embedded images are omitted.
-- Notes are cached with the repository and exact release tag, including across
-  restarts. **Refresh** reloads that tag through the existing GitHub, GitLab,
-  Codeberg or self-hosted Forgejo/Gitea/GitLab API in the background. Refresh errors
-  keep cached notes visible. Reading notes never starts an update.
-- Releases without descriptions show an explicit message. Older library records
-  fetch notes on first opening. If the tag is no longer among the provider's recent
-  releases, use **Open release page** or check for updates again.
-
-### Export and import library (new in 0.5.7)
-
-- In **Settings**, use **Export Library…** to save application configuration and
-  icons as versioned JSON. Application files, backups, update caches and AppForge
-  access tokens are excluded. Environment variables require an explicit opt-in.
-- **Import Library…** previews the file before registration. Choose individual
-  applications or all eligible rows; duplicate files are skipped. Conflicting IDs
-  can be imported with new IDs, and existing entries stay unchanged.
-- Missing applications retain their configuration and can be reconnected with
-  **Locate file…**. Imports restore categories, repositories, update preferences,
-  icons and optional menu preferences. Environment restoration is off by default.
-- Background file work supports cancellation. Completed imports are kept, with a
-  summary of imports, skips, duplicates, missing files and errors. Transfers apply
-  immediately, independently of saving other Settings preferences.
-
-See the [library transfer guide](docs/LIBRARY_TRANSFER.md) for conflicts, limits and
-what is included.
-
-### Storage manager (new in 0.5.8)
-
-- Open **Storage…** from the library for a modern donut-style pie chart of application
-  files and saved backups, storage totals, app/backup counts and the biggest consumers.
-- Sort the application table by current file size, backup size or combined usage.
-  Filter to apps with backups, then select an app to review backup versions, dates
-  and sizes. Column headers also support sorting.
-- Select individual backups or **Select older than retention**, review estimated
-  savings, then confirm **Delete selected…**. Your retention setting stays unchanged;
-  unlimited retention selects no old backups automatically.
-- Measurement and cleanup run in background workers with progress and **Stop**.
-  **Refresh** rechecks disk usage. Missing files and inaccessible folders produce
-  notices and incomplete totals rather than blocking the library.
-- Only regular files in the selected app's expected backup directory are eligible.
-  Symlinks and installed application files are protected; changed backups require
-  a new preview. Shared hard links count toward logical sizes but show zero estimated
-  savings until they have a single link. Sizes cover registered executable files and
-  managed backups, rather than whole application data folders or filesystem capacity.
-
-See the [0.5.8 release notes](releases/RELEASE_NOTES_v0.5.8.md) and the
-[storage guide](docs/STORAGE.md) for safety and measurement details.
-
-### Enhanced system tray (new in 0.5.9)
-
-See the [0.5.9 release notes](releases/RELEASE_NOTES_v0.5.9.md) for this update.
-
-- Enable **Minimize or close to the system tray** in Settings on a desktop with tray support.
-  The tray menu shows available update counts and current download/check activity,
-  with **Check for updates** and **Update All** using the existing confirmation workflow.
-- Use **Open AppForge** to return to the library, or open Settings directly from the tray.
-  **Exit AppForge** quits; minimizing or closing the window hides it from the taskbar
-  and keeps background checks and updates running while background mode is enabled.
-- On KDE Plasma Wayland, AppForge uses a temporary KWin observer to receive
-  titlebar/taskbar minimize notifications that Qt may not receive. It observes only
-  AppForge's own main window while tray mode is enabled, and is unloaded when tray
-  mode is disabled or AppForge exits. No KDE configuration is changed. If KWin's
-  scripting interface is unavailable, AppForge reports it; closing to tray still works.
-- Launch from **Applications**, **Favorites** or **Recently used**. Use **Choose favorites**
-  to select favorites. Recent launches remember the last eight apps launched through
-  AppForge; external desktop launches are not recorded. Missing/non-executable or busy
-  apps are disabled. Launches use each app's existing environment preferences.
-- Availability notifications remain once per new version. Hidden updates report success
-  or failure, with a single summary per Update All batch. Repeated identical background
-  check errors are suppressed for the session. Notification preferences apply throughout.
-- In each library card's menu beside **Edit**, choose **Add to favorites** or
-  **Remove from favorites**. Favorites appear first with a small gold star in the
-  top-right corner. Hover over a card to reveal a gray star in that same spot;
-  click it to add a favorite, or click the gold star to remove one. The stars have
-  a fuller, rounded shape, and the card layout stays still as they appear.
-  The selected sort order applies within favorites and other apps;
-  search and filters continue to apply. Favorites are shared with the tray in both directions.
-- Favorites and recent launches are saved locally and excluded from library exports.
-  Tray support and native menu appearance depend on your desktop; without a tray host,
-  continue using the main window.
-
-### Start at login (new in 0.5.9)
-
-- In Settings, enable **Start AppForge at login** to launch it when you log in to
-  your Linux desktop. Optionally enable **Start minimized to the system tray**;
-  this also enables background mode. Ordinary launches still open the window.
-- Without tray support, AppForge opens visibly. Startup self-update prompts wait
-  until you open the hidden window. A duplicate login launch leaves an existing
-  instance alone; an ordinary second launch brings it forward.
-- Save writes AppForge's own entry under `$XDG_CONFIG_HOME/autostart/appforge.desktop`
-  (normally `~/.config/autostart/appforge.desktop`). Disabling startup removes that
-  entry. Files not managed by AppForge are preserved, and save errors are shown.
-- Keep the AppImage at its saved location. If you move it, open it once from its
-  new location to refresh the startup entry. Source installations point to their
-  current Python environment and source folder, which must remain available.
-- Settings scrolls on smaller screens while Save and Cancel stay visible.
-
-### Advanced launch options (new in 0.6.0)
-
-- In Add or Edit, click **Launch options…** to set command-line arguments,
-  choose a working directory, or enable **Run in terminal** for scripts and CLI tools.
-- Quote argument values containing spaces, for example `--profile "Work profile"`.
-  Arguments are passed directly, without shell expansion. Leave the working
-  directory blank to keep using the application's folder.
-- Options apply to AppForge, tray launches and desktop-menu launchers, and survive
-  restarts, updates and rollback. Library export/import includes them.
-- Choose **Use options**, then save the parent Add/Edit dialog. Both forms scroll
-  on smaller screens while their Save/Cancel buttons remain available.
-
-See the [launch options guide](docs/LAUNCH_OPTIONS.md) for terminal support,
-argument syntax and working-directory behavior.
-
-### Library and launcher
-- **Add apps from anywhere**: by file picker or by dragging `.AppImage` files onto the window. Files are never
-  moved or copied. To add a plain executable or script, choose *All files* in the file picker.
-- **Reads the AppImage without running it**: name, version, description and icon are extracted from inside the file.
-  File names such as `Dolphin-Emu-5.0-x86_64.AppImage` are cleaned up to a sensible suggested name ("Dolphin Emu").
-- **Application cards** show icon, name, version, format, update status and file location.
-  Badges share a soft tinted background, colored outline and matching text in both
-  themes: green for up to date, blue for available updates, yellow for paused
-  updates, red for errors and gray for unavailable or skipped updates.
-- **Launch from a card.** Apps are started detached, so they keep running if you close AppForge. If an app exits
-  right after launch, AppForge shows its output and keeps a log. For terminal launches,
-  application output appears in the terminal; AppForge may only capture terminal-process
-  output and exit status. See the [launch options guide](docs/LAUNCH_OPTIONS.md).
-- **Search, categories, filters and sorting**: filter by category or by status (updates available, needs attention,
-  no update source) and sort by name, date added or update status.
-- **One shared category**: the **Category** dropdown in Add/Edit uses the standard KDE/desktop
-  menu categories. Your choice groups the app in AppForge and places its launcher in the same
-  category when menu integration is enabled. **Automatic** uses the application's metadata.
-  Existing menu choices take precedence over old library-only categories. Older custom categories
-  are preserved until you choose a replacement. See the [category guide](docs/CATEGORIES.md).
-- **Light and dark theme**: click the sun/moon button immediately to the right of
-  Settings to switch instantly. The sun switches to light mode; the moon switches
-  to dark mode. Your choice is remembered across restarts. Until you choose a mode,
-  AppForge follows your desktop's appearance.
-- **Standalone executables too**: besides AppImages you can add any single Linux program (ELF binary) or `#!`
-  script. They get cards, launchers, update checks, backups and rollback just like AppImages. For updates, the
-  release must publish the raw binary (see [Current limitations](#current-limitations)).
-
-### Per-app update controls (new in 0.6.0)
-
-- In a card's three-dot menu, choose **Pause updates** to stop update checks and
-  installations for that app. Its status becomes a yellow **Update paused** badge.
-  Choose **Resume updates** to enable updates and check again.
-- When an update is available, choose **Skip this version** to hide that exact
-  release from update buttons, Update All and notifications. Checks continue so a
-  newer release can still be offered. **Clear skipped version** undoes the skip.
-- Both choices survive restarts. Paused and skipped releases do not count toward
-  available updates in the library or tray. Launching and rollback remain available.
-- These controls cannot be changed while that app is checking or updating; let the
-  current operation finish first. These local choices are not included in library exports.
-
-See the [update controls guide](docs/UPDATE_CONTROLS.md) for details.
-
-### Updates
-- **Link a repository** to any app and AppForge checks its releases for a newer version. Supported sources:
-  - **GitHub**, **GitLab.com** and **Codeberg**
-  - **Any self-hosted Forgejo, Gitea or GitLab server**, e.g. `https://git.example.dev/owner/repo`
-- **Smart release matching.** AppForge picks the right AppImage from a release and ignores source archives, `.zsync`
-  files, checksums and other CPU architectures. If several files look equally good it asks once and remembers your
-  choice. You can also set a file pattern per app (for example `MyApp-*-x86_64.AppImage`) and opt single apps into
-  pre-releases.
-- **Understands real-world version numbers**: `v1.2.3`, `5.0-1234`, `2024-05-01`, `2.0-rc1`, and so on.
-- For nightly-only repositories, enable **Include pre-releases when checking for updates**
-  in **Edit information…**. With that option off, the card shows **Pre-releases available**
-  and explains how to opt in. Numbered nightly builds are compared by build number, not commit hash.
-- **Update** a single app or use **Update All**.
-- **Safe by design.** Downloads go to a hidden temporary file, are validated, and are checksum-verified when the
-  release publishes a SHA-256 (GitHub's asset digest, `*.sha256` or `SHA256SUMS`). Only then is the new file swapped
-  in atomically. Your app's file name and executable bit are preserved so launchers keep working. A failed, corrupt or
-  cancelled download never touches the working version.
-- **Background checks and notifications.** While AppForge is open it re-checks apps on your schedule (every 1 to 24
-  hours) and notifies you once per new version. Optionally it keeps running in the **system tray** after the window is
-  closed.
-
-### Backups and rollback
-- Every update keeps the previous version in a hidden `.<name>.backups` folder next to the app.
-- **Backups & rollback** (card menu) lists saved versions with version, date and size. **Restore this version**
-  swaps one in, and the version you leave is saved first, so a rollback can itself be undone.
-- Keep the newest *N* backups per app (default 3, or unlimited). AppForge only ever deletes `.AppImage` files inside
-  a `.<name>.backups` folder.
-
-### Application menu integration
-- **Add to application menu** creates a standard `.desktop` launcher, so the app shows up in KDE's launcher or the
-  GNOME overview and can be pinned. It keeps working without AppForge running.
-- The launcher is keyed on the library id, so renaming, changing the icon, moving the file or updating only rewrites
-  its contents. **Pins and favourites survive.** The entry is hidden while the file is missing or not executable.
-- Choose the shared **Category** (Development, Games, Graphics, Internet, Multimedia, Office, ...) and set
-  **environment variables** (`NAME=value`, one per line) per app. They are applied both in the launcher and when you
-  press *Launch* inside AppForge.
-- AppForge repairs missing or outdated launchers at startup and only deletes `.desktop` files it created itself
-  (named `appforge-<id>.desktop` with its own marker).
-
-### Moved or missing files
-- Cards for missing, moved or non-executable files are clearly marked, with **Locate file...** and **Make
-  executable** actions.
-- *Locate file...* first searches for likely matches (same name apart from version and architecture) in the old
-  folder, your other apps' folders and common places such as `~/Applications`, `~/Downloads` and `/opt`, and offers
-  one-click reconnection.
-
-### AppForge itself
-- **Self-update**: AppForge checks its own releases at startup and offers *Update now* or *Later*. The update is
-  verified, the old build is kept as a backup, and it is swapped in atomically.
-- **Single instance**: starting AppForge while it is already running just brings the existing window forward.
-- **Pin to taskbar**: AppForge writes its own launcher so the desktop can offer "Pin to Task Manager".
-- **Settings** (gear icon to the right of **Add Application**): automatic checks and interval, notifications, tray behaviour,
-  login startup and an optional GitHub token to raise the API rate limit.
+What's new: [AppForge 0.6.1 release notes](releases/RELEASE_NOTES_v0.6.1.md).
 
 ## Install
 
-### AppImage (recommended)
-
-Download the latest `AppForge-<version>-x86_64.AppImage` from the
-[Releases](https://github.com/Thilen03/AppForge/releases) page, then:
+Download `AppForge-<version>-x86_64.AppImage` from
+[GitHub Releases](https://github.com/Thilen03/AppForge/releases), then:
 
 ```bash
 chmod +x AppForge-*-x86_64.AppImage
 ./AppForge-*-x86_64.AppImage
 ```
 
-The AppImage bundles Python and Qt, so you need neither. If it complains about FUSE, see
-[Troubleshooting](#troubleshooting).
+Run these commands in the folder containing the downloaded AppImage. Python and Qt
+are bundled. If FUSE is unavailable, launch with `--appimage-extract-and-run`; see
+[troubleshooting](docs/USAGE.md#troubleshooting) for other startup issues.
 
-### From source
+## Quick start
 
-Requires Python 3.10 or newer.
+1. Click **Add Application** and choose **Add a local file…** or **Download from a link…**.
+   For a local binary or script, select *All files* in the file picker. **Discover apps…**
+   finds existing applications in folders you choose.
+2. For downloads, paste a repository/release link, select a file and destination, then
+   review the Add form. **Add folder…** saves a new destination for discovery too.
+3. Review the name, icon, category and optional **Add to the application menu** choice.
+   Local apps can also be given an update-source repository.
+4. Launch from the card. Use **Update** or **Update All** when updates are available;
+   **Backups & rollback** restores an earlier version.
+
+For nightlies, choose **Enable pre-releases** in the app's card menu. Choosing an
+excluded nightly asset also offers to enable them. Selecting an asset checks for an
+update; downloading starts when you choose **Update**.
+
+## Supported sources
+
+| Source | Example |
+| --- | --- |
+| GitHub | `https://github.com/owner/repo` or `owner/repo` |
+| GitLab.com | `https://gitlab.com/group/project` (subgroups supported) |
+| Codeberg | `https://codeberg.org/owner/repo` |
+| Self-hosted Forgejo / Gitea / GitLab | `https://git.example.dev/owner/repo` |
+
+Repository and release links are supported; self-hosted sources require HTTPS.
+AppForge uses release APIs, not website scraping. Downloads and updates require an
+AppImage or raw executable; archives and packages are not unpacked.
+
+## Documentation
+
+| Topic | Guide |
+| --- | --- |
+| Everyday use, tray/startup, backups, data locations and troubleshooting | [Using AppForge](docs/USAGE.md) |
+| Download from a repository | [Downloading applications](docs/DOWNLOADING.md) |
+| Scan folders and import existing apps | [Discovery](docs/DISCOVERY.md) |
+| Shared library/desktop-menu categories | [Categories](docs/CATEGORIES.md) |
+| Arguments, working directories and terminal launches | [Launch options](docs/LAUNCH_OPTIONS.md) |
+| Pause updates and skip versions | [Update controls](docs/UPDATE_CONTROLS.md) |
+| Export and import configuration | [Library transfer](docs/LIBRARY_TRANSFER.md) |
+| Measure storage and clean up backups | [Storage](docs/STORAGE.md) |
+
+## Privacy and limitations
+
+No telemetry. Network access is limited to release APIs and download/checksum URLs
+for chosen sources, plus AppForge's own releases. Files are inspected without execution;
+checksums are verified where published, but GPG/minisign signatures are not.
+
+An optional GitHub token is sent only to `api.github.com`. A token saved in Settings
+is stored **unencrypted** in the local library database (mode 0600); `GITHUB_TOKEN`
+or `GH_TOKEN` avoids storing it there.
+
+Linux only. Discovery is manual and excludes symlink paths. Tray/login behavior
+depends on desktop support. If neither usable versions nor published checksums are
+available, AppForge cannot determine whether an update is needed. Different
+checksums identify different files, not which version is newer.
+
+## Development
+
+Built with Python 3.10+, PySide6 (Qt 6) and SQLite.
+
+<details>
+<summary>Run from source, build and test</summary>
 
 ```bash
 git clone https://github.com/Thilen03/AppForge.git
@@ -344,109 +125,24 @@ pip install -r requirements-dev.txt
 PYTHONPATH=src python -m appforge
 ```
 
-On Arch/CachyOS you may need Qt's xcb helper library (normally already present with Plasma):
-`sudo pacman -S xcb-util-cursor`.
+On Arch/CachyOS, Qt may also need `xcb-util-cursor`.
 
-## Quick start
-
-1. Use **Discover apps…** to find and review applications in selected folders, or click **Add Application** (or drag an AppImage onto the window) and review the detected name, version and icon.
-   For a plain binary or script, pick it with the *All files* filter.
-2. Optionally paste an **update source**, such as `https://github.com/owner/repo` or
-   `https://git.example.dev/owner/repo`.
-3. Leave **Add to the application menu** ticked if you want a launcher in your desktop menu.
-4. Launch it from its card. When an update is available, press **Update** on the card or **Update All**.
-
-### Supported update sources
-
-| Source | Example URL |
-| --- | --- |
-| GitHub | `https://github.com/owner/repo` (or just `owner/repo`) |
-| GitLab.com | `https://gitlab.com/group/project` (subgroups work) |
-| Codeberg | `https://codeberg.org/owner/repo` |
-| Self-hosted Forgejo / Gitea / GitLab | `https://git.example.dev/owner/repo` |
-
-You can paste the repository URL, a release page URL, a `.git` URL or `git@host:owner/repo.git`; AppForge trims it
-down to the repository. Self-hosted servers must use `https://`. AppForge only talks to the official release APIs and
-never scrapes web pages.
-
-## Where your data lives
-
-| What | Where |
-| --- | --- |
-| Library database | `~/.local/share/appforge/library.db` |
-| App icons and logs | `~/.local/share/appforge/` |
-| AppForge log | `~/.local/share/appforge/appforge.log` |
-| Launchers | `~/.local/share/applications/appforge-<id>.desktop` |
-| Backups | `.<name>.backups/` next to each app |
-
-Set `APPFORGE_DATA_DIR` to use a throw-away library for experiments. Launchers then go to
-`$APPFORGE_DATA_DIR/applications`, so your real menu is never touched.
-
-## Privacy and security
-
-- No telemetry. The only network traffic is to the release APIs of the sources you linked (and to AppForge's own
-  releases for self-update).
-- AppImages are inspected without being executed.
-- Updates are verified (valid file, SHA-256 where published) before replacing anything.
-- Only `https://` download links are used.
-- Your GitHub token (optional) is only ever sent to `api.github.com`, never to GitLab, Codeberg or self-hosted
-  servers. If you save it in Settings it is stored **unencrypted** in the library file (mode 0600). The
-  `GITHUB_TOKEN` or `GH_TOKEN` environment variable works too and avoids storing it.
-
-## Building the AppImage
-
-```bash
-./scripts/build_appimage.sh
-# -> dist/AppForge-<version>-x86_64.AppImage
-```
-
-The script creates a build virtualenv, runs PyInstaller (bundling Python and Qt), assembles an AppDir and runs
-`appimagetool` (downloaded on first use into `build/tools/`, or use your own on `PATH`). It needs `squashfs-tools`
-(`sudo pacman -S squashfs-tools`) and `curl`.
-
-## Development checks
-
-With `requirements-dev.txt` installed in your active Python environment, run:
+Build the AppImage with `./scripts/build_appimage.sh`. It uses PyInstaller and
+appimagetool, requires `squashfs-tools` and `curl`, and writes
+`dist/AppForge-<version>-x86_64.AppImage`.
 
 ```bash
 PYTHONPATH=src QT_QPA_PLATFORM=offscreen python -m pytest -q -ra
 PYTHONPATH=src QT_QPA_PLATFORM=offscreen python -m appforge --selftest
 ```
 
-Real AppImage fixtures need `appimagetool` and `squashfs-tools`. Set `APPIMAGETOOL`
-to select the tool and, for offline fixture creation, `APPIMAGE_RUNTIME_FILE` to
-a local Type 2 runtime. Fixture launch tests use extraction mode and need no FUSE
-mount. Tests requiring real local sockets report explicit skips when the host
-prohibits them; rerun those tests on a normal Linux host before release approval.
+Real AppImage fixtures need appimagetool and squashfs-tools. Set `APPIMAGETOOL` to
+choose the tool and `APPIMAGE_RUNTIME_FILE` for an offline local Type 2 runtime.
+Socket-dependent tests report skips on restricted hosts. Use `APPFORGE_DATA_DIR`
+for a temporary library and isolated desktop launchers.
 
-Integration tests cover populated database upgrades, restart persistence,
-discovery, updates, rollback, storage cleanup, library transfer and background
-tray actions. See the [Phase 7 verification report](docs/PHASE_7_PLAN.md) for
-results and the remaining desktop checklist. Automated checks do not replace
-manual testing of the final AppImage on your desktop.
+See the [integration verification report](docs/PHASE_7_PLAN.md) and
+[publishing guide](docs/PUBLISHING.md). Automated checks do not replace manual
+testing of the final AppImage.
 
-## Troubleshooting
-
-| Symptom | Fix |
-| --- | --- |
-| `dlopen(): error loading libfuse.so.2` | `sudo pacman -S fuse2`, or run with `--appimage-extract-and-run`, or set `APPIMAGE_EXTRACT_AND_RUN=1`. |
-| `Could not load the Qt platform plugin "xcb"` | `sudo pacman -S xcb-util-cursor` (and `libxcb`, `xcb-util-*` on a minimal install). |
-| Blurry or wrong theme under Wayland | Start with `QT_QPA_PLATFORM=wayland` or `=xcb` to compare, and please report it. |
-| An app "closes unexpectedly" after launch | AppForge shows the app's output. Full log: `~/.local/share/appforge/logs/<id>.log`. |
-| Icon or name not detected | Some AppImages use unsupported compression or the Type 1 format; the file name is used instead. The reason is shown in the Add dialog. |
-| `Couldn't reach ...` / rate limit | Check your connection. For GitHub, add a token in Settings (or set `GITHUB_TOKEN`) to raise the limit. |
-| Self-hosted source says "not found" | Check the URL and that the repository has public releases. The server must run Forgejo, Gitea or GitLab and be reachable over `https://`. |
-| Plasma minimize-to-tray still uses the taskbar | Exit the old AppForge instance from the tray before launching a rebuilt AppImage. Tray mode must be enabled. Check `~/.local/share/appforge/appforge.log` for `KWin minimize observer active for AppForge` or a KWin/D-Bus error. |
-| No notifications | Enable them in Settings. Without the tray option AppForge uses `notify-send` (`sudo pacman -S libnotify`). Background availability checks and update completion notify while the window isn't in front. |
-| *Checksum mismatch* during an update | The download was discarded and your app is untouched. Retry; if it persists, the release's published checksum is wrong. |
-| App missing from the application menu | Use the card menu, *Add to application menu*. The entry is hidden while the file is missing or not executable. Some desktops need a minute (or `kbuildsycoca6`) to notice new launchers. |
-
-## Current limitations
-
-- Linux only.
-- Discovery is user-initiated; it does not monitor folders continuously. Symlink paths are excluded.
-- Discovery cancellation takes effect between file reads. Very large individual AppImages can delay it.
-- Updates for standalone executables work when a release publishes the **raw binary**; releases that only ship
-  `.tar.gz`, `.zip`, `.deb` or `.rpm` show "no matching file".
-- Only checksums are verified, not GPG or minisign signatures.
-- Login startup requires a desktop that supports XDG autostart; it starts after login, not before it.
+</details>

@@ -37,19 +37,19 @@ def parse_version(text: str | None) -> Version | None:
     legacy = _LEGACY_COMMIT_BUILD.fullmatch(text.strip())
     if legacy and re.search(r"[a-f]", legacy.group(2), re.IGNORECASE):
         return Version((int(legacy.group(1)),))
-    m = re.search(r"\d", text)
+    m = re.search(r"(?<![A-Za-z0-9.])v?(\d)", text)
     if not m:
         return None
-    s = text[m.start():]
+    s = text[m.start(1):]
     core = re.match(r"\d+(?:[._]\d+)*", s)
     nums = [int(x) for x in re.split(r"[._]", core.group(0))]
-    rest = s[core.end():]
+    rest = s[core.end():].split("+", 1)[0]  # build metadata does not affect precedence
     # "-1234" / "-05-01" style numeric groups extend the version (build numbers, dates)
     while (g := re.match(r"-(\d+(?:[._]\d+)*)(?![A-Za-z0-9._])", rest)):
         nums += [int(x) for x in re.split(r"[._]", g.group(1))]
         rest = rest[g.end():]
     rank, rank_num = 0, 0
-    w = re.match(r"[-_.+ ]*([A-Za-z]+)[-_.]?(\d+)?", rest)
+    w = re.match(r"[-_.~ ]*([A-Za-z]+)[-_.]?(\d+)?", rest)
     if w:
         word = w.group(1).lower()
         rank = _PRE.get(word, _POST.get(word, 0))
@@ -71,5 +71,5 @@ def display_version(tag: str) -> str:
     """Strip ordinary tag prefixes; retain numbered nightly tags and their build identity."""
     if _NUMBERED_NIGHTLY.fullmatch((tag or "").strip()):
         return tag.strip()
-    m = re.search(r"\d", tag or "")
-    return tag[m.start():].strip() if m else (tag or "").strip()
+    m = re.search(r"(?<![A-Za-z0-9.])v?(\d)", tag or "")
+    return tag[m.start(1):].strip() if m else (tag or "").strip()

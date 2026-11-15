@@ -24,7 +24,7 @@ from ..core.organize import (
 from ..core.selfupdate import appimage_path, install_blocker
 from ..core.settings import AppSettings
 from ..core.tray import TrayShortcuts
-from ..core.updates.assets import is_appimage_name
+from ..core.updates.assets import is_candidate_name, compatible_arch, host_arch
 from ..core.updates.installer import InstallCancelled, InstallResult
 from ..core.updates.service import UpdateService, can_update
 from ..core.update_policy import updates_paused, updates_suppressed
@@ -359,6 +359,7 @@ class MainWindow(QMainWindow):
         card.releasePageRequested.connect(self.open_release_page)
         card.releaseNotesRequested.connect(self.show_release_notes)
         card.chooseAssetRequested.connect(self.choose_asset)
+        card.prereleasesRequested.connect(self.set_prereleases_enabled)
         card.backupsRequested.connect(self.show_backups)
         card.desktopToggleRequested.connect(self.toggle_desktop_entry)
         return card
@@ -613,7 +614,7 @@ class MainWindow(QMainWindow):
                 current_filename=Path(e.path).name, app_name=e.name,
                 asset_pattern=e.metadata.get("asset_pattern"),
                 include_prereleases=bool(e.metadata.get("include_prereleases")), client=self._client,
-                token=token, format_id=e.format)
+                token=token, format_id=e.format, installed_path=e.path)
             job.signals.done.connect(self._on_check_done)
             self._jobs[e.id] = job
             self._set_busy(e.id, "Checking for updates…", None)
@@ -928,17 +929,48 @@ class MainWindow(QMainWindow):
         if url and url.startswith(("https://", "http://")):
             QDesktopServices.openUrl(QUrl(url))
 
+    def set_prereleases_enabled(self, app_id: str, enabled: bool):
+        entry = self.service.get(app_id)
+        if not entry or not entry.github_repo or app_id in self._busy:
+            return
+        self.service.update_application(app_id, settings={"include_prereleases": enabled})
+        self._recheck_update_preferences(app_id)
+
+    def _recheck_update_preferences(self, app_id: str):
+        # A cached install target must not survive a change of update channel.
+        entry = self.updates.clear_update_state(app_id)
+        self._refresh_card(app_id)
+        if entry and updates_paused(entry):
+            self.statusBar().showMessage("Update preferences saved. Resume updates to check this app.", 6000)
+        else:
+            self.check_updates([app_id], user_initiated=True)
+
     def choose_asset(self, app_id: str):
         entry = self.service.get(app_id)
-        if not entry:
+        if not entry or app_id in self._busy:
             return
         info = entry.metadata.get("update") or {}
-        assets = [a for a in info.get("assets", []) if is_appimage_name(a["name"])] or info.get("assets", [])
+        assets = [a for a in info.get("assets", [])
+                  if is_candidate_name(a["name"], entry.format) and compatible_arch(a["name"], host_arch())]
         name = self._pick_asset(assets, (info.get("asset") or {}).get("name"),
                                 "Pick the file AppForge should download for this app.")
-        if name:
+        if name and app_id not in self._busy:
+            excluded_pre = (not entry.metadata.get("include_prereleases")
+                            and (info.get("prereleases_only")
+                                 or (info.get("notes") or {}).get("prerelease")))
+            if excluded_pre:
+                answer = QMessageBox.question(
+                    self, "Enable pre-releases?",
+                    f"The selected release for “{entry.name}” is a pre-release/nightly build.\n\n"
+                    "Enable pre-release updates for this app and check the selected file? "
+                    "Pre-release builds may be less stable.",
+                    QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+                if answer != QMessageBox.Yes or app_id in self._busy:
+                    return
             self.updates.set_asset_pattern(app_id, name)
-            self.check_updates([app_id], user_initiated=True)
+            if excluded_pre:
+                self.service.update_application(app_id, settings={"include_prereleases": True})
+            self._recheck_update_preferences(app_id)
 
     def _pick_asset(self, assets: list[dict], preselect: str | None, message: str) -> str | None:
         if not assets:
@@ -953,6 +985,11 @@ class MainWindow(QMainWindow):
         if not entry or app_id in self._busy or not can_update(entry):
             return
         info = entry.metadata["update"]
+        if info.get("comparison") == "checksum" and not from_batch:
+            if QMessageBox.question(self, "Version ordering unknown",
+                                    info.get("message", "") + "\n\nInstall this release file?",
+                                    QMessageBox.Yes | QMessageBox.No, QMessageBox.No) != QMessageBox.Yes:
+                return
         if info.get("ambiguous") and not entry.metadata.get("asset_pattern"):
             cands = info.get("candidates") or info.get("assets", [])
             name = self._pick_asset(cands, (info.get("asset") or {}).get("name"),
@@ -989,6 +1026,10 @@ class MainWindow(QMainWindow):
         lines = "\n".join(f"•  {e.name}:  {e.installed_version or '?'}  →  {e.latest_version}" for e in ready)
         box = QMessageBox(QMessageBox.Question, "Update all", f"Update {len(ready)} application"
                           f"{'s' if len(ready) != 1 else ''}?", parent=self)
+        uncertain = [e.name for e in ready if e.metadata["update"].get("comparison") == "checksum"]
+        if uncertain:
+            lines += ("\n\nVersion ordering is unknown for: " + ", ".join(uncertain)
+                      + ". Their release files have different checksums; review their release notes before updating.")
         box.setInformativeText(lines + "\n\nThe current version of each app is kept as a backup next to its file.")
         go = box.addButton("Update", QMessageBox.AcceptRole)
         notes_btn = box.addButton("Release notes…", QMessageBox.ActionRole)
@@ -1121,7 +1162,26 @@ class MainWindow(QMainWindow):
         dialog.deleteLater()
 
     def add_application(self, initial_path: str | None = None):
-        dlg = AddApplicationDialog(self.service, self, initial_path if isinstance(initial_path, str) else None)
+        downloaded = None
+        if not isinstance(initial_path, str):
+            from .download_dialog import AddSourceDialog, DownloadApplicationDialog
+            source = AddSourceDialog(self)
+            accepted = source.exec() == AddSourceDialog.Accepted
+            mode = source.mode
+            source.deleteLater()
+            if not accepted:
+                return
+            if mode == "link":
+                download = DownloadApplicationDialog(self.service, self, client=self._client,
+                                                       token=self.settings.effective_github_token())
+                accepted = download.exec() == DownloadApplicationDialog.Accepted
+                downloaded = download.downloaded
+                download.deleteLater()
+                if not accepted or not downloaded:
+                    return
+                initial_path = downloaded.path
+        dlg = AddApplicationDialog(self.service, self, initial_path if isinstance(initial_path, str) else None,
+                                   downloaded=downloaded)
         if dlg.exec() == AddApplicationDialog.Accepted and dlg.added:
             self.reload()
             msg = f"Added {dlg.added.name}"

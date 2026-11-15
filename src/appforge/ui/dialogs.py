@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
 
@@ -120,9 +121,10 @@ def _launch_options_row(dialog, layout):
 
 
 class AddApplicationDialog(QDialog):
-    def __init__(self, service: LibraryService, parent=None, initial_path: str | None = None):
+    def __init__(self, service: LibraryService, parent=None, initial_path: str | None = None, *, downloaded=None):
         super().__init__(parent)
         self.service = service
+        self.downloaded = downloaded
         self.setWindowTitle("Add application")
         self.resize(560, min(770, self.screen().availableGeometry().height() - 80))
         self.setMinimumSize(520, 420)
@@ -135,6 +137,8 @@ class AddApplicationDialog(QDialog):
         self._name_touched = False
         self._custom_icon: str | None = None
         self._build()
+        if downloaded:
+            self.repo_edit.setText(downloaded.choice.source)
         if initial_path:
             self._set_path(initial_path)
 
@@ -143,8 +147,11 @@ class AddApplicationDialog(QDialog):
         lay.setContentsMargins(24, 22, 24, 20)
         lay.setSpacing(10)
         lay.addWidget(QLabel("Add application", objectName="title"))
-        subtitle = QLabel("Pick an AppImage (or a Linux program or script) anywhere on your computer. "
-                          "It stays where it is.", objectName="subtitle")
+        subtitle = QLabel(
+            ("Download complete. Review the details and add it to your library. "
+             f"Checksum: {self.downloaded.checksum}. The file is kept if you cancel.") if self.downloaded else
+            "Pick an AppImage (or a Linux program or script) anywhere on your computer. It stays where it is.",
+            objectName="subtitle")
         subtitle.setWordWrap(True)
         lay.addWidget(subtitle)
         lay.addSpacing(8)
@@ -277,6 +284,18 @@ class AddApplicationDialog(QDialog):
             self._show_file_msg(result)
             return
         md: AppMetadata = result
+        if self.downloaded and self.path_edit.text() == self.downloaded.path:
+            from ..core.downloads import validate_downloaded
+            try:
+                validate_downloaded(self.downloaded)
+            except LibraryError as exc:
+                self._show_file_msg(str(exc))
+                return
+            from ..core.updates.version import parse_version
+            release_version = self.downloaded.choice.version
+            version = release_version if parse_version(release_version) is not None else md.version or release_version
+            md = replace(md, version=version,
+                         extra={**md.extra, "installed_version_source": "github_release"})
         self.metadata = md
         self.name_edit.setEnabled(True)
         self.icon_btn.setEnabled(True)
@@ -389,9 +408,20 @@ class AddApplicationDialog(QDialog):
     def _accept(self):
         self.menu_requested = self.menu_cb.isChecked()
         try:
+            md = self.metadata
+            if self.downloaded and self.path_edit.text() == self.downloaded.path:
+                from ..core.downloads import validate_downloaded
+                from ..core.updates.service import pattern_from_asset
+                validate_downloaded(self.downloaded)
+                if normalize_repo(self.repo_edit.text()) == self.downloaded.choice.source:
+                    choice = self.downloaded.choice
+                    extra = {**md.extra, "asset_pattern": pattern_from_asset(choice.asset.name, choice.release.tag)}
+                    if choice.release.prerelease:
+                        extra["include_prereleases"] = True
+                    md = replace(md, extra=extra)
             self.added = self.service.add_application(
                 self.path_edit.text(), name=self.name_edit.text(),
-                github_repo=self.repo_edit.text(), metadata=self.metadata,
+                github_repo=self.repo_edit.text(), metadata=md,
                 custom_icon=self._custom_icon, integrate_desktop=self.menu_requested,
                 menu_category=self.menu_category_cb.currentData(),
                 env_vars=parse_env_text(self.env_edit.toPlainText()),

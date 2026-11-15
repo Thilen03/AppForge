@@ -114,11 +114,11 @@ def _fetch_text(url: str, limit: int = 1024 * 1024) -> str | None:
         return None
 
 
-def _parse_checksum_text(text: str, filename: str) -> str | None:
+def _parse_checksum_text(text: str, filename: str, *, allow_bare: bool = True) -> str | None:
     """Return the hex digest listed for exactly ``filename`` (GNU, BSD or bare-hash formats)."""
     hexp = r"[0-9a-fA-F]{64}(?:[0-9a-fA-F]{64})?"
     lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
-    if len(lines) == 1 and re.fullmatch(hexp, lines[0]):
+    if allow_bare and len(lines) == 1 and re.fullmatch(hexp, lines[0]):
         return lines[0].lower()                      # a sidecar file containing only the hash
     for ln in lines:
         m = re.fullmatch(rf"({hexp})\s+\*?(.+)", ln) or None
@@ -135,7 +135,10 @@ def find_expected_checksum(asset: dict, assets: list[dict]) -> tuple[str, str] |
     digest = asset.get("digest")
     if digest and ":" in digest:
         algo, _, value = digest.partition(":")
-        if algo.lower() in ("sha256", "sha512") and re.fullmatch(r"[0-9a-fA-F]+", value):
+        length = {"sha256": 64, "sha512": 128}.get(algo.lower())
+        if length:
+            if not re.fullmatch(rf"[0-9a-fA-F]{{{length}}}", value):
+                raise InstallError("The publisher supplied an invalid asset checksum.")
             return algo.lower(), value.lower()
     name = asset["name"]
     sidecars = [a for a in assets if a["name"] in (f"{name}.sha256", f"{name}.sha256sum", f"{name}.sha512")]
@@ -145,7 +148,7 @@ def find_expected_checksum(asset: dict, assets: list[dict]) -> tuple[str, str] |
         text = _fetch_text(a["url"])
         if not text:
             continue
-        hexval = _parse_checksum_text(text, name)
+        hexval = _parse_checksum_text(text, name, allow_bare=a in sidecars)
         if hexval:
             return ("sha512" if len(hexval) == 128 else "sha256"), hexval
     return None
@@ -191,6 +194,29 @@ def clean_stale_parts(path: Path) -> None:
             pass
 
 
+def download_verified(path: Path, fd: int, asset: dict, assets: list[dict], *,
+                      format_id: str, progress: Progress | None = None,
+                      cancel: threading.Event | None = None) -> tuple[int, str]:
+    """Shared new-download/update validation; _download owns and closes fd."""
+    size, sha256_hex = _download(asset["url"], fd, int(asset.get("size") or 0), progress, cancel)
+    if asset.get("size") and size != int(asset["size"]):
+        raise InstallError("The download size does not match the published asset size.")
+    validate_for_format(path, format_id)
+    expected = find_expected_checksum(asset, assets)
+    if expected:
+        algo, want = expected
+        got = sha256_hex if algo == "sha256" else _hash_file(path, algo)
+        if got != want:
+            raise InstallError(f"Checksum mismatch ({algo}): the download doesn't match what the "
+                               "publisher listed. The update was discarded.")
+        checksum = f"verified ({algo})"
+    else:
+        checksum = "not available"
+    if cancel and cancel.is_set():
+        raise InstallCancelled("Download cancelled.")
+    return size, checksum
+
+
 # -- main entry point ---------------------------------------------------------------------
 def install_update(path: str | os.PathLike, asset: dict, assets: list[dict], *,
                    old_version: str | None, progress: Progress | None = None,
@@ -210,19 +236,8 @@ def install_update(path: str | os.PathLike, asset: dict, assets: list[dict], *,
     tmp = Path(tmp_name)
     backup: Path | None = None
     try:
-        size, sha256_hex = _download(asset["url"], fd, size_hint, progress, cancel)
-        validate_appimage_file(tmp) if format_id == "appimage" else validate_executable_file(tmp)
-
-        expected = find_expected_checksum(asset, assets)
-        if expected:
-            algo, want = expected
-            got = sha256_hex if algo == "sha256" else _hash_file(tmp, algo)
-            if got != want:
-                raise InstallError(f"Checksum mismatch ({algo}): the download doesn't match what the "
-                                   "publisher listed. The update was discarded.")
-            checksum = f"verified ({algo})"
-        else:
-            checksum = "not available"
+        size, checksum = download_verified(tmp, fd, asset, assets, format_id=format_id,
+                                           progress=progress, cancel=cancel)
 
         # permissions: keep the user's mode, make sure it's executable
         try:

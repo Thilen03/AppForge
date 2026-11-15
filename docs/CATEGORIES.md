@@ -1,4 +1,4 @@
-# Shared application categories in AppForge 0.6.0
+# Shared application categories
 
 ## Implementation plan
 

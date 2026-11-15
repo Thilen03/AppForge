@@ -1,4 +1,4 @@
-# Discovering applications in AppForge 0.6.0
+# Discovering applications
 
 Discovery finds portable applications already on your computer and lets you review
 and import them into your library. It does not download or install applications.
@@ -13,6 +13,10 @@ and import them into your library. It does not download or install applications.
 3. Click **Scan folders**. AppForge scans these folders and their subfolders in the
    background, reporting progress. **Cancel scan** stops between file reads and
    keeps results found so far.
+
+These folders are also offered as download destinations when they are writable.
+**Add Application → Download from a link… → Add folder…** saves a new location
+here too. See the [download guide](DOWNLOADING.md).
 
 The scanner recognizes AppImages and executable ELF binaries and shebang scripts.
 AppImages can be discovered without an executable bit. Plain binaries and scripts
@@ -54,4 +58,4 @@ visible but cannot be imported, and the ignore list survives restarts.
 
 The discovery update uses the existing settings storage and does not require a
 library database migration. See the original [0.5.5 discovery release notes](../releases/RELEASE_NOTES_v0.5.5.md)
-and the [0.5.6 release notes](../releases/RELEASE_NOTES_v0.5.6.md) for the latest refinements.
+and the [0.6.1 release notes](../releases/RELEASE_NOTES_v0.6.1.md) for download-folder integration.

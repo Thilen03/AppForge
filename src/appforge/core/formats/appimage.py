@@ -176,7 +176,12 @@ _NUMBERED_NIGHTLY_IN_NAME = re.compile(
     r"(?<![A-Za-z0-9])((?:nightly|snapshot)[-_]\d+(?:[-_][0-9a-f]{7,40})?)(?=$|[-_ .])",
     re.IGNORECASE,
 )
-_VERSION_IN_NAME = re.compile(r"(?<![A-Za-z0-9.])v?(\d+(?:\.\d+){1,3}(?:[-+~][0-9A-Za-z.]+)?)")
+_VERSION_IN_NAME = re.compile(
+    r"(?<![A-Za-z0-9.])v?(\d+(?:[._]\d+){1,3}"
+    r"(?:[-~_](?:rc|alpha|beta|pre|preview|dev|snapshot|nightly)[._-]?\d*)?"
+    r"(?:-\d+)?(?:\+[0-9A-Za-z.]+)?)(?=$|[-_ .])",
+    re.IGNORECASE,
+)
 
 
 def suggest_name_from_filename(filename: str) -> str:
@@ -198,7 +203,10 @@ def suggest_name_from_filename(filename: str) -> str:
 def version_from_filename(filename: str) -> str | None:
     stem = re.sub(r"\.appimage$", "", filename, flags=re.IGNORECASE)
     stem = "".join(t for t in re.split(r"([-_ ]+)", stem) if t.lower() not in _ARCH_TOKENS)
-    m = _NUMBERED_NIGHTLY_IN_NAME.search(stem) or _VERSION_IN_NAME.search(stem)
+    m = (_NUMBERED_NIGHTLY_IN_NAME.search(stem)
+         or re.search(r"(?<![A-Za-z0-9])v?(\d{4}-\d{2}-\d{2})(?=$|[-_ .])", stem)
+         or _VERSION_IN_NAME.search(stem)
+         or re.search(r"(?<![A-Za-z0-9])v(\d+)(?=$|[-_ .])", stem))
     return m.group(1) if m else None
 
 

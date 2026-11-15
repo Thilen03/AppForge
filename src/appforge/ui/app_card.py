@@ -108,6 +108,7 @@ class AppCard(QFrame):
     releasePageRequested = Signal(str)
     releaseNotesRequested = Signal(str)
     chooseAssetRequested = Signal(str)
+    prereleasesRequested = Signal(str, bool)
     backupsRequested = Signal(str)
     desktopToggleRequested = Signal(str)
     favoriteRequested = Signal(str, bool)
@@ -287,6 +288,7 @@ class AppCard(QFrame):
     def _build_menu(self) -> RoundedMenu:
         e = self.entry
         info = e.metadata.get("update") or {}
+        self._policy_actions = []
         m = RoundedMenu(self)
         m.setToolTipsVisible(True)
         m.addAction("Details…", lambda: self.detailsRequested.emit(e.id))
@@ -297,14 +299,18 @@ class AppCard(QFrame):
             m.addSeparator()
             check = m.addAction("Check for updates", lambda: self.checkRequested.emit(e.id))
             check.setEnabled(not updates_paused(e))
+            include_pre = bool(e.metadata.get("include_prereleases"))
+            self._policy_actions.append(m.addAction(
+                "Use stable releases only" if include_pre else "Enable pre-releases",
+                lambda: self.prereleasesRequested.emit(e.id, not include_pre)))
             if info.get("tag"):
                 m.addAction("Release notes…", lambda: self.releaseNotesRequested.emit(e.id))
             if info.get("release_url"):
                 m.addAction("View release page", lambda: self.releasePageRequested.emit(e.id))
             if info.get("assets"):
-                m.addAction("Choose release asset…", lambda: self.chooseAssetRequested.emit(e.id))
+                self._policy_actions.append(m.addAction(
+                    "Choose release asset…", lambda: self.chooseAssetRequested.emit(e.id)))
         m.addSeparator()
-        self._policy_actions = []
         paused = updates_paused(e)
         self._policy_actions.append(m.addAction("Resume updates" if paused else "Pause updates",
             lambda: self.pauseUpdatesRequested.emit(e.id, not paused)))
