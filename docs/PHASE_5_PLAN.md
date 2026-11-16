@@ -42,7 +42,7 @@ Advance development version 0.5.7 to 0.5.8; preserve historical notes and dist f
 - `ui/backups_dialog.py`: report unavailable managed directories gracefully.
 - `tests/test_storage.py`: 19 storage/safety/worker/UI regression cases.
 - `README.md`, `docs/STORAGE.md`, `docs/DISCOVERY.md`, local `roadmap.md`,
-  `pyproject.toml`, `src/appforge/__init__.py`, and public
+  `pyproject.toml`, `src/tuxshelf/__init__.py`, and public
   `releases/RELEASE_NOTES_v0.5.8.md`: usage, status and consistent current version.
 
 No database schema change, migration, settings change or new dependency. Existing
@@ -112,7 +112,7 @@ application source and every existing binary remain untouched.
 
 Selected local asset (regular, non-symlink, nonempty):
 
-- `dist/AppForge-0.5.8-x86_64.AppImage`
+- `dist/TuxShelf-0.5.8-x86_64.AppImage`
 - Size: **84,609,528 bytes**
 - SHA-256: `44ec01e730dcea1d66d7210271302ac1259dc8a222cadd0e8bd61c2b201fbb39`
 

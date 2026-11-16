@@ -9,13 +9,13 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QMessageBox
 
 from test_gui import qapp, wait_for  # noqa: F401
-from appforge.core.backups import BackupService
-from appforge.core.backups.files import delete_managed_backup
-from appforge.core.backups.service import scan_backup_records
-from appforge.core.models import AppEntry
-from appforge.core.storage import cleanup_backups, scan_storage
-from appforge.core.updates.installer import backup_dir_for
-from appforge.ui.storage_dialog import StorageDialog
+from tuxshelf.core.backups import BackupService
+from tuxshelf.core.backups.files import delete_managed_backup
+from tuxshelf.core.backups.service import scan_backup_records
+from tuxshelf.core.models import AppEntry
+from tuxshelf.core.storage import cleanup_backups, scan_storage
+from tuxshelf.core.updates.installer import backup_dir_for
+from tuxshelf.ui.storage_dialog import StorageDialog
 
 
 def make_app(service, tmp_path, name='Editor', size=100):
@@ -133,7 +133,7 @@ def test_disappearing_and_permission_error(service, tmp_path, monkeypatch):
     path.unlink()
     result = cleanup_backups([(a, app.backups[0])], [a.path], Event())
     assert result.errors and not result.removed
-    import appforge.core.storage as storage
+    import tuxshelf.core.storage as storage
     monkeypatch.setattr(storage, 'scan_backup_records', lambda *a, **k: (_ for _ in ()).throw(PermissionError('denied')))
     assert scan([a]).apps[0].notices
 
@@ -163,7 +163,7 @@ def test_dialog_sort_filter_retention_and_workers(qapp, service, tmp_path, monke
         reads.append(get_ident())
         return original()
     monkeypatch.setattr(service, 'list_applications', read)
-    import appforge.ui.storage_dialog as ui
+    import tuxshelf.ui.storage_dialog as ui
     worker_threads = []
     scanner = ui.scan_storage
     def background(*args):
@@ -219,7 +219,7 @@ def test_ui_confirmation_cleanup_and_main_thread_write(qapp, service, tmp_path, 
 
 
 def test_close_cancels_and_waits(qapp, service, tmp_path, monkeypatch):
-    import appforge.ui.storage_dialog as ui
+    import tuxshelf.ui.storage_dialog as ui
     import time
     make_app(service, tmp_path)
     scanner = ui.scan_storage
@@ -237,13 +237,13 @@ def test_close_cancels_and_waits(qapp, service, tmp_path, monkeypatch):
 
 
 def test_main_window_entry_point(qapp, service, monkeypatch):
-    from appforge.ui.main_window import MainWindow
-    import appforge.ui.storage_dialog as ui
+    from tuxshelf.ui.main_window import MainWindow
+    import tuxshelf.ui.storage_dialog as ui
     calls = []
     monkeypatch.setattr(ui.StorageDialog, 'exec', lambda dialog: calls.append(dialog.windowTitle()))
     win = MainWindow(service)
     win.storage_btn.click()
-    assert calls == ['Storage · AppForge']
+    assert calls == ['Storage · TuxShelf']
     assert wait_for(qapp, lambda: not any(isinstance(w, StorageDialog) and w._job for w in qapp.topLevelWidgets()))
     win.close()
 
@@ -260,7 +260,7 @@ def test_symlink_swap_after_preview_is_rejected(service, tmp_path):
 
 
 def test_permission_failure_continues_cleanup(service, tmp_path, monkeypatch):
-    import appforge.core.backups.files as files
+    import tuxshelf.core.backups.files as files
     a = make_app(service, tmp_path)
     one, two = add_backup(a, 1), add_backup(a, 2)
     rows = scan([a]).apps[0].backups
@@ -302,7 +302,7 @@ def test_busy_or_changed_app_after_confirmation_is_rejected(qapp, service, tmp_p
 
 
 def test_existing_backup_dialog_handles_unavailable_folder(qapp, service, tmp_path):
-    from appforge.ui.backups_dialog import BackupsDialog
+    from tuxshelf.ui.backups_dialog import BackupsDialog
     a = make_app(service, tmp_path)
     folder = backup_dir_for(Path(a.path))
     folder.symlink_to(tmp_path, target_is_directory=True)

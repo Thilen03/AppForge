@@ -6,14 +6,14 @@ from types import SimpleNamespace
 
 import pytest
 
-from appforge.core.formats.appimage import version_from_filename
-from appforge.core.models import AppEntry, UpdateStatus
-from appforge.core.updates import checker, installer
-from appforge.core.updates.assets import choose_asset
-from appforge.core.updates.github import Asset, Release
-from appforge.core.updates.service import UpdateService, pattern_from_asset
-from appforge.core.updates.version import compare
-from appforge.ui.main_window import MainWindow
+from tuxshelf.core.formats.appimage import version_from_filename
+from tuxshelf.core.models import AppEntry, UpdateStatus
+from tuxshelf.core.updates import checker, installer
+from tuxshelf.core.updates.assets import choose_asset
+from tuxshelf.core.updates.github import Asset, Release
+from tuxshelf.core.updates.service import UpdateService, pattern_from_asset
+from tuxshelf.core.updates.version import compare
+from tuxshelf.ui.main_window import MainWindow
 from test_gui import qapp, wait_for  # noqa: F401
 
 
@@ -260,7 +260,7 @@ def test_unnamed_hash_in_global_sums_cannot_identify_asset(monkeypatch):
 
 
 def test_check_worker_always_reports_unexpected_failure(qapp, monkeypatch):
-    from appforge.ui import workers
+    from tuxshelf.ui import workers
     def broken(**kwargs):
         raise ValueError('malformed release response')
     monkeypatch.setattr(workers, 'check_for_update', broken)

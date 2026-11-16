@@ -4,7 +4,7 @@
 
 The **Launch** button has a small arrow on its right. Open it to choose **Default**
 or a named profile, then click **Launch**. The checked menu item and Launch tooltip
-identify the selected profile. Selection is remembered while this AppForge window
+identify the selected profile. Selection is remembered while this TuxShelf window
 is open, including card refreshes; a new session starts with Default. Choosing a
 profile does not launch the app until you click Launch (or double-click its card
 outside selection mode).
@@ -19,7 +19,7 @@ same settings and any managed desktop-menu launcher.
 Debug, then edit its environment variables, arguments, working directory or terminal
 setting. Profiles are independent: clearing a field removes that preference for
 that profile rather than inheriting it from Default. Later changes to Default do
-not alter existing named profiles. The application still inherits AppForge's cleaned
+not alter existing named profiles. The application still inherits TuxShelf's cleaned
 process environment, with the selected profile's variables applied on top.
 
 Rename a profile in its **Name** field, or choose **Delete profile** to remove it.
@@ -52,7 +52,7 @@ are passed directly to the executable: shell commands, pipes, redirects, `$HOME`
 command substitutions and wildcards are not expanded or executed. To pass a
 literal backslash, quote or escape it as in shell-style argument syntax.
 
-Default's arguments are used when launching from AppForge with Default, its tray,
+Default's arguments are used when launching from TuxShelf with Default, its tray,
 or a managed desktop-menu launcher. Existing application file/URL markers in desktop launchers
 are kept after the configured arguments; a literal `%U` typed here stays literal.
 Up to 8,192 characters and 256 arguments are supported.
@@ -65,24 +65,24 @@ containing the application, which is the existing default and follows the file
 when it is relocated.
 
 A custom folder is remembered independently of the executable's location. Missing
-folders can be saved for later reconnection or transfer, but AppForge refuses to
+folders can be saved for later reconnection or transfer, but TuxShelf refuses to
 launch until the folder exists or you clear/change it. Desktop launchers receive
 the same folder in their `Path` setting; missing-folder behavior depends on the
 desktop launcher.
 
 ## Run in terminal
 
-Enable this for interactive scripts or command-line tools. AppForge first looks
+Enable this for interactive scripts or command-line tools. TuxShelf first looks
 for `xdg-terminal-exec`, then tries installed terminal emulators. On KDE, Konsole
 is preferred among the fallbacks. Other supported fallbacks are GNOME Terminal,
-Xfce Terminal, kitty, Alacritty, foot and xterm. If none is found, AppForge shows
+Xfce Terminal, kitty, Alacritty, foot and xterm. If none is found, TuxShelf shows
 an error and you can disable terminal mode or install a supported terminal.
 
 Desktop-menu launchers use the standard `Terminal=true` property, so the desktop
 chooses the terminal. Both routes use the same application arguments, working
-directory and environment preferences. Launches remain detached from AppForge.
+directory and environment preferences. Launches remain detached from TuxShelf.
 The terminal's own settings determine whether it stays open after the app exits.
-Interactive input/output appears in the terminal; AppForge's launch log captures
+Interactive input/output appears in the terminal; TuxShelf's launch log captures
 the terminal process output, which may not include the child application's output
 or final exit status when the terminal hands work to an existing process.
 
@@ -98,5 +98,5 @@ the existing opt-in export/import environment checkboxes; they are excluded by
 default. Other profile preferences are included normally.
 Paths remain absolute and may need changing on another machine. Arguments are
 plain text in the exported JSON, so avoid putting secrets in them. Importing or
-editing preferences does not execute an application. Older AppForge builds may
+editing preferences does not execute an application. Older TuxShelf builds may
 reject exports containing these new launch-option fields.

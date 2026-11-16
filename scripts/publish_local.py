@@ -243,8 +243,8 @@ class Publisher:
         if difference not in (0, 1):
             raise Stop('Could not inspect staged changes. No commit performed.')
         if difference == 1:
-            message = input('Commit message [Update AppForge public source and publishing workflow]: ').strip()
-            self.git('commit', '-m', message or 'Update AppForge public source and publishing workflow')
+            message = input('Commit message [Update TuxShelf public source and publishing workflow]: ').strip()
+            self.git('commit', '-m', message or 'Update TuxShelf public source and publishing workflow')
         if self.git('rev-parse', 'HEAD^{tree}') != snapshot:
             raise Stop('Committed tree differs from the reviewed index (possibly a hook). No push.')
         self.remote_unchanged()
@@ -258,10 +258,10 @@ class Publisher:
         if (self.root / 'dist').is_symlink():
             raise Stop('dist/ must not be a symlink.')
         matches = []
-        for path in (self.root / 'dist').glob('AppForge-*-x86_64.AppImage'):
+        for path in (self.root / 'dist').glob('TuxShelf-*-x86_64.AppImage'):
             if path.is_symlink() or not path.is_file():
                 continue
-            version = path.name[len('AppForge-'):-len('-x86_64.AppImage')]
+            version = path.name[len('TuxShelf-'):-len('-x86_64.AppImage')]
             try:
                 semver(version)
             except Stop:
@@ -280,7 +280,7 @@ class Publisher:
         section = re.search(r'(?ms)^\[project\]\s*\n(.*?)(?=^\[|\Z)', config)
         project = re.search(r'^version\s*=\s*"([^"]+)"\s*$', section[1], re.M) if section else None
         init = re.search(r'^__version__\s*=\s*"([^"]+)"',
-                         (self.root / 'src/appforge/__init__.py').read_text(), re.M)
+                         (self.root / 'src/tuxshelf/__init__.py').read_text(), re.M)
         if not project or not init or project[1] != version or init[1] != version:
             raise Stop('Selected AppImage does not match both project version declarations.')
         return version, asset
@@ -346,7 +346,7 @@ class Publisher:
         if not path.is_file() or not path.stat().st_size:
             raise Stop(f'Matching public release notes are missing or empty: {path.name}')
         text = path.read_text(encoding='utf-8')
-        heading = re.search(r'^# AppForge v?([^\s]+)[ \t]*$', text, re.M)
+        heading = re.search(r'^# TuxShelf v?([^\s]+)[ \t]*$', text, re.M)
         if not heading or heading[1] != version:
             raise Stop('Release-notes version heading does not match the AppImage.')
         if not text[heading.end():].strip():
@@ -403,7 +403,7 @@ class Publisher:
         if self.optional_provenance(version, asset) != evidence:
             raise Stop('Build/test evidence changed during source publication. Review again.')
         existing_tag = self.remote_release('v' + version)
-        print(f'Ready to publish AppForge {version} at source commit {commit}')
+        print(f'Ready to publish TuxShelf {version} at source commit {commit}')
         print(f'Asset: {asset.name}; SHA-256: {digest}')
         print(notes.read_text(encoding='utf-8'))
         self.confirm('RELEASE',
@@ -416,7 +416,7 @@ class Publisher:
             raise Stop('Release inputs changed during review. Approval is invalid; nothing uploaded.')
         existing_tag = self.remote_release('v' + version)
         args = ['gh', 'release', 'create', 'v' + version, str(asset), '--repo', REPO,
-                '--title', 'AppForge ' + version, '--notes-file', str(notes)]
+                '--title', 'TuxShelf ' + version, '--notes-file', str(notes)]
         args += ['--verify-tag'] if existing_tag else ['--target', commit]
         if semver(version)[1]:
             args.append('--prerelease')
@@ -445,8 +445,8 @@ def main():
     parser.add_argument('--dry-run', action='store_true', help='Offline read-only preview; no staging or network')
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
-    if root != Path('/home/thilen/appforge'):
-        raise Stop('Run the installed script from /home/thilen/appforge/ only.')
+    if root != Path('/home/thilen/tuxshelf'):
+        raise Stop('Run the installed script from /home/thilen/tuxshelf/ only.')
     publisher = Publisher(root, args.dry_run)
     getattr(publisher, args.command)()
 

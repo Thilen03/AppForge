@@ -7,10 +7,10 @@ from PySide6.QtWidgets import QDialog
 
 from test_gui import qapp, wait_for  # noqa: F401
 from test_tray import window  # noqa: F401
-from appforge.core import autostart
-from appforge.core.settings import AppSettings
-from appforge.ui.main_window import MainWindow
-from appforge.ui.settings_dialog import SettingsDialog
+from tuxshelf.core import autostart
+from tuxshelf.core.settings import AppSettings
+from tuxshelf.ui.main_window import MainWindow
+from tuxshelf.ui.settings_dialog import SettingsDialog
 
 
 @pytest.fixture(autouse=True)
@@ -30,7 +30,7 @@ def test_defaults_and_roundtrip(service):
 
 
 def test_create_refresh_disable_and_unrelated_files(config, monkeypatch):
-    command = ['/opt/My App $stuff%/AppForge.AppImage']
+    command = ['/opt/My App $stuff%/TuxShelf.AppImage']
     monkeypatch.setattr(autostart, 'startup_command', lambda: command)
     autostart.set_enabled(True)
     dest = autostart.entry_path()
@@ -87,13 +87,13 @@ def test_failed_atomic_write_keeps_old_entry(config, monkeypatch):
 
 
 def test_stable_appimage_and_source_commands(tmp_path, monkeypatch):
-    exe = tmp_path / 'App Forge.AppImage'
+    exe = tmp_path / 'Tux Shelf.AppImage'
     exe.write_text('fixture')
     monkeypatch.setenv('APPIMAGE', str(exe))
     assert autostart.startup_command() == [str(exe.resolve())]
     monkeypatch.delenv('APPIMAGE')
     command = autostart.startup_command()
-    assert command[0] == 'env' and command[-2:] == ['-m', 'appforge']
+    assert command[0] == 'env' and command[-2:] == ['-m', 'tuxshelf']
     assert command[1].startswith('PYTHONPATH=')
     monkeypatch.setattr(autostart.sys, 'frozen', True, raising=False)
     monkeypatch.setenv('APPDIR', '/tmp/transient')
@@ -101,11 +101,12 @@ def test_stable_appimage_and_source_commands(tmp_path, monkeypatch):
         autostart.startup_command()
 
 
-def test_invalid_command_and_relative_config(monkeypatch):
+def test_invalid_command_and_relative_config(monkeypatch, tmp_path):
     with pytest.raises(autostart.AutostartError):
         autostart.render_entry(['/tmp/bad\nExec=anything'])
     monkeypatch.setenv('XDG_CONFIG_HOME', 'relative')
-    assert autostart.entry_path() == Path.home() / '.config/autostart/appforge.desktop'
+    monkeypatch.setenv('HOME', str(tmp_path))
+    assert autostart.entry_path() == Path.home() / '.config/autostart/tuxshelf.desktop'
 
 
 def test_settings_enable_minimized_implies_background_and_cancel_is_noop(qapp, service):
@@ -216,7 +217,7 @@ def test_hidden_startup_falls_back_without_tray(qapp, service):
 
 
 def test_login_duplicate_does_not_raise_existing_window():
-    from appforge.app import activate_window
+    from tuxshelf.app import activate_window
     from types import SimpleNamespace
     opened = []
     w = SimpleNamespace(bring_to_front=lambda: opened.append(True))

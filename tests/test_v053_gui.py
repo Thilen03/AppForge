@@ -7,7 +7,7 @@ from test_gui import qapp, wait_for  # noqa: F401  (shared fixture)
 
 
 def test_combo_popup_is_opaque_and_masked_and_menu_is_translucent(qapp):
-    from appforge.ui.popups import RoundedComboBox, RoundedMenu
+    from tuxshelf.ui.popups import RoundedComboBox, RoundedMenu
     combo = RoundedComboBox()
     combo.addItems(["a", "b", "c"])
     combo.show()
@@ -24,7 +24,7 @@ def test_combo_popup_is_opaque_and_masked_and_menu_is_translucent(qapp):
 
 
 def test_bring_to_front_restores_minimized_and_hidden(qapp, service):
-    from appforge.ui.main_window import MainWindow
+    from tuxshelf.ui.main_window import MainWindow
     win = MainWindow(service)
     win.show()
     win.showMinimized()
@@ -40,8 +40,8 @@ def test_bring_to_front_restores_minimized_and_hidden(qapp, service):
 
 
 def test_self_update_later_does_nothing_and_can_be_offered_again(qapp, service, monkeypatch):
-    from appforge.core.selfupdate import SelfUpdate
-    from appforge.ui.main_window import MainWindow
+    from tuxshelf.core.selfupdate import SelfUpdate
+    from tuxshelf.ui.main_window import MainWindow
     win = MainWindow(service)
     found = SelfUpdate("99.0.0", "https://github.com/Thilen03/AppForge/releases/tag/v99.0.0")
     seen = []
@@ -62,8 +62,8 @@ def test_self_update_later_does_nothing_and_can_be_offered_again(qapp, service, 
 def test_settings_is_a_blue_gear_next_to_add_application(qapp, service):
     from PySide6.QtGui import QColor
     from PySide6.QtWidgets import QPushButton, QToolButton
-    from appforge.ui import theme
-    from appforge.ui.main_window import MainWindow
+    from tuxshelf.ui import theme
+    from tuxshelf.ui.main_window import MainWindow
     win = MainWindow(service)
     win.show()
     qapp.processEvents()

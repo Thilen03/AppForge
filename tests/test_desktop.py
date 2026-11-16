@@ -10,16 +10,16 @@ from types import SimpleNamespace
 
 import pytest
 
-from appforge.core import library as library_mod
-from appforge.core import relocate as relocate_mod
-from appforge.core.desktop import (
+from tuxshelf.core import library as library_mod
+from tuxshelf.core import relocate as relocate_mod
+from tuxshelf.core.desktop import (
     DesktopError, DesktopService, entry_filename, quote_exec_arg, render_entry,
 )
-from appforge.core.formats import AppMetadata
-from appforge.core.library import LibraryError
-from appforge.core.models import AppEntry
-from appforge.core.paths import applications_dir
-from appforge.core.relocate import find_candidates, identity_key
+from tuxshelf.core.formats import AppMetadata
+from tuxshelf.core.library import LibraryError
+from tuxshelf.core.models import AppEntry
+from tuxshelf.core.paths import applications_dir
+from tuxshelf.core.relocate import find_candidates, identity_key
 
 
 # ------------------------------------------------------------------------------- helpers
@@ -99,7 +99,7 @@ def test_render_has_required_keys_and_marker(service, tmp_path):
     assert data["Terminal"] == "false" and data["StartupWMClass"] == "dolphin"
     assert data["Categories"] == "Development;TextEditor;"
     assert data["Icon"] == "application-x-executable"            # no icon stored
-    assert data["X-AppForge-Id"] == entry.id
+    assert data["X-TuxShelf-Id"] == entry.id
 
 
 def read_entry_from_text(text: str) -> dict[str, str]:
@@ -195,7 +195,7 @@ def test_failure_to_write_is_reported_not_fatal_on_add(service, tmp_path, monkey
     md = AppMetadata(format_id="appimage", name_suggestion="Q")
     blocked = tmp_path / "blocked"
     blocked.write_text("a file where a directory should be")
-    monkeypatch.setenv("APPFORGE_APPLICATIONS_DIR", str(blocked / "apps"))
+    monkeypatch.setenv("TUXSHELF_APPLICATIONS_DIR", str(blocked / "apps"))
     entry = service.add_application(str(f), metadata=md, integrate_desktop=True)   # must not raise
     assert not service.desktop_enabled(service.get(entry.id))
     with pytest.raises(LibraryError):
@@ -279,7 +279,7 @@ def test_marker_must_match_file_name(service, tmp_path):
     entry, _ = make_app(service, tmp_path)
     f = launcher(service, entry)
     f.parent.mkdir(parents=True, exist_ok=True)
-    f.write_text(f"[Desktop Entry]\nName=x\nX-AppForge-Id=someone-else\n")
+    f.write_text(f"[Desktop Entry]\nName=x\nX-TuxShelf-Id=someone-else\n")
     assert service.desktop.remove(entry.id) is False and f.exists()
     assert service.desktop.list_managed() == []
 
@@ -325,22 +325,22 @@ def test_sync_with_unwritable_directory_reports_failure(service, tmp_path, monke
     service.set_desktop_integration(entry.id, True)
     blocked = tmp_path / "blocked"
     blocked.write_text("file")
-    monkeypatch.setenv("APPFORGE_APPLICATIONS_DIR", str(blocked / "apps"))
+    monkeypatch.setenv("TUXSHELF_APPLICATIONS_DIR", str(blocked / "apps"))
     report = service.sync_desktop_entries()
     assert [n for n, _ in report.failed] == ["Dolphin"]
 
 
 # ------------------------------------------------------------------------------- applications_dir
 def test_applications_dir_resolution(monkeypatch, tmp_path):
-    for var in ("APPFORGE_APPLICATIONS_DIR", "APPFORGE_DATA_DIR", "XDG_DATA_HOME"):
+    for var in ("TUXSHELF_APPLICATIONS_DIR", "TUXSHELF_DATA_DIR", "XDG_DATA_HOME"):
         monkeypatch.delenv(var, raising=False)
     monkeypatch.setenv("HOME", str(tmp_path / "home"))
     assert applications_dir() == tmp_path / "home" / ".local" / "share" / "applications"
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "xdg"))
     assert applications_dir() == tmp_path / "xdg" / "applications"
-    monkeypatch.setenv("APPFORGE_DATA_DIR", str(tmp_path / "portable"))
+    monkeypatch.setenv("TUXSHELF_DATA_DIR", str(tmp_path / "portable"))
     assert applications_dir() == tmp_path / "portable" / "applications"
-    monkeypatch.setenv("APPFORGE_APPLICATIONS_DIR", str(tmp_path / "explicit"))
+    monkeypatch.setenv("TUXSHELF_APPLICATIONS_DIR", str(tmp_path / "explicit"))
     assert applications_dir() == tmp_path / "explicit"
     assert not (tmp_path / "xdg" / "applications").exists()      # resolving never creates anything
 

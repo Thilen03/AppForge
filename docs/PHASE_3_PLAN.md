@@ -29,7 +29,7 @@ Implemented in `core/updates/notes.py`, `ui/release_notes_dialog.py`, shared
 Release/provider/checker/service mappings, and card/details/main-window routing.
 Tests are in `tests/test_release_notes.py`. README and the local roadmap describe
 the workflow. Confirmed version advances from 0.5.6 to 0.5.7 in `pyproject.toml`,
-`src/appforge/__init__.py`, README and roadmap; public notes are
+`src/tuxshelf/__init__.py`, README and roadmap; public notes are
 `releases/RELEASE_NOTES_v0.5.7.md`. Historical release files remain unchanged.
 
 - Focused release-notes/details/source/discovery/backup/GUI/publishing suite:
@@ -49,17 +49,17 @@ the workflow. Confirmed version advances from 0.5.6 to 0.5.7 in `pyproject.toml`
 
 No schema migration, build, commit, push or upload. Existing `dist/` files were
 not modified. Source is ready for the user to build and manually test
-`AppForge-0.5.7-x86_64.AppImage`; publication is not yet approved. Git metadata is
+`TuxShelf-0.5.7-x86_64.AppImage`; publication is not yet approved. Git metadata is
 read-only in this environment.
 
 ## Changed files
 
-- Provider/cache logic: `src/appforge/core/updates/github.py`, `providers.py`,
+- Provider/cache logic: `src/tuxshelf/core/updates/github.py`, `providers.py`,
   `checker.py`, `service.py`, and new `notes.py` in that directory.
-- UI: `src/appforge/ui/app_card.py`, `details_dialog.py`, `main_window.py`, and new
+- UI: `src/tuxshelf/ui/app_card.py`, `details_dialog.py`, `main_window.py`, and new
   `release_notes_dialog.py` in that directory.
 - Tests: new `tests/test_release_notes.py`.
-- Versions/documentation: `pyproject.toml`, `src/appforge/__init__.py`, `README.md`,
+- Versions/documentation: `pyproject.toml`, `src/tuxshelf/__init__.py`, `README.md`,
   `docs/DISCOVERY.md`, this plan, and `releases/RELEASE_NOTES_v0.5.7.md`.
   The local-only `roadmap.md` also records completion and verification limits.
 

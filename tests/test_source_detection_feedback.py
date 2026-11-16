@@ -4,14 +4,14 @@ import pytest
 from test_gui import qapp  # noqa: F401
 from test_discovery import wait
 from test_appimage_sources import INFO, SOURCE, image
-from appforge.core.formats import AppMetadata
-from appforge.core.formats.appimage import AppImageFormat, _parse_metainfo
-from appforge.core.formats.appimage_update import (
+from tuxshelf.core.formats import AppMetadata
+from tuxshelf.core.formats.appimage import AppImageFormat, _parse_metainfo
+from tuxshelf.core.formats.appimage_update import (
     SOURCE_ORIGIN_KEY, SUGGESTED_SOURCE_KEY, repository_metadata_url, source_detection_message,
 )
-from appforge.core.discovery import scan
-from appforge.ui.dialogs import AddApplicationDialog
-from appforge.ui.discovery_dialog import DiscoveryDialog
+from tuxshelf.core.discovery import scan
+from tuxshelf.ui.dialogs import AddApplicationDialog
+from tuxshelf.ui.discovery_dialog import DiscoveryDialog
 
 
 @pytest.mark.parametrize('value,explicit,expected', [
@@ -111,7 +111,7 @@ def test_clear_suggestion_does_not_claim_detection_failed(qapp, tmp_path, servic
 def test_real_appstream_only_image_has_suggestion(fixtures, tmp_path):
     import make_fixtures
     import subprocess
-    from appforge.core.library import inspect_file
+    from tuxshelf.core.library import inspect_file
     build = make_fixtures.subprocess.run
     def inject_metainfo(command, **kwargs):
         appdir = tmp_path / 'fallback.AppDir'

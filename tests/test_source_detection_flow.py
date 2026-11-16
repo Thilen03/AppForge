@@ -8,11 +8,11 @@ from PySide6.QtWidgets import QFileDialog, QPushButton, QScrollArea
 from test_gui import qapp  # noqa: F401
 from test_discovery import wait
 from test_appimage_sources import INFO, SOURCE, image
-from appforge.core.library import LibraryError, inspect_file
-from appforge.ui import dialogs
-from appforge.ui.dialogs import AddApplicationDialog
-from appforge.ui.download_dialog import AddSourceDialog
-from appforge.ui.main_window import MainWindow
+from tuxshelf.core.library import LibraryError, inspect_file
+from tuxshelf.ui import dialogs
+from tuxshelf.ui.dialogs import AddApplicationDialog
+from tuxshelf.ui.download_dialog import AddSourceDialog
+from tuxshelf.ui.main_window import MainWindow
 
 
 @pytest.mark.parametrize('outcome', ['found', 'not_found', 'failed'])

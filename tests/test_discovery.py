@@ -5,10 +5,10 @@ import time
 
 import pytest
 
-from appforge.core.discovery import (
+from tuxshelf.core.discovery import (
     IGNORED_KEY, ROOTS_KEY, default_roots, import_candidate, load_paths, save_paths, scan,
 )
-from appforge.core.library import LibraryError
+from tuxshelf.core.library import LibraryError
 
 
 def program(path, data=b'#!/bin/sh\necho never-run\n', mode=0o755):
@@ -37,8 +37,8 @@ def test_scan_formats_metadata_and_read_only(tmp_path, monkeypatch):
 
 
 def test_appimage_detection_reuses_metadata_reader(tmp_path, monkeypatch):
-    from appforge.core.formats.appimage import AppImageFormat
-    from appforge.core.formats import AppMetadata
+    from tuxshelf.core.formats.appimage import AppImageFormat
+    from tuxshelf.core.formats import AppMetadata
     image = program(tmp_path / 'Example.AppImage', b'\x7fELF' + b'\0' * 4 + b'AI\x02' + b'\0' * 100, 0o644)
     monkeypatch.setattr(AppImageFormat, 'extract_metadata', lambda self, path:
                         AppMetadata('appimage', 'Embedded Name', '3.4', icon_data=b'icon', icon_ext='png'))
@@ -90,7 +90,7 @@ def test_cancellation_and_inaccessible_paths(tmp_path, monkeypatch):
     cancelled = threading.Event()
     cancelled.set()
     assert scan([str(tmp_path)], cancel=cancelled).visited == 0
-    import appforge.core.discovery as discovery
+    import tuxshelf.core.discovery as discovery
     monkeypatch.setattr(discovery.os, 'scandir', lambda p: (_ for _ in ()).throw(PermissionError('denied')))
     result = scan([str(tmp_path)])
     assert 'denied' in result.errors[0]
@@ -154,7 +154,7 @@ def wait(qapp, condition):
 
 def test_dialog_preview_confirmation_ignore_import_and_persistence(qapp, tmp_path, service, monkeypatch):
     from PySide6.QtWidgets import QMessageBox
-    from appforge.ui.discovery_dialog import DiscoveryDialog
+    from tuxshelf.ui.discovery_dialog import DiscoveryDialog
     program(tmp_path / 'one')
     program(tmp_path / 'two')
     dlg = DiscoveryDialog(service)
@@ -191,8 +191,8 @@ def test_dialog_preview_confirmation_ignore_import_and_persistence(qapp, tmp_pat
 
 def test_worker_keeps_event_loop_responsive_and_close_cancels(qapp, tmp_path, service, monkeypatch):
     from PySide6.QtCore import QTimer
-    from appforge.ui.discovery_dialog import DiscoveryDialog
-    import appforge.core.discovery as discovery
+    from tuxshelf.ui.discovery_dialog import DiscoveryDialog
+    import tuxshelf.core.discovery as discovery
     started = threading.Event()
     def slow_scan(roots, registered, ignored, cancel, progress):
         started.set()
@@ -212,7 +212,7 @@ def test_worker_keeps_event_loop_responsive_and_close_cancels(qapp, tmp_path, se
 
 
 def test_changed_file_during_scan_is_reported(tmp_path, monkeypatch):
-    import appforge.core.discovery as discovery
+    import tuxshelf.core.discovery as discovery
     app = program(tmp_path / 'tool')
     original = discovery.inspect_file
     def changing(path):
@@ -226,7 +226,7 @@ def test_changed_file_during_scan_is_reported(tmp_path, monkeypatch):
 
 
 def test_missing_root_and_unreadable_candidate_do_not_abort(tmp_path, monkeypatch):
-    import appforge.core.discovery as discovery
+    import tuxshelf.core.discovery as discovery
     program(tmp_path / 'bad')
     good = program(tmp_path / 'good')
     original = discovery.inspect_file
@@ -242,7 +242,7 @@ def test_missing_root_and_unreadable_candidate_do_not_abort(tmp_path, monkeypatc
 
 def test_import_can_stop_and_changed_candidate_does_not_block_next(qapp, tmp_path, service, monkeypatch):
     from PySide6.QtWidgets import QMessageBox
-    from appforge.ui.discovery_dialog import DiscoveryDialog
+    from tuxshelf.ui.discovery_dialog import DiscoveryDialog
     one = program(tmp_path / 'one')
     program(tmp_path / 'two')
     dlg = DiscoveryDialog(service)
@@ -263,8 +263,8 @@ def test_import_can_stop_and_changed_candidate_does_not_block_next(qapp, tmp_pat
 
 
 def test_main_window_discovery_entry_refreshes_library(qapp, service, tmp_path, monkeypatch):
-    import appforge.ui.discovery_dialog as discovery_dialog
-    from appforge.ui.main_window import MainWindow
+    import tuxshelf.ui.discovery_dialog as discovery_dialog
+    from tuxshelf.ui.main_window import MainWindow
     app = program(tmp_path / 'new-tool')
     class Dialog:
         def __init__(self, library, parent):
@@ -282,7 +282,7 @@ def test_main_window_discovery_entry_refreshes_library(qapp, service, tmp_path, 
 
 
 def test_dialog_scans_all_saved_roots_regardless_of_watch_checkboxes(qapp, tmp_path, service):
-    from appforge.ui.discovery_dialog import DiscoveryDialog
+    from tuxshelf.ui.discovery_dialog import DiscoveryDialog
     selected = program(tmp_path / 'applications' / 'tool')
     other = program(tmp_path / 'emulators' / 'other-tool')
     dlg = DiscoveryDialog(service)
@@ -297,7 +297,7 @@ def test_dialog_scans_all_saved_roots_regardless_of_watch_checkboxes(qapp, tmp_p
 
 
 def test_scan_skips_roms_and_data_before_format_reads(tmp_path, monkeypatch):
-    import appforge.core.discovery as discovery
+    import tuxshelf.core.discovery as discovery
     app = program(tmp_path / 'emulator.AppImage')
     for i in range(200):
         program(tmp_path / 'roms' / f'game-{i}.extm')
@@ -335,7 +335,7 @@ def test_matching_extension_does_not_make_data_an_application(tmp_path):
 
 @pytest.fixture
 def results_dialog(qapp, service, tmp_path):
-    from appforge.ui.discovery_dialog import DiscoveryDialog
+    from tuxshelf.ui.discovery_dialog import DiscoveryDialog
     for name in ('zulu-3.0.sh', 'Bravo-1.0.sh', 'alpha-2.0.sh'):
         program(tmp_path / name)
     result = scan([str(tmp_path)])

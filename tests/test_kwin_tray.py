@@ -8,7 +8,7 @@ from PySide6.QtQml import QJSEngine
 
 from test_gui import qapp  # noqa: F401
 from test_tray import window  # noqa: F401
-from appforge.ui.kwin_tray import KWinTrayBridge, plasma_wayland, render_observer
+from tuxshelf.ui.kwin_tray import KWinTrayBridge, plasma_wayland, render_observer
 
 
 class FakeBus(QObject):
@@ -44,7 +44,7 @@ def test_load_run_disable_cleanup(qapp):
     call = bus.calls[-1]
     script, name = call.args
     assert call.method == 'loadScript' and call.path == '/Scripting'
-    assert Path(script).is_file() and name.startswith('appforge-tray-')
+    assert Path(script).is_file() and name.startswith('tuxshelf-tray-')
     assert ':1.123' in Path(script).read_text()
     call.callback([7], None)
     assert bus.calls[-1].path == '/Scripting/Script7'
@@ -169,14 +169,14 @@ def test_generated_script_reads_only_own_normal_windows(qapp):
     engine.evaluate('own.minimized=true; own.minimizedChanged.emit(); other.minimizedChanged.emit(); dialog.minimizedChanged.emit();')
     calls = engine.evaluate('calls').toVariant()
     assert len(calls) == 2
-    assert calls[-1] == [':1.123','/test','org.appforge.TrayObserver','stateChanged','token',True]
+    assert calls[-1] == [':1.123','/test','org.tuxshelf.TrayObserver','stateChanged','token',True]
     engine.evaluate('var added=win(123,true,false); workspace.windowAdded.emit = function(){this.slots.forEach(function(fn){fn(added);});}; workspace.windowAdded.emit(); added.minimized=true; added.minimizedChanged.emit();')
     assert engine.evaluate('calls.length').toInt() == 4
     assert engine.evaluate('own.minimized').toBool()  # script never changes window state
 
 
 def test_compositor_callback_hides_without_any_qt_minimized_state(window, qapp, monkeypatch):
-    import appforge.ui.main_window as mw
+    import tuxshelf.ui.main_window as mw
     bus = FakeBus()
     monkeypatch.setattr(mw, 'plasma_wayland', lambda platform: True)
     monkeypatch.setattr(mw, 'KWinTrayBridge', lambda parent: KWinTrayBridge(parent, transport=bus))
@@ -197,7 +197,7 @@ def test_compositor_callback_hides_without_any_qt_minimized_state(window, qapp, 
 
 
 def test_foreign_or_unminimize_callback_never_hides_window(window, qapp, monkeypatch):
-    import appforge.ui.main_window as mw
+    import tuxshelf.ui.main_window as mw
     bus = FakeBus()
     monkeypatch.setattr(mw, 'plasma_wayland', lambda platform: True)
     monkeypatch.setattr(mw, 'KWinTrayBridge', lambda parent: KWinTrayBridge(parent, transport=bus))
@@ -214,7 +214,7 @@ def test_foreign_or_unminimize_callback_never_hides_window(window, qapp, monkeyp
 
 
 def test_filesystem_failure_is_reported(qapp, monkeypatch):
-    import appforge.ui.kwin_tray as module
+    import tuxshelf.ui.kwin_tray as module
     bridge, bus = bridge_with_bus()
     errors = []
     bridge.failed.connect(errors.append)
@@ -226,7 +226,7 @@ def test_filesystem_failure_is_reported(qapp, monkeypatch):
 @pytest.mark.parametrize('error', [None, 'Access denied'])
 def test_real_qtdbus_pending_reply_handling(qapp, error):
     from PySide6.QtDBus import QDBusMessage, QDBusPendingCall
-    from appforge.ui.kwin_tray import SessionBus
+    from tuxshelf.ui.kwin_tray import SessionBus
     from test_gui import wait_for
     transport = SessionBus.__new__(SessionBus)
     QObject.__init__(transport)

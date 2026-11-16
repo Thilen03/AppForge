@@ -5,15 +5,15 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 root = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(root / "src"), str(root / "tests")]
 out = Path(sys.argv[1]); out.mkdir(parents=True, exist_ok=True)
-os.environ["APPFORGE_DATA_DIR"] = tempfile.mkdtemp()
+os.environ["TUXSHELF_DATA_DIR"] = tempfile.mkdtemp()
 from PySide6.QtWidgets import QApplication
 import make_fixtures
-from appforge.core.database import Database
-from appforge.core.library import LibraryService
-from appforge.core.paths import database_path, icons_dir
-from appforge.ui import theme
-from appforge.ui.main_window import MainWindow
-from appforge.ui.dialogs import AddApplicationDialog, EditApplicationDialog
+from tuxshelf.core.database import Database
+from tuxshelf.core.library import LibraryService
+from tuxshelf.core.paths import database_path, icons_dir
+from tuxshelf.ui import theme
+from tuxshelf.ui.main_window import MainWindow
+from tuxshelf.ui.dialogs import AddApplicationDialog, EditApplicationDialog
 
 app = QApplication([]); theme.apply_theme(app)
 fx = make_fixtures.build_default_set(Path(tempfile.mkdtemp()))
@@ -33,7 +33,7 @@ d.grab().save(str(out / "add_dialog.png"))
 ed = EditApplicationDialog(svc, svc.list_applications()[0], w); ed.show(); pump(5); ed.grab().save(str(out / "edit_dialog.png"))
 # dark
 theme.apply_theme(app); 
-from appforge.ui import theme as T
+from tuxshelf.ui import theme as T
 app.setStyle("Fusion"); T._current = T.DARK; app.setPalette(T._palette(T.DARK)); app.setStyleSheet(T.stylesheet(T.DARK)); w.reload(); pump()
 w._cards[0]._reveal(True); pump(20); w.grab().save(str(out / "library_dark.png"))
 print("saved", sorted(p.name for p in out.iterdir()))

@@ -87,15 +87,15 @@ that setup from the project directory if the same local build environment exists
 ```bash
 PYTHONPATH=src python3 - <<'PY'
 from pathlib import Path
-from appforge.core.formats.appimage import appimage_type, find_squashfs_offset
+from tuxshelf.core.formats.appimage import appimage_type, find_squashfs_offset
 source = Path('build/tools/appimagetool')
 assert appimage_type(source) == 2
 size = find_squashfs_offset(source)
 assert size and size < source.stat().st_size
 with source.open('rb') as stream:
-    Path('/tmp/appforge-phase7-runtime').write_bytes(stream.read(size))
+    Path('/tmp/tuxshelf-phase7-runtime').write_bytes(stream.read(size))
 PY
-APPIMAGE_RUNTIME_FILE=/tmp/appforge-phase7-runtime \
+APPIMAGE_RUNTIME_FILE=/tmp/tuxshelf-phase7-runtime \
 PYTHONPATH=src:.venv-build/lib/python3.14/site-packages \
 QT_QPA_PLATFORM=offscreen python3 -m pytest -q -ra
 ```
@@ -104,11 +104,11 @@ The Python 3.14 site-packages path above describes this verified host only. On a
 normal development installation use the Python environment with
 `requirements-dev.txt` installed, and a compatible local runtime or allow
 appimagetool's normal runtime download. No packages were installed in this task.
-Tiny temporary test AppImages were built; no AppForge distributable was built.
+Tiny temporary test AppImages were built; no TuxShelf distributable was built.
 
 ## Files changed
 
-- `src/appforge/core/updates/installer.py`: connection-failure descriptor cleanup.
+- `src/tuxshelf/core/updates/installer.py`: connection-failure descriptor cleanup.
 - `tests/test_integration.py`: 12 integration/safety cases.
 - `tests/conftest.py`: explicit socket-permission capability fixtures.
 - `tests/make_fixtures.py`: offline runtime option and fixture error diagnostics.
@@ -148,7 +148,7 @@ commit, push or publication occurred; `.git` remains read-only in this environme
 
 ### Confirmed 0.6.0 source preparation
 
-Updated `pyproject.toml`, `src/appforge/__init__.py`, README badge/current-feature
+Updated `pyproject.toml`, `src/tuxshelf/__init__.py`, README badge/current-feature
 section, `docs/DISCOVERY.md` heading, `docs/CATEGORIES.md`, this report and local
 roadmap. Created only the matching public
 `releases/RELEASE_NOTES_v0.6.0.md`; it documents shared categories, legacy behavior,
@@ -161,7 +161,7 @@ Fresh validation after the version update: **483 passed, 12 skipped, one existin
 Qt deprecation warning**, no failures/errors, using the previously documented local
 runtime/build dependencies. Source smoke, active-version/notes-heading consistency
 and whitespace checks passed. The socket skips retain the limitations described
-above. No `dist/AppForge-0.6.0-x86_64.AppImage` exists in this workspace. SOURCE is
+above. No `dist/TuxShelf-0.6.0-x86_64.AppImage` exists in this workspace. SOURCE is
 ready for the user to build and manually test that matching binary; publication
 is not ready until that is completed and explicitly confirmed. No binary was
 built, renamed or modified, and no Git metadata or remote state was written.
@@ -215,15 +215,15 @@ menus, details actions, tray counts, notifications, check selection, direct and
 batch installation guards, busy-state guards and missing-file repair. Full suite
 with the existing build dependencies and an offline fixture runtime: **497 passed,
 12 skipped**, with one existing Qt deprecation warning. The documented command
-above was reused with `/tmp/appforge-update-controls-runtime` as the temporary
+above was reused with `/tmp/tuxshelf-update-controls-runtime` as the temporary
 runtime. Eleven skips require prohibited TCP sockets; one requires Unix sockets.
 The initial system-only run reported 475 passed, 2 skipped and 31 setup errors
 because appimagetool could not download its runtime; the offline setup resolved
 those errors. Source offscreen smoke test and `git diff --check` passed. Paused and
 skipped cards were rendered and visually inspected in light and dark themes.
 
-SOURCE is ready to build and manually test as AppForge-0.6.0-x86_64.AppImage.
-No AppForge distributable was built or modified, and no commit, push or publishing
+SOURCE is ready to build and manually test as TuxShelf-0.6.0-x86_64.AppImage.
+No TuxShelf distributable was built or modified, and no commit, push or publishing
 operation was performed. Manual desktop/AppImage approval remains pending.
 
 ## Appearance toggle follow-up for 0.6.0
@@ -254,7 +254,7 @@ Final full-suite result using the documented offline fixture runtime and existin
 build dependencies: **501 passed, 12 skipped**, one existing Qt deprecation warning.
 The skips cover 11 prohibited TCP socket cases and one Unix socket/process-handoff
 case. No failures or errors. SOURCE remains ready for the user to build and
-manually test AppForge-0.6.0-x86_64.AppImage; no distributable, Git metadata or
+manually test TuxShelf-0.6.0-x86_64.AppImage; no distributable, Git metadata or
 remote publication was changed.
 
 ## Consistent card badges for 0.6.0
@@ -319,7 +319,7 @@ rendered and visually inspected in light and dark mode.
 
 Native terminal windows and desktop activation still need manual verification on
 the user's desktop (including KDE/Konsole). Terminal process handoff may prevent
-AppForge's existing log/early-exit check from reporting the child app's output or
-exit status; this is documented in the user guide. No matching AppForge binary
+TuxShelf's existing log/early-exit check from reporting the child app's output or
+exit status; this is documented in the user guide. No matching TuxShelf binary
 was built, renamed or modified. SOURCE is ready for the user to build and manually
-test AppForge-0.6.0-x86_64.AppImage; no Git metadata or remote state was written.
+test TuxShelf-0.6.0-x86_64.AppImage; no Git metadata or remote state was written.

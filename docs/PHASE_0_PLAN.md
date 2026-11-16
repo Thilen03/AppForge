@@ -24,13 +24,13 @@ Version declarations, README badge/link and notes heading agree on 0.6.4;
 cancel/retry/existing-file flows, real sort-header clicks and discovery layouts
 in both themes.
 Initial dist/ inventory was empty, recorded in
-/tmp/appforge-064-preparation-assets-before.json. An AppImage appeared while
+/tmp/tuxshelf-064-preparation-assets-before.json. An AppImage appeared while
 checks were running; this preparation did not build or modify it. The new file
-is dist/AppForge-0.6.4-x86_64.AppImage, 84,736,504 bytes, observed SHA-256
+is dist/TuxShelf-0.6.4-x86_64.AppImage, 84,736,504 bytes, observed SHA-256
 6782ca3f8f3b1dc1285976a0ce64abe510d39aa00cf43e809d3dc3bce803d8bd.
 Its appearance prevents claiming an unchanged inventory across preparation;
 source provenance and manual testing are not inferred from its name or hash.
-Observed file metadata is in /tmp/appforge-064-preparation-observed-asset.json.
+Observed file metadata is in /tmp/tuxshelf-064-preparation-observed-asset.json.
 SOURCE 0.6.4 is prepared. Publication still requires the user's explicit
 confirmation of building from the prepared source and personally testing that
 exact binary. Nothing was committed or published.
@@ -131,11 +131,11 @@ and releases/RELEASE_NOTES_v0.6.4.md. No release date was inferred.
 Validation: 44 focused discovery/watch tests passed. Initial system-Python runs
 hit blocked fixture runtime downloads and missing PySquashfsImage. Reusing
 .venv-build/lib/python3.14/site-packages on PYTHONPATH and
-APPIMAGE_RUNTIME_FILE=/tmp/appforge-test-runtime resolved those environment
+APPIMAGE_RUNTIME_FILE=/tmp/tuxshelf-test-runtime resolved those environment
 issues: full suite 843 passed, 12 restricted TCP/Unix socket skips, one existing
 Qt deprecation warning. Startup selftest and git diff --check passed.
 SOURCE 0.6.4 is ready for the user to build and manually test as
-AppForge-0.6.4-x86_64.AppImage. Existing dist files were not modified. No release
+TuxShelf-0.6.4-x86_64.AppImage. Existing dist files were not modified. No release
 binary was built or manually tested; publication remains pending. Git metadata
 is read-only; no staging, commit, push, tag or upload was attempted.
 
@@ -146,7 +146,7 @@ User requested prepare release 0.6.3. Verified previous release at HEAD 315bf4b
 the confirmed 0.6.3, so no further bump. Reviewed changes since HEAD, new bulk/
 profile modules and tests, public docs, release history and local tags through
 v0.5.4. Optional roadmap.md is unavailable. Repository identity is the main
-AppForge directory, main, origin/main and the expected GitHub URL. Git metadata
+TuxShelf directory, main, origin/main and the expected GitHub URL. Git metadata
 remains read-only; the index is empty and no staging/commit/fetch/push/tag/upload
 was attempted.
 
@@ -165,11 +165,11 @@ passed; version declarations/notes heading/expected artifact agree and 18 local
 documentation links resolve. Earlier feature QA includes actual modal/editor/
 worker flows, real process launches and light/dark card/dropdown/editor inspection.
 
-Recorded the existing dist/AppForge-0.6.3-x86_64.AppImage (84,732,408 bytes) before
+Recorded the existing dist/TuxShelf-0.6.3-x86_64.AppImage (84,732,408 bytes) before
 preparation and verified SHA-256, size, modification time, inode and mode unchanged
 after checks. Its filename does not verify its source contents or user testing.
 SOURCE 0.6.3 is ready for the user to build and manually test as
-AppForge-0.6.3-x86_64.AppImage. Matching binary build/manual testing is unconfirmed;
+TuxShelf-0.6.3-x86_64.AppImage. Matching binary build/manual testing is unconfirmed;
 publication remains pending that explicit confirmation. No distributable was built,
 renamed or changed during release preparation.
 
@@ -278,10 +278,10 @@ dist files were untouched; no build/manual AppImage test, staging or publication
 was attempted. Git metadata remains read-only in this environment.
 
 User subsequently confirmed that bulk actions belong in release 0.6.3. Updated
-pyproject.toml, src/appforge/__init__.py and README from 0.6.2 to 0.6.3, and created
+pyproject.toml, src/tuxshelf/__init__.py and README from 0.6.2 to 0.6.3, and created
 only releases/RELEASE_NOTES_v0.6.3.md for the verified bulk features. Historical
 notes remain unchanged; no publication date was inferred. Expected user build:
-AppForge-0.6.3-x86_64.AppImage. Existing dist files remain untouched; matching
+TuxShelf-0.6.3-x86_64.AppImage. Existing dist files remain untouched; matching
 binary build/manual testing and publication are still pending.
 
 Inspected for the 0.5.5 discovery update, 14 November 2026.
@@ -377,7 +377,7 @@ Final complete regression run with those local dependencies/runtime: **590 passe
 12 skipped, 1 existing Qt deprecation warning**. All skips explicitly report the
 host's TCP/Unix socket restrictions. Final `git diff --check` passed. Source 0.6.1
 is ready for the user to build and manually test as
-`AppForge-0.6.1-x86_64.AppImage`; publication approval remains outstanding.
+`TuxShelf-0.6.1-x86_64.AppImage`; publication approval remains outstanding.
 
 ## Pre-release opt-in follow-up (kept in 0.6.1 by user confirmation)
 
@@ -475,7 +475,7 @@ Bash example syntax and git diff --check. Live provider access remains restricte
 automated tests do not establish final AppImage desktop/manual testing.
 
 SOURCE is ready for the user to build and manually test as
-AppForge-0.6.1-x86_64.AppImage. An existing file of that name is present in dist;
+TuxShelf-0.6.1-x86_64.AppImage. An existing file of that name is present in dist;
 verified its contents, size and modification time remain unchanged during this
 preparation. Its relationship to the final source and manual testing are not
 confirmed. No distributable was built, renamed or modified. No staging, commit,
@@ -509,7 +509,7 @@ mapping, original light/dark colors, live changes and startup restoration.
 
 Validation: focused settings/theme tests: 74 passed, 1 socket skip. Full regression
 with the existing .venv-build dependencies on PYTHONPATH and local
-APPIMAGE_RUNTIME_FILE=/tmp/appforge-test-runtime: 664 passed, 12 local TCP/Unix
+APPIMAGE_RUNTIME_FILE=/tmp/tuxshelf-test-runtime: 664 passed, 12 local TCP/Unix
 socket skips, 1 existing Qt deprecation warning. Earlier attempts using only system
 Python could not create online fixtures or import PySquashfsImage; loading the
 existing dependencies/runtime resolved those setup failures. Offscreen startup
@@ -544,7 +544,7 @@ build dependencies and local test runtime: 665 passed, 12 restricted TCP/Unix so
 skips, 1 existing Qt deprecation warning. Startup selftest and git diff --check
 passed. Visually inspected the collapsed settings, expanded controls and custom
 cards in light/dark themes. Source 0.6.2 is ready to build and manually test as
-AppForge-0.6.2-x86_64.AppImage; existing dist files were not changed. No manual
+TuxShelf-0.6.2-x86_64.AppImage; existing dist files were not changed. No manual
 binary testing or publishing is claimed. Git metadata remains read-only here.
 
 ## Watched discovery folders plan
@@ -656,7 +656,7 @@ run exposed interpreter-exit cleanup ordering, resolved before regression runs.
 Final full regression on the completed source with existing build dependencies and
 local AppImage fixture runtime: 736 passed, 12 restricted local TCP/Unix socket
 skips, 1 existing Qt deprecation warning. Source 0.6.2 is ready for the user to build
-and manually test AppForge-0.6.2-x86_64.AppImage. Existing dist files were not changed;
+and manually test TuxShelf-0.6.2-x86_64.AppImage. Existing dist files were not changed;
 fixture AppImages were generated only in temporary test folders. No manual testing
 of a new distributable, staging, commits or publication is claimed. Git metadata
 remains read-only in this environment.
@@ -756,7 +756,7 @@ User requested prepare release 0.6.2. Verified previous release source at HEAD
 3d92ef9 (0.6.1); active pyproject.toml, __init__.py and README already consistently
 identify the confirmed 0.6.2, so no additional version bump. Reviewed current diffs,
 new modules/tests, existing notes and available local tags (through v0.5.4).
-Optional roadmap.md remains unavailable. Repository identity is the main AppForge
+Optional roadmap.md remains unavailable. Repository identity is the main TuxShelf
 directory, branch main, upstream origin/main, origin
 https://github.com/Thilen03/AppForge.git. Git metadata remains read-only; the index
 has no staged changes and no staging/commit/push/fetch/tag/upload was attempted.
@@ -775,18 +775,18 @@ notes heading/expected artifact name and 21 local file links. git diff --check p
 Earlier feature verification includes real local Add modal/worker tests and
 light/dark inspection at small sizes; automated checks are not manual binary tests.
 
-Recorded the existing dist/AppForge-0.6.2-x86_64.AppImage (84,707,832 bytes) before
+Recorded the existing dist/TuxShelf-0.6.2-x86_64.AppImage (84,707,832 bytes) before
 preparation and confirmed its SHA-256, size, modification time, inode and mode were
 unchanged afterward. Its name alone does not verify that it contains this source.
 SOURCE 0.6.2 is ready for the user to rebuild and manually test as
-AppForge-0.6.2-x86_64.AppImage. Matching binary build/manual testing is unconfirmed;
+TuxShelf-0.6.2-x86_64.AppImage. Matching binary build/manual testing is unconfirmed;
 release publication remains pending that explicit confirmation. No distributable
 was built, renamed or changed during preparation.
 
-## 0.6.5 card actions and AppForge release notes
+## 0.6.5 card actions and TuxShelf release notes
 
 Use the existing primary button style for Update/Retry update. Add an offline
-AppForge notes dialog using the existing safe Markdown document and link handler.
+TuxShelf notes dialog using the existing safe Markdown document and link handler.
 Bundle current public notes as package data; test equality to prevent drift.
 Store suppression and last-shown version in existing settings (no migration).
 Show once per version only when the real main window becomes visible; hidden
@@ -802,7 +802,7 @@ notes; a test keeps them identical to the public 0.6.5 notes. README, usage and
 publishing guidance updated. No database migration or dependency changes.
 Validation: 64 focused tests passed; after the final Settings layout adjustment,
 26 relevant tests passed. Full regression with existing .venv-build dependencies
-on PYTHONPATH and /tmp/appforge-test-runtime: 871 passed, 12 restricted TCP/Unix
+on PYTHONPATH and /tmp/tuxshelf-test-runtime: 871 passed, 12 restricted TCP/Unix
 socket skips, one existing Qt deprecation warning. The initial system-Python full
 run was interrupted after missing PySquashfsImage caused fixture-related failures;
 the complete rerun above uses the already installed project dependencies. Startup
@@ -811,7 +811,7 @@ and Settings screenshots in light/dark themes. Source 0.6.5 is ready for the use
 to build and manually test. No AppImages built/modified and no Git metadata writes,
 commits or publishing performed; Git metadata remains read-only in this environment.
 
-## 0.6.5 optional AppForge launcher
+## 0.6.5 optional TuxShelf launcher
 
 Replace bootstrap's unconditional self launcher creation with persistent opt-in.
 Use desktop/selflauncher for safe create/remove operations and existing source/
@@ -824,7 +824,7 @@ README and usage. Test decisions, refresh/removal persistence, file ownership,
 errors and source/AppImage commands, then run regression and startup selftest.
 
 Implemented opt-in bootstrap and a once-only first-visible-start prompt ahead of
-release notes. Settings now creates/removes the AppForge menu shortcut with Save;
+release notes. Settings now creates/removes the TuxShelf menu shortcut with Save;
 Cancel leaves it unchanged. Existing managed entries are adopted and refreshed;
 explicitly disabled shortcuts are never recreated. The strict selflauncher API
 uses the existing stable AppImage/source startup command, atomic writes, ownership
@@ -842,7 +842,7 @@ or publication were performed.
 
 ## 0.6.5 Utilities and moved-AppImage consent
 
-Use Utility as AppForge's sole main category in packaged and generated entries.
+Use Utility as TuxShelf's sole main category in packaged and generated entries.
 Compare the current APPIMAGE path with the owned launcher's saved executable before
 startup refresh. Queue a first-visible-window repair prompt for changed paths;
 never rewrite that shortcut before Yes. No leaves it intact and asks next launch,
@@ -851,7 +851,7 @@ opt-outs/foreign entries, and avoid implicit repair on unrelated Settings saves.
 Extend launcher tests for unchanged/moved/renamed/declined/repaired paths, failures
 and categories; update current 0.6.5 notes and usage, then validate startup and UI.
 
-Implemented Utilities-only categories in the packaged entry and both AppForge
+Implemented Utilities-only categories in the packaged entry and both TuxShelf
 entry renderers. Startup detects an owned shortcut's changed AppImage path before
 any refresh and defers a plain-text Yes/No repair prompt until the window is visible.
 The prompt shows old/new locations; Yes uses the existing guarded atomic writer,
@@ -884,7 +884,7 @@ date or speculative claims. No source behavior/version changes needed. Run notes
 launcher checks and startup/desktop validation; reuse the completed full regression
 for this unchanged source (894 passed, 12 socket skips, one Qt warning). Initial
 dist AppImage inventory is empty, recorded in
-/tmp/appforge-065-release-assets-before.json. No building, staging or publishing.
+/tmp/tuxshelf-065-release-assets-before.json. No building, staging or publishing.
 
 Preparation complete: active declarations/README and current public/bundled notes
 agree on 0.6.5. Finalized notes include verified features, normal-user upgrade
@@ -895,12 +895,135 @@ packaged desktop-file-validate passed, git diff --check passed and 17 local docs
 links resolve. Latest full regression for the unchanged application source remains
 894 passed, 12 restricted TCP/Unix socket skips and one existing Qt warning.
 Initial dist inventory was empty. An AppImage appeared during preparation:
-dist/AppForge-0.6.5-x86_64.AppImage, 84,748,792 bytes, SHA-256
+dist/TuxShelf-0.6.5-x86_64.AppImage, 84,748,792 bytes, SHA-256
 677d597f4140692195ea47b415f66f9332a0c3f86afb76dabe30ff4432b5ad4c.
-Observed metadata is recorded in /tmp/appforge-065-release-assets-observed.json.
+Observed metadata is recorded in /tmp/tuxshelf-065-release-assets-observed.json.
 This preparation did not build, rename or modify that asset. Concurrent appearance
 prevents claiming an unchanged inventory; its source/notes agreement and manual
 testing are unconfirmed. SOURCE 0.6.5 is ready for the user to build and manually
-test as AppForge-0.6.5-x86_64.AppImage. Publication is not approved or ready until
+test as TuxShelf-0.6.5-x86_64.AppImage. Publication is not approved or ready until
 that matching build and personal testing are explicitly confirmed. Git metadata
 remains read-only; no staging, commit, fetch, push, tag or upload was performed.
+
+
+## 0.6.6 TuxShelf rename
+
+Rename the application, Python package, executable, resources, desktop identity,
+packaging and public/private project Markdown to TuxShelf. Reuse the existing UI,
+library database, settings, updater and desktop services. Keep the established
+working directory and actual GitHub remote address; do not change Git metadata,
+backups or existing built artifacts. Retain narrowly scoped compatibility for
+earlier libraries, environment overrides, JSON exports and managed shortcuts,
+without modifying application files or adopting foreign/symlink entries. Verify
+imports, packaging paths, startup, desktop integration, data continuity and the
+automated suite; inspect the renamed UI in both themes. No AppImage build or
+publication is authorized by this rename.
+
+### Rename implementation and validation
+
+Implemented source version 0.6.6: renamed the Python package to `tuxshelf`, its
+entry point, resource filenames, desktop identity, KWin callbacks, notifications,
+UI text, packaging, publishing asset selection, scripts and tests. Updated all
+37 project Markdown files, including historical notes and local instructions;
+preserved the real working-directory and configured remote addresses. Current
+public notes are `releases/RELEASE_NOTES_v0.6.6.md` and match the bundled copy.
+
+Compatibility reuses an earlier library in place when no new library database
+exists (even when the new directory is empty), retains existing settings/icons/
+backup paths, accepts earlier environment overrides and library JSON formats,
+retains owned shortcut filenames for existing pins, and refreshes their content
+with TuxShelf branding. Foreign or symlink compatibility entries are not adopted.
+Moved AppImage shortcut repair still requires user consent. Existing legacy
+installations share the old lock/socket identity, and saved window geometry is
+carried forward without overwriting the current preference. No schema migration
+or application-file move is needed.
+
+Validation used installed build-environment dependencies on PYTHONPATH and a
+local runtime read from an existing backup solely for temporary AppImage test
+fixtures. The full suite passed with 909 passed, 12 local TCP/Unix socket skips
+and one Qt drag-event deprecation warning. A subsequent empty-new-directory
+compatibility refinement passed the focused core/autostart/instance/compatibility
+checks: 74 passed, one restricted Unix-socket skip. The renamed offscreen startup
+smoke test passed; library, Settings and release notes were visually checked in
+light/dark themes. Shell syntax, publishing push dry-run and diff whitespace
+checks passed. A path audit confirms every tracked project file retains an
+existing or renamed counterpart. Remaining old-name references are compatibility
+identifiers and actual local/repository addresses.
+
+Existing dist files were hash-checked unchanged. No application AppImage was
+built, renamed or manually tested; source is ready for the user to build and test
+`TuxShelf-0.6.6-x86_64.AppImage`. Git metadata remains read-only here; no staging,
+commit, push, tag, upload or remote repository rename was performed.
+
+
+## 0.6.6 title-bar suffix correction
+
+The main window already requests `TuxShelf <version>`, but Qt platform plugins
+can append the shorter application display name to that title. Set the Qt display
+name to the same full title, while retaining the stable application id and
+desktop-file identity. Update active versions and bundled/public notes. Validate
+actual bootstrap metadata, the main-window title, related GUI tests and the
+startup smoke test; the offscreen backend cannot verify native KDE decorations.
+
+Implemented the title-bar correction within version 0.6.6 with the Qt application display name matching the main
+window's complete `TuxShelf <version>` title. Stable application/desktop ids are
+unchanged. Updated active version declarations, README and matching public and
+bundled 0.6.6 notes; earlier notes retained. Related release-notes, launcher and
+rename-compatibility tests: 46 passed. Actual bootstrap title/display metadata
+was checked in separate light/dark offscreen runs with only the unavailable
+socket guard and interactive event loop substituted. Offscreen startup smoke
+test and diff whitespace check passed. Native KDE decoration requires user
+verification with the rebuilt AppImage; no AppImage was built or modified.
+
+User confirmed the title-bar fix belongs to the ongoing 0.6.6 release. Active
+versions and README were restored to 0.6.6, the fix was merged into its public
+and bundled notes, and the newly created, unpublished 0.6.7 notes were removed.
+The title-bar fix itself remains in place. Existing binaries are untouched.
+
+
+## Confirmed 0.6.6 release preparation
+
+User explicitly requested preparation of 0.6.6, retaining the title-bar fix in
+this version. Previous source release is HEAD 45a68c8 (0.6.5); local release tags
+end at v0.5.4, so the 0.6.5 commit and notes are the comparison baseline. Active
+pyproject, package and README references already agree on 0.6.6. Repository
+identity remains /home/thilen/appforge, main, origin/main and the existing GitHub
+remote. Git metadata remains read-only; no staging or publication is authorized.
+
+Preparation: review the rename/compatibility changes and prior development
+context, finish only the current version's public and bundled notes, explicitly
+explain the distinctive name and changed startup command, polish grammatical
+artifacts of the rename, run the full available automated suite and startup
+checks, and verify every existing dist file remains unchanged. README already
+contains the requested front-page rename explanation and current highlights.
+No roadmap.md is present. Do not build or modify an AppImage or infer manual
+build/test approval from an existing filename or automated metadata inspection.
+
+### 0.6.6 preparation result
+
+Confirmed source 0.6.6 against previous release 0.6.5. Final public notes and
+bundled notes are identical and describe the AppForge-to-TuxShelf rename and
+its rationale, updated application identity/commands, existing-data/export/
+shortcut compatibility and the duplicate-title fix. The command-name change is
+explicitly listed under Breaking changes. No publication date was added. README
+already covers these changes and upgrade guidance. Corrected four remaining
+rename-related articles in import UI/errors, launcher logs and a source comment.
+
+Full automated suite: 910 passed, 12 restricted TCP/Unix socket skips, one Qt
+drag-event deprecation warning, in 120.19 seconds. Focused transfer, compatibility
+and bundled-notes checks after final wording changes: 82 passed. Offscreen
+startup, shell syntax and diff whitespace checks passed. Final bundled notes were
+visually reviewed in both themes. Offline `release --dry-run` passed local checks
+without staging, fetching, committing, pushing or contacting GitHub. Remote
+authentication and release/tag availability remain unverified.
+
+An existing dist/TuxShelf-0.6.6-x86_64.AppImage (84,748,792 bytes, SHA-256
+6986c56c2a9557797344262957e5ad3d19d8c2a16ef91ae1e4af4572018f1d18) has embedded
+name TuxShelf and version 0.6.6, but its bundled notes differ from the finalized
+source notes. Therefore it must be rebuilt from the finalized source and manually
+tested by the user before publishing. This inspection did not execute the binary
+and establishes neither source provenance nor manual testing. All existing dist
+files, including the earlier backup, were hash-checked unchanged. No provenance
+record or test evidence was manufactured. SOURCE is ready for the user to build
+and test; release publication is not ready or approved. Git metadata remains
+read-only here and no Git metadata changes or publication were attempted.

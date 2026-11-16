@@ -22,15 +22,15 @@ installer, dependency or backup changes are needed.
 
 Risks: desktop tray support varies; native host rendering requires manual desktop
 verification. Tray failures must fall back to the main window. Recent launches
-mean launches requested successfully through AppForge, not external desktop use.
+mean launches requested successfully through TuxShelf, not external desktop use.
 
 ## Implemented behavior and validation
 
 Development version: 0.5.8 → 0.5.9. Phase 6 only; Phase 7 remains planned.
 
-Changed files: `src/appforge/ui/tray.py`, `src/appforge/ui/main_window.py`,
-`src/appforge/core/tray.py`, `tests/test_tray.py`, `pyproject.toml`,
-`src/appforge/__init__.py`, `README.md`, `docs/DISCOVERY.md`, this plan,
+Changed files: `src/tuxshelf/ui/tray.py`, `src/tuxshelf/ui/main_window.py`,
+`src/tuxshelf/core/tray.py`, `tests/test_tray.py`, `pyproject.toml`,
+`src/tuxshelf/__init__.py`, `README.md`, `docs/DISCOVERY.md`, this plan,
 local `roadmap.md`, and `releases/RELEASE_NOTES_v0.5.9.md`.
 
 - 19 tray tests passed, covering shortcut preference persistence/corruption, missing
@@ -151,7 +151,7 @@ AppImage testing. Version remains 0.5.9; existing dist files are untouched.
 ## Tray menu and native minimize follow-up plan (0.5.9)
 
 Remove the duplicate Open application library action, signal and handler while
-preserving Open AppForge and its existing filter state. The previous offscreen
+preserving Open TuxShelf and its existing filter state. The previous offscreen
 checks only exercised QWidget.showMinimized. Add regression cases for native
 QWindow minimization when QWidget callbacks are missed or widget state lags.
 Connect native window state/visibility signals on show, coalesce deferred minimize
@@ -165,7 +165,7 @@ compositor/taskbar verification from the offscreen tests.
 ### Native minimize follow-up results
 
 Removed the redundant library menu action, signal and filter-reset handler from
-`ui/tray.py` and `ui/main_window.py`; Open AppForge remains. Updated
+`ui/tray.py` and `ui/main_window.py`; Open TuxShelf remains. Updated
 `tests/test_tray.py`, `tests/test_autostart.py`, README and the existing 0.5.9 notes.
 The five new cases cover missed widget callbacks, delayed widget state, four
 native minimize/restore cycles, restore-before-hide cancellation, and native
@@ -198,10 +198,10 @@ The user confirms the issue persists on CachyOS/KDE Plasma. The prior native Qt
 callbacks cannot cover compositor minimization that Wayland does not report to
 the application. Add an optional `ui/kwin_tray.py` session-only KWin bridge for
 Plasma's Wayland backend: load a temporary script over QtDBus, listen only to this
-process's normal AppForge window, and forward actual minimized/unminimized state
+process's normal TuxShelf window, and forward actual minimized/unminimized state
 to the existing guarded hide helper. Do not infer minimization from focus/exposure.
 Use async D-Bus, ownership-specific script names and a private callback path/token;
-unload and remove the temporary script when background mode is disabled or AppForge
+unload and remove the temporary script when background mode is disabled or TuxShelf
 exits. Preserve native Qt behavior for other desktops/backends. Handle missing,
 denied, restarted or disconnected D-Bus/KWin without crashing. Ensure QtDBus is
 bundled, exercise generated JS with a simulated KWin workspace and test lifecycle /
@@ -210,7 +210,7 @@ no-Qt-event routing. No source version bump, AppImage build or KDE configuration
 ### Plasma-specific implementation and validation
 
 Added `ui/kwin_tray.py` and `tests/test_kwin_tray.py`; connected the bridge to
-`ui/main_window.py` and included QtDBus explicitly in `packaging/appforge.spec`.
+`ui/main_window.py` and included QtDBus explicitly in `packaging/tuxshelf.spec`.
 Updated README, public 0.5.9 notes and local roadmap. The existing Qt event paths
 remain for other desktops and X11. No migration, dependency package addition,
 version bump or KDE configuration change.
@@ -243,7 +243,7 @@ Real KWin/D-Bus end-to-end verification is blocked: an isolated dbus-run-session
 fails to bind its Unix socket with Operation not permitted, and the earlier native
 Wayland probe aborted. These mocks and offscreen tests are not a claim of testing
 KDE's titlebar on CachyOS. Source is ready for the user to build and manually test.
-Exit any old AppForge instance through the tray first: an ordinary second launch
+Exit any old TuxShelf instance through the tray first: an ordinary second launch
 activates the running instance, so rebuilding 0.5.9 without exiting can test the
 old process. No AppImage was built, changed or published during this work.
 
@@ -275,7 +275,7 @@ The complete development file list remains in the sections above and Git status.
 
 Selected local asset (regular, non-symlink, nonempty):
 
-- `dist/AppForge-0.5.9-x86_64.AppImage`
+- `dist/TuxShelf-0.5.9-x86_64.AppImage`
 - Size: **84,638,200 bytes**
 - SHA-256: `b1fae9a96d310b28a8f98a2bba40be5fc7c7999bb08f1c68719a5b1f2a1a90b3`
 

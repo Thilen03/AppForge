@@ -34,7 +34,7 @@ extend only its existing public release notes. No build or publication authorize
 
 ## Implementation
 
-The versioned envelope uses `format: appforge-library`, schema version 1 and an
+The versioned envelope uses `format: tuxshelf-library`, schema version 1 and an
 applications list. Validation completes before preview/registration; 32 MiB file,
 10,000 record and 10 MiB icon limits bound work and memory. JSON duplicate keys,
 unknown fields, malformed types, unsafe IDs and unsupported schemas are rejected.
@@ -80,7 +80,7 @@ are reported; stop/cancel never rolls back or deletes existing application files
   executable-installer test, and the socket single-instance test in `test_v053.py`.
   All setup errors occur while appimagetool builds shared fixtures. Phase 3's
   baseline was 268 passed with these same 3 failures and 31 setup errors.
-- Source `PYTHONPATH=src QT_QPA_PLATFORM=offscreen python3 -m appforge --selftest`:
+- Source `PYTHONPATH=src QT_QPA_PLATFORM=offscreen python3 -m tuxshelf --selftest`:
   **passed**. `git diff --check`: **passed**.
 - Settings, export and import layouts rendered and visually inspected in light
   and dark themes. Long locations/statuses use tooltips; status columns can be
@@ -89,10 +89,10 @@ are reported; stop/cancel never rolls back or deletes existing application files
 
 ## Changed files for Phase 4
 
-- New service: `src/appforge/core/library_transfer.py`.
-- Service integration: `src/appforge/core/library.py`.
-- New UI: `src/appforge/ui/library_transfer_dialog.py`.
-- Entry points: `src/appforge/ui/settings_dialog.py`, `src/appforge/ui/main_window.py`.
+- New service: `src/tuxshelf/core/library_transfer.py`.
+- Service integration: `src/tuxshelf/core/library.py`.
+- New UI: `src/tuxshelf/ui/library_transfer_dialog.py`.
+- Entry points: `src/tuxshelf/ui/settings_dialog.py`, `src/tuxshelf/ui/main_window.py`.
 - New tests: `tests/test_library_transfer.py`.
 - Documentation: `README.md`, `docs/LIBRARY_TRANSFER.md`, this plan and the local-only
   `roadmap.md`. Extended only `releases/RELEASE_NOTES_v0.5.7.md`, preserving its
@@ -110,7 +110,7 @@ workflows. Changed files for both phases are listed here and in `PHASE_3_PLAN.md
 The user reported **manual testing passed** after Phase 4 and requested preparation
 of release 0.5.7. The sole matching local binary is a regular, non-symlink file:
 
-- Asset: `dist/AppForge-0.5.7-x86_64.AppImage`
+- Asset: `dist/TuxShelf-0.5.7-x86_64.AppImage`
 - Size: **84,584,952 bytes**
 - SHA-256: `61491e172f3e30d524038517e8e2d14c0cec2ddf93613cc4c1e8d64a9304c96d`
 

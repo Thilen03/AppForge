@@ -13,22 +13,22 @@ import pytest
 
 from test_gui import qapp  # noqa: F401
 
-from appforge.core.backups import BackupService
-from appforge.core.database import Database, MIGRATIONS
-from appforge.core.desktop.service import DesktopService
-from appforge.core.details import inspect_details
-from appforge.core.discovery import import_candidate, scan
-from appforge.core.library import LibraryService
-from appforge.core.library_transfer import export_library, read_export, preview_import, prepare_import
-from appforge.core.models import AppEntry, UpdateStatus
-from appforge.core.settings import AppSettings
-from appforge.core.storage import scan_storage, cleanup_backups
-from appforge.core.tray import TrayShortcuts
-from appforge.core.updates import installer
-from appforge.core.updates.checker import check_for_update
-from appforge.core.updates.github import Asset, Release
-from appforge.core.updates.notes import cached_notes
-from appforge.core.updates.service import UpdateService
+from tuxshelf.core.backups import BackupService
+from tuxshelf.core.database import Database, MIGRATIONS
+from tuxshelf.core.desktop.service import DesktopService
+from tuxshelf.core.details import inspect_details
+from tuxshelf.core.discovery import import_candidate, scan
+from tuxshelf.core.library import LibraryService
+from tuxshelf.core.library_transfer import export_library, read_export, preview_import, prepare_import
+from tuxshelf.core.models import AppEntry, UpdateStatus
+from tuxshelf.core.settings import AppSettings
+from tuxshelf.core.storage import scan_storage, cleanup_backups
+from tuxshelf.core.tray import TrayShortcuts
+from tuxshelf.core.updates import installer
+from tuxshelf.core.updates.checker import check_for_update
+from tuxshelf.core.updates.github import Asset, Release
+from tuxshelf.core.updates.notes import cached_notes
+from tuxshelf.core.updates.service import UpdateService
 
 
 class Response(io.BytesIO):
@@ -237,8 +237,8 @@ def test_failed_install_preserves_app_backups_and_closes_temp(tmp_path, monkeypa
 def test_hidden_window_checks_and_updates_batch_through_workers(service, tmp_path, monkeypatch, qapp):
     from PySide6.QtGui import QIcon
     from PySide6.QtWidgets import QMessageBox
-    import appforge.core.updates.checker as checker
-    import appforge.ui.main_window as main_window
+    import tuxshelf.core.updates.checker as checker
+    import tuxshelf.ui.main_window as main_window
     from test_gui import wait_for
 
     monkeypatch.setattr(main_window, 'tray_available', lambda: True)
@@ -285,7 +285,7 @@ def test_hidden_window_checks_and_updates_batch_through_workers(service, tmp_pat
             assert inspect_details(saved).backup_count == 1
             assert cached_notes(saved)['body'] == '## Updated'
         assert '0 application updates' in window.tray.status_action.text()
-        assert len(notices) == 1 and notices[0][0] == 'AppForge updates finished'
+        assert len(notices) == 1 and notices[0][0] == 'TuxShelf updates finished'
         assert not window.isVisible()
     finally:
         window._quitting = True
@@ -299,7 +299,7 @@ def test_hidden_window_checks_and_updates_batch_through_workers(service, tmp_pat
 def test_drag_drop_routes_only_local_file_to_existing_add_flow(service, tmp_path, monkeypatch, qapp):
     from PySide6.QtCore import QMimeData, QPoint, QPointF, Qt, QUrl
     from PySide6.QtGui import QDragEnterEvent, QDropEvent
-    from appforge.ui.main_window import MainWindow
+    from tuxshelf.ui.main_window import MainWindow
     from test_gui import wait_for
 
     window = MainWindow(service)

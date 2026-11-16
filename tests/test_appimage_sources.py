@@ -8,13 +8,13 @@ from PySide6.QtWidgets import QMessageBox
 
 from test_gui import qapp  # noqa: F401
 from test_discovery import wait
-from appforge.core.discovery import scan
-from appforge.core.formats.appimage_update import (
+from tuxshelf.core.discovery import scan
+from tuxshelf.core.formats.appimage_update import (
     MAX_UPDATE_BYTES, SUGGESTED_SOURCE_KEY, read_update_information, suggest_source,
 )
-from appforge.core.library import inspect_file
-from appforge.ui.dialogs import AddApplicationDialog
-from appforge.ui.discovery_dialog import DiscoveryDialog
+from tuxshelf.core.library import inspect_file
+from tuxshelf.ui.dialogs import AddApplicationDialog
+from tuxshelf.ui.discovery_dialog import DiscoveryDialog
 
 INFO = 'gh-releases-zsync|ExampleOrg|ExampleApp|latest|ExampleApp-*.AppImage.zsync'
 SOURCE = 'https://github.com/ExampleOrg/ExampleApp'
@@ -219,8 +219,8 @@ def test_real_packaged_appimage_info_and_nonexecuting_inspection(fixtures, tmp_p
 
 
 def test_download_source_takes_precedence_over_embedded_hint(qapp, tmp_path, service):
-    from appforge.core.downloads import DownloadChoice, DownloadResult, file_signature
-    from appforge.core.updates.github import Asset, Release
+    from tuxshelf.core.downloads import DownloadChoice, DownloadResult, file_signature
+    from tuxshelf.core.updates.github import Asset, Release
     path = image(tmp_path / 'Downloaded.AppImage')
     chosen_source = 'https://codeberg.org/chosen/repository'
     asset = Asset('Downloaded.AppImage', 'https://codeberg.org/chosen/repository/releases/download/v5/Downloaded.AppImage')
@@ -237,7 +237,7 @@ def test_download_source_takes_precedence_over_embedded_hint(qapp, tmp_path, ser
 
 @pytest.mark.parametrize('chosen', ['', 'https://codeberg.org/my/project'])
 def test_typing_before_inspection_finishes_is_preserved(qapp, tmp_path, service, monkeypatch, chosen):
-    import appforge.ui.dialogs as module
+    import tuxshelf.ui.dialogs as module
     class Pool:
         def start(self, job):
             pass
@@ -252,7 +252,7 @@ def test_typing_before_inspection_finishes_is_preserved(qapp, tmp_path, service,
 
 
 def test_old_inspection_cannot_fill_source_after_duplicate_file_selection(qapp, tmp_path, service, monkeypatch):
-    import appforge.ui.dialogs as module
+    import tuxshelf.ui.dialogs as module
     class Pool:
         def start(self, job):
             pass

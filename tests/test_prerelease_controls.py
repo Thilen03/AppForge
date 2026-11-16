@@ -4,14 +4,14 @@ from types import SimpleNamespace
 import pytest
 from PySide6.QtWidgets import QMessageBox
 
-from appforge.core.database import Database
-from appforge.core.models import AppEntry, UpdateStatus
-from appforge.core.update_policy import updates_paused
-from appforge.core.updates.checker import check_for_update
-from appforge.core.updates.github import Asset, Release
-from appforge.core.updates.service import can_update
-from appforge.ui.main_window import MainWindow
-from appforge.ui.popups import RoundedMenu
+from tuxshelf.core.database import Database
+from tuxshelf.core.models import AppEntry, UpdateStatus
+from tuxshelf.core.update_policy import updates_paused
+from tuxshelf.core.updates.checker import check_for_update
+from tuxshelf.core.updates.github import Asset, Release
+from tuxshelf.core.updates.service import can_update
+from tuxshelf.ui.main_window import MainWindow
+from tuxshelf.ui.popups import RoundedMenu
 from test_gui import qapp, wait_for  # noqa: F401
 
 

@@ -4,14 +4,14 @@ import json
 
 import pytest
 
-from appforge.core.formats.appimage import version_from_filename
-from appforge.core.formats.base import AppMetadata
-from appforge.core.models import UpdateStatus
-from appforge.core.updates import checker
-from appforge.core.updates.providers import SelfHostedClient
-from appforge.core.updates.version import compare
-from appforge.ui.dialogs import EditApplicationDialog
-from appforge.ui.main_window import MainWindow
+from tuxshelf.core.formats.appimage import version_from_filename
+from tuxshelf.core.formats.base import AppMetadata
+from tuxshelf.core.models import UpdateStatus
+from tuxshelf.core.updates import checker
+from tuxshelf.core.updates.providers import SelfHostedClient
+from tuxshelf.core.updates.version import compare
+from tuxshelf.ui.dialogs import EditApplicationDialog
+from tuxshelf.ui.main_window import MainWindow
 from test_gui import qapp, wait_for  # noqa: F401
 
 ROOT = 'https://git.magicbean.dev/MagicBeanDev/Longshot'
@@ -94,7 +94,7 @@ def test_numbered_nightly_filename_and_comparison_ignore_commit_hash():
 
 
 def test_prerelease_status_keeps_source_and_explains_opt_in(qapp, service, tmp_path):
-    from appforge.core.models import AppEntry
+    from tuxshelf.core.models import AppEntry
     entry = AppEntry(name='Longshot', path=str(tmp_path / 'Longshot.AppImage'), github_repo=ROOT,
                      installed_version='nightly-144-a636846b')
     service.db.add(entry)

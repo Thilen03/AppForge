@@ -10,16 +10,16 @@ import pytest
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QDialog, QFileDialog
 
-from appforge.core import downloads
-from appforge.core.database import Database
-from appforge.core.discovery import ROOTS_KEY, load_paths, save_paths
-from appforge.core.downloads import download_application, download_choices, fetch_releases, validate_downloaded
-from appforge.core.library import LibraryError
-from appforge.core.updates import installer
-from appforge.core.updates.github import Asset, GitHubError, Release
-from appforge.ui.dialogs import AddApplicationDialog
-from appforge.ui.download_dialog import AddSourceDialog, DownloadApplicationDialog
-from appforge.ui.main_window import MainWindow
+from tuxshelf.core import downloads
+from tuxshelf.core.database import Database
+from tuxshelf.core.discovery import ROOTS_KEY, load_paths, save_paths
+from tuxshelf.core.downloads import download_application, download_choices, fetch_releases, validate_downloaded
+from tuxshelf.core.library import LibraryError
+from tuxshelf.core.updates import installer
+from tuxshelf.core.updates.github import Asset, GitHubError, Release
+from tuxshelf.ui.dialogs import AddApplicationDialog
+from tuxshelf.ui.download_dialog import AddSourceDialog, DownloadApplicationDialog
+from tuxshelf.ui.main_window import MainWindow
 from test_gui import qapp, wait_for  # noqa: F401
 
 SOURCE = 'https://github.com/o/r'
@@ -288,7 +288,7 @@ def test_add_source_chooser_routes_selection(qapp, mode):
 
 
 def test_main_window_local_and_drag_drop_preserve_existing_add_form(qapp, service, tmp_path, monkeypatch):
-    from appforge.ui import download_dialog, main_window
+    from tuxshelf.ui import download_dialog, main_window
     calls = []
     monkeypatch.setattr(download_dialog.AddSourceDialog, 'exec', lambda self: self._choose('local') or QDialog.Accepted)
     monkeypatch.setattr(main_window.AddApplicationDialog, 'exec', lambda self: calls.append(self.path_edit.text()) or QDialog.Rejected)

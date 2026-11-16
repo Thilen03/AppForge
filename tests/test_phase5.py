@@ -12,25 +12,25 @@ from pathlib import Path
 
 import pytest
 
-from appforge.core.database import Database
-from appforge.core.formats import FORMATS, detect_format, get_format
-from appforge.core.formats.executable import ExecutableFormat, executable_kind
-from appforge.core.library import LibraryError, normalize_repo
-from appforge.core.models import AppEntry, UpdateStatus
-from appforge.core.organize import (
+from tuxshelf.core.database import Database
+from tuxshelf.core.formats import FORMATS, detect_format, get_format
+from tuxshelf.core.formats.executable import ExecutableFormat, executable_kind
+from tuxshelf.core.library import LibraryError, normalize_repo
+from tuxshelf.core.models import AppEntry, UpdateStatus
+from tuxshelf.core.organize import (
     ALL, ATTENTION, SORT_RECENT, SORT_STATUS, UNLINKED, UPDATES, Filter, categories_in_use,
     category_of, category_suggestions, derived_category, matches, sort_entries,
 )
-from appforge.core.settings import AppSettings
-from appforge.core.updates import installer
-from appforge.core.updates.assets import choose_asset, is_executable_name
-from appforge.core.updates.checker import check_for_update
-from appforge.core.updates.github import Asset, GitHubError, Release
-from appforge.core.updates.providers import (
+from tuxshelf.core.settings import AppSettings
+from tuxshelf.core.updates import installer
+from tuxshelf.core.updates.assets import choose_asset, is_executable_name
+from tuxshelf.core.updates.checker import check_for_update
+from tuxshelf.core.updates.github import Asset, GitHubError, Release
+from tuxshelf.core.updates.providers import (
     ForgejoClient, GitLabClient, SelfHostedClient, client_for, parse_source,
 )
-from appforge.core.updates.service import NOTIFIED_KEY, UpdateService
-from appforge.services.notifier import summarize_updates
+from tuxshelf.core.updates.service import NOTIFIED_KEY, UpdateService
+from tuxshelf.services.notifier import summarize_updates
 
 ELF = b"\x7fELF" + b"\x02\x01\x01" + b"\x00" * 600
 
@@ -337,7 +337,7 @@ def test_install_executable_update_validates_backs_up_with_bak_suffix(tmp_path, 
 
 
 def test_rollback_of_an_executable_uses_bak_backups(service, tmp_path):
-    from appforge.core.backups import BackupService, is_backup_file
+    from tuxshelf.core.backups import BackupService, is_backup_file
     p = make_exec(tmp_path / "bin", "tool", ELF + b"v2")
     e = service.add_application(str(p))
     bdir = p.parent / ".tool.backups"
@@ -453,7 +453,7 @@ def test_notify_once_per_version(service, tmp_path):
 
 
 def test_notified_marker_survives_a_new_check_result(service, tmp_path):
-    from appforge.core.updates.checker import CheckOutcome
+    from tuxshelf.core.updates.checker import CheckOutcome
     svc = UpdateService(service)
     e = avail(service, tmp_path)
     svc.mark_notified(e.id)

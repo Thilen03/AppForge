@@ -1,14 +1,14 @@
-# AppForge v0.5.0 – Expanded Application Support & Update Management
+# TuxShelf v0.5.0 – Expanded Application Support & Update Management
 
-AppForge 0.5.0 is a major update that expands application format support, introduces additional Git hosting providers, and adds background update management, notifications, categories, filtering, and a dedicated settings interface.
+TuxShelf 0.5.0 is a major update that expands application format support, introduces additional Git hosting providers, and adds background update management, notifications, categories, filtering, and a dedicated settings interface.
 
-This release moves AppForge beyond AppImage-only management, making it possible to manage standalone Linux executables and scripts as well.
+This release moves TuxShelf beyond AppImage-only management, making it possible to manage standalone Linux executables and scripts as well.
 
 ## ✨ New Features
 
 ### 🌐 Multiple Update Sources
 
-AppForge now supports three Git hosting providers:
+TuxShelf now supports three Git hosting providers:
 
 - **GitHub**
 - **GitLab.com**
@@ -26,7 +26,7 @@ Features include:
 
 ### ⚙️ Standalone Executable Support
 
-AppForge can now manage standalone Linux executables and scripts in addition to AppImages.
+TuxShelf can now manage standalone Linux executables and scripts in addition to AppImages.
 
 Supported formats:
 
@@ -74,7 +74,7 @@ The filter controls automatically disappear when the library is empty.
 
 ### 🔄 Background Update Checks
 
-AppForge can now check for updates automatically while running in the background.
+TuxShelf can now check for updates automatically while running in the background.
 
 Features include:
 
@@ -93,7 +93,7 @@ Features include:
 
 ### 🔔 Update Notifications
 
-AppForge now notifies you when new application updates are discovered.
+TuxShelf now notifies you when new application updates are discovered.
 
 Features include:
 
@@ -101,7 +101,7 @@ Features include:
 - Each version is announced only once.
 - Uses system tray notifications when available.
 - Falls back to `notify-send` when the tray icon is unavailable.
-- Avoids unnecessary notifications when AppForge is already in the foreground.
+- Avoids unnecessary notifications when TuxShelf is already in the foreground.
 - Avoids notifications for manually triggered update checks.
 - Combines multiple available updates into a single notification.
 - Displays up to four application names, followed by a count of additional updates.
@@ -109,16 +109,16 @@ Features include:
 
 ### 🖥️ System Tray Integration
 
-AppForge can optionally continue running in the system tray after its main window is closed.
+TuxShelf can optionally continue running in the system tray after its main window is closed.
 
 Features include:
 
 - Optional **Keep running in the system tray** setting.
 - Closing the window hides it instead of exiting.
 - Tray menu actions:
-  - Open AppForge
+  - Open TuxShelf
   - Check for updates now
-  - Quit AppForge
+  - Quit TuxShelf
 - Proper application shutdown when selecting Quit.
 - Confirmation before quitting if a download is currently running.
 - Tray functionality is disabled automatically when the desktop environment does not provide a system tray.
@@ -221,15 +221,15 @@ The following features remain planned:
 
 - Automatic unpacking of archives containing standalone executables.
 - Support for self-hosted GitLab and Forgejo servers.
-- Start AppForge automatically at login.
+- Start TuxShelf automatically at login.
 - Secure API token storage through the system keyring.
 - GPG and minisign signature verification.
-- Rebuilding and publishing the AppForge AppImage for this release.
+- Rebuilding and publishing the TuxShelf AppImage for this release.
 
 ## 🎯 Release Summary
 
-AppForge 0.5.0 significantly expands the application's capabilities.
+TuxShelf 0.5.0 significantly expands the application's capabilities.
 
-With support for multiple Git hosting providers, standalone Linux executables, background update checks, notifications, system tray operation, and improved library organization, AppForge is becoming a more complete application management solution for Linux.
+With support for multiple Git hosting providers, standalone Linux executables, background update checks, notifications, system tray operation, and improved library organization, TuxShelf is becoming a more complete application management solution for Linux.
 
 **Manage your applications. Automate your updates. Stay in control.**

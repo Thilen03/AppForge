@@ -1,4 +1,4 @@
-# AppForge 0.5.4
+# TuxShelf 0.5.4
 
 ## Modified functionality
 - **Settings button is now a gear.** It is an icon-only button in the bottom-right corner of the window
@@ -9,7 +9,7 @@
   URL on another host is accepted, e.g. `https://git.magicbean.dev/MagicBeanDev/Longshot`. Accepted forms:
   `https://host/owner/repo`, `host/owner/repo(.git)`, `git@host:owner/repo.git`, release/`src` page URLs
   (trimmed to the repository), `host:port`, and nested `group/sub/project` paths.
-  - For such hosts AppForge asks the Forgejo/Gitea release API first and then GitLab's, and remembers which
+  - For such hosts TuxShelf asks the Forgejo/Gitea release API first and then GitLab's, and remembers which
     one answered. Network and rate-limit errors are reported straight away (no second probe).
   - Safety is unchanged or stricter: unknown hosts must use `https://` (plain `http://` and URLs with
     embedded credentials are rejected), the GitHub token is never sent to them, and only `https://`

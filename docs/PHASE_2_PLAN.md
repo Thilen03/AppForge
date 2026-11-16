@@ -25,7 +25,7 @@ plain text. Missing descriptions, versions, dates, inaccessible files and backup
 scan failures have explicit fallback text.
 
 Release access opens the existing provider release page. Fetching and rendering
-release descriptions inside AppForge remains Phase 3. Backup and rollback actions
+release descriptions inside TuxShelf remains Phase 3. Backup and rollback actions
 open the existing management dialog; their underlying operations are unchanged.
 
 ## Validation
@@ -62,7 +62,7 @@ works; that confirmation does not establish testing of a final release binary.
   the provider injected-client expectation in `test_phase5.py`, the socket-based
   executable installer test there, and the single-instance socket test in
   `test_v053.py`. Setup errors occur when appimagetool builds shared fixtures.
-- `PYTHONPATH=src QT_QPA_PLATFORM=offscreen python3 -m appforge --selftest` passed.
+- `PYTHONPATH=src QT_QPA_PLATFORM=offscreen python3 -m tuxshelf --selftest` passed.
 - Light/dark details, discovery selection and Settings layouts were inspected
   during development. Whitespace validation passed.
 - No application database migrations, builds, commits, pushes, or uploads were
@@ -71,16 +71,16 @@ works; that confirmation does not establish testing of a final release binary.
 
 ### Changed files for this release
 
-- Versions/documentation: `pyproject.toml`, `src/appforge/__init__.py`, `README.md`,
+- Versions/documentation: `pyproject.toml`, `src/tuxshelf/__init__.py`, `README.md`,
   `docs/DISCOVERY.md`, `docs/PHASE_2_PLAN.md`, and
   `releases/RELEASE_NOTES_v0.5.6.md`. The local roadmap was also updated.
-- Details: `src/appforge/core/details.py`, `src/appforge/ui/details_dialog.py`,
-  `src/appforge/core/backups/service.py`, `src/appforge/ui/app_card.py`, and
-  `src/appforge/ui/main_window.py`.
-- Update checks: `src/appforge/core/formats/appimage.py`,
-  `src/appforge/core/updates/checker.py`, `src/appforge/core/updates/service.py`,
-  and `src/appforge/core/updates/version.py`.
-- Visual refinements: `src/appforge/ui/discovery_dialog.py`,
-  `src/appforge/ui/theme.py`, and the main-window changes listed above.
+- Details: `src/tuxshelf/core/details.py`, `src/tuxshelf/ui/details_dialog.py`,
+  `src/tuxshelf/core/backups/service.py`, `src/tuxshelf/ui/app_card.py`, and
+  `src/tuxshelf/ui/main_window.py`.
+- Update checks: `src/tuxshelf/core/formats/appimage.py`,
+  `src/tuxshelf/core/updates/checker.py`, `src/tuxshelf/core/updates/service.py`,
+  and `src/tuxshelf/core/updates/version.py`.
+- Visual refinements: `src/tuxshelf/ui/discovery_dialog.py`,
+  `src/tuxshelf/ui/theme.py`, and the main-window changes listed above.
 - Tests: `tests/test_details.py`, `tests/test_selfhosted_updates.py`, and
   `tests/test_v053_gui.py`.

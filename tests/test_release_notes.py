@@ -8,14 +8,14 @@ import pytest
 from PySide6.QtCore import QThreadPool, QUrl
 from PySide6.QtGui import QTextDocument
 
-from appforge.core.models import UpdateStatus
-from appforge.core.updates.checker import check_for_update, CheckOutcome
-from appforge.core.updates.github import Asset, GitHubClient, GitHubError, Release
-from appforge.core.updates.providers import ForgejoClient, GitLabClient, SelfHostedClient
-from appforge.core.updates.notes import cached_notes, fetch_notes, release_notes
-from appforge.core.updates.service import UpdateService
-from appforge.ui.main_window import MainWindow
-from appforge.ui.release_notes_dialog import NotesDocument, open_web_link
+from tuxshelf.core.models import UpdateStatus
+from tuxshelf.core.updates.checker import check_for_update, CheckOutcome
+from tuxshelf.core.updates.github import Asset, GitHubClient, GitHubError, Release
+from tuxshelf.core.updates.providers import ForgejoClient, GitLabClient, SelfHostedClient
+from tuxshelf.core.updates.notes import cached_notes, fetch_notes, release_notes
+from tuxshelf.core.updates.service import UpdateService
+from tuxshelf.ui.main_window import MainWindow
+from tuxshelf.ui.release_notes_dialog import NotesDocument, open_web_link
 from test_details import add_script
 from test_gui import qapp, wait_for  # noqa: F401
 

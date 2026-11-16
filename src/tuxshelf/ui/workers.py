@@ -1,0 +1,119 @@
+"""Background jobs. They run pure functions from core.updates and report back by signal;
+all database writes happen on the main thread."""
+from __future__ import annotations
+
+import threading
+import logging
+
+from PySide6.QtCore import QObject, QRunnable, Signal
+
+from ..core.selfupdate import check_self_update, install_self_update
+from ..core.updates.checker import CheckOutcome, check_for_update
+from ..core.models import UpdateStatus
+from ..core.updates.installer import InstallError, install_update
+
+
+class JobSignals(QObject):
+    done = Signal(str, object)          # app_id, CheckOutcome | InstallResult | InstallError
+    progress = Signal(str, int, int)    # app_id, bytes_done, bytes_total
+
+
+class CheckJob(QRunnable):
+    def __init__(self, app_id: str, **kwargs):
+        super().__init__()
+        self.app_id, self.kwargs, self.signals = app_id, kwargs, JobSignals()
+
+    def run(self):
+        try:
+            result = check_for_update(**self.kwargs)
+        except Exception as exc:  # a provider/file error must always release the busy state
+            logging.getLogger(__name__).exception("Update check failed for %s", self.app_id)
+            result = CheckOutcome(UpdateStatus.FAILED, f"Update check failed: {exc}")
+        self.signals.done.emit(self.app_id, result)
+
+
+class InstallJob(QRunnable):
+    def __init__(self, app_id: str, path: str, asset: dict, assets: list[dict], old_version: str | None,
+                 format_id: str = "appimage"):
+        super().__init__()
+        self.app_id, self.signals = app_id, JobSignals()
+        self._args = (path, asset, assets, old_version, format_id)
+        self.cancel = threading.Event()
+
+    def run(self):
+        path, asset, assets, old_version, format_id = self._args
+        try:
+            result = install_update(
+                path, asset, assets, old_version=old_version, cancel=self.cancel, format_id=format_id,
+                progress=lambda done, total: self.signals.progress.emit(self.app_id, done, total))
+        except InstallError as exc:
+            result = exc
+        except Exception as exc:  # noqa: BLE001 - never let a worker die silently
+            result = InstallError(f"Unexpected error: {exc}")
+        self.signals.done.emit(self.app_id, result)
+
+
+class SelfUpdateSignals(QObject):
+    found = Signal(object)              # SelfUpdate
+
+
+class SelfUpdateJob(QRunnable):
+    def __init__(self, client=None, token: str | None = None):
+        super().__init__()
+        self._client, self._token, self.signals = client, token, SelfUpdateSignals()
+
+    def run(self):
+        try:
+            found = check_self_update(self._client, self._token)
+        except Exception:  # noqa: BLE001 - a failed self-check must never disturb startup
+            return
+        if found:
+            self.signals.found.emit(found)
+
+
+class SelfInstallSignals(QObject):
+    progress = Signal(int, int)         # bytes_done, bytes_total
+    done = Signal(object)               # InstallResult | InstallError
+
+
+class SelfInstallJob(QRunnable):
+    """Downloads the new TuxShelf AppImage and swaps it in (the running copy keeps working)."""
+
+    def __init__(self, update):
+        super().__init__()
+        self._update, self.signals = update, SelfInstallSignals()
+        self.cancel = threading.Event()
+
+    def run(self):
+        try:
+            result = install_self_update(
+                self._update, progress=lambda done, total: self.signals.progress.emit(done, total),
+                cancel=self.cancel)
+        except InstallError as exc:
+            result = exc
+        except Exception as exc:  # noqa: BLE001 - never let a worker die silently
+            result = InstallError(f"Unexpected error: {exc}")
+        self.signals.done.emit(result)
+
+
+class DiscoverySignals(QObject):
+    progress = Signal(int, str)
+    done = Signal(object)
+
+
+class DiscoveryJob(QRunnable):
+    """A read-only scan; receives plain snapshots, never the live SQLite connection."""
+
+    def __init__(self, roots, registered, ignored):
+        super().__init__()
+        self.signals = DiscoverySignals()
+        self.cancel = threading.Event()
+        self.args = roots, registered, ignored
+
+    def run(self):
+        from ..core.discovery import ScanResult, scan
+        try:
+            result = scan(*self.args, cancel=self.cancel, progress=self.signals.progress.emit)
+        except Exception as exc:  # keep cancellation/closure working even for unexpected errors
+            result = ScanResult(errors=[f"Discovery failed: {exc}"])
+        self.signals.done.emit(result)

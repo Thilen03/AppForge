@@ -13,7 +13,7 @@ user saves unrelated edits. Map recognizable legacy standard categories to the
 shared desktop category; arbitrary legacy names remain readable until the user
 chooses a replacement. An existing explicit desktop category takes precedence when
 old records contain conflicting values. Automatic continues to use embedded
-metadata, with Other for unclassified files in AppForge.
+metadata, with Other for unclassified files in TuxShelf.
 
 Affected files: core desktop category resolution, core organize category labels,
 Add/Edit dialogs, category regression tests, README and this guide. Reuse existing
@@ -24,7 +24,7 @@ transfer and automatic reset; inspect both themes and run full regression/smoke.
 
 ## Using the shared category
 
-In Add or Edit, select **Category** and save. AppForge uses the choice for category
+In Add or Edit, select **Category** and save. TuxShelf uses the choice for category
 filters and category searches, even if **Add to the application menu** is disabled.
 When menu integration is enabled, the same choice updates the existing launcher;
 its desktop-file ID remains unchanged, preserving pinned shortcuts. **Automatic**
@@ -33,7 +33,7 @@ removes your explicit choice and uses the embedded application metadata.
 The dropdown uses the existing standard desktop categories and their display
 names, including Games, Internet, Multimedia, Science & Math, and Utilities. It
 does not discover custom or renamed sections from a user's Plasma menu setup.
-Unclassified automatic entries continue to appear under Other in AppForge.
+Unclassified automatic entries continue to appear under Other in TuxShelf.
 
 Existing explicit desktop categories win over old library-only overrides. Existing
 standard library categories (for example Games) are recognized in both places and
@@ -59,4 +59,4 @@ clears an old custom category. Cancelling changes preserves the original record.
   README and this guide. Earlier Phase 7 work remains preserved.
 - No new database migration or runtime dependency. The user subsequently confirmed
   0.6.0 as the working version; active declarations and matching public release
-  notes now include this change. No AppForge binary build or publishing operation.
+  notes now include this change. No TuxShelf binary build or publishing operation.

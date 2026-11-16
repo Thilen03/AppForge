@@ -6,16 +6,16 @@ from PySide6.QtCore import QPoint, QTimer, Qt
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QDialog, QDialogButtonBox, QLabel, QMessageBox, QPushButton
 
-from appforge.core.bulk import BulkActions, UpdatePreferences
-from appforge.core.database import Database
-from appforge.core.desktop import DesktopError, MENU_CATEGORY_KEY
-from appforge.core.library import LibraryError
-from appforge.core.models import UpdateStatus
-from appforge.core.organize import category_of
-from appforge.core.update_policy import PAUSED_KEY, SKIPPED_KEY
-from appforge.ui.bulk_dialog import BulkUpdateDialog
-from appforge.ui.main_window import MainWindow
-from appforge.ui.popups import RoundedComboBox
+from tuxshelf.core.bulk import BulkActions, UpdatePreferences
+from tuxshelf.core.database import Database
+from tuxshelf.core.desktop import DesktopError, MENU_CATEGORY_KEY
+from tuxshelf.core.library import LibraryError
+from tuxshelf.core.models import UpdateStatus
+from tuxshelf.core.organize import category_of
+from tuxshelf.core.update_policy import PAUSED_KEY, SKIPPED_KEY
+from tuxshelf.ui.bulk_dialog import BulkUpdateDialog
+from tuxshelf.ui.main_window import MainWindow
+from tuxshelf.ui.popups import RoundedComboBox
 from test_gui import qapp, wait_for  # noqa: F401
 from test_tray import add
 

@@ -1,4 +1,4 @@
-# AppForge 0.6.3
+# TuxShelf 0.6.3
 
 ## New features
 
@@ -20,7 +20,7 @@
 
 ## Improvements
 
-- Your chosen launch profile stays selected while the AppForge window is open,
+- Your chosen launch profile stays selected while the TuxShelf window is open,
   including after card refreshes. New sessions start with Default.
 - Use **Select visible** to select apps matching the current search and filters.
   Sorting and card refreshes preserve selection; apps hidden by a filter are
@@ -31,14 +31,14 @@
   completed changes. Busy apps are skipped and individual failures are reported
   without stopping the remaining apps.
 - Removing selected entries requires confirmation and preserves application files
-  and backups. AppForge's menu shortcuts and stored icons are removed with the
+  and backups. TuxShelf's menu shortcuts and stored icons are removed with the
   entries.
 - Changing update channels or asset patterns clears cached update targets. Use
   **Check for updates** afterward to find releases matching the new settings.
 
 ## Installation/upgrade instructions
 
-Once published, use AppForge's self-update or download
-`AppForge-0.6.3-x86_64.AppImage`, make it executable and launch it. Existing
+Once published, use TuxShelf's self-update or download
+`TuxShelf-0.6.3-x86_64.AppImage`, make it executable and launch it. Existing
 applications and preferences are retained; no database migration is required.
-Older AppForge versions may reject library exports containing launch profiles.
+Older TuxShelf versions may reject library exports containing launch profiles.

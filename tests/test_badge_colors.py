@@ -9,14 +9,14 @@ from PySide6.QtWidgets import QLabel
 
 from test_gui import qapp  # noqa: F401
 from test_tray import add, window  # noqa: F401
-from appforge.core.database import Database
-from appforge.core.library import FileState
-from appforge.core.models import AppEntry, UpdateStatus
-from appforge.core.settings import CARD_BADGES, AppSettings
-from appforge.ui import theme
-from appforge.ui.app_card import AppCard
-from appforge.ui.settings_dialog import SettingsDialog
-from appforge.ui.main_window import MainWindow
+from tuxshelf.core.database import Database
+from tuxshelf.core.library import FileState
+from tuxshelf.core.models import AppEntry, UpdateStatus
+from tuxshelf.core.settings import CARD_BADGES, AppSettings
+from tuxshelf.ui import theme
+from tuxshelf.ui.app_card import AppCard
+from tuxshelf.ui.settings_dialog import SettingsDialog
+from tuxshelf.ui.main_window import MainWindow
 
 
 def test_settings_validation_and_reopen(service):
@@ -44,10 +44,10 @@ def test_dialog_picker_cancel_save_and_resets(qapp, service, monkeypatch):
     settings = AppSettings(service.db)
     dialog = SettingsDialog(settings, False)
     assert set(dialog.badge_buttons) == set(CARD_BADGES)
-    monkeypatch.setattr('appforge.ui.settings_dialog.QColorDialog.getColor', lambda *args: QColor())
+    monkeypatch.setattr('tuxshelf.ui.settings_dialog.QColorDialog.getColor', lambda *args: QColor())
     dialog.badge_buttons['failed'].click()
     assert dialog.badge_colors == {}
-    monkeypatch.setattr('appforge.ui.settings_dialog.QColorDialog.getColor', lambda *args: QColor('#FF00AA'))
+    monkeypatch.setattr('tuxshelf.ui.settings_dialog.QColorDialog.getColor', lambda *args: QColor('#FF00AA'))
     dialog.badge_buttons['failed'].click()
     assert dialog.badge_colors == {'failed': '#FF00AA'}
     assert settings.card_badge_colors == {}

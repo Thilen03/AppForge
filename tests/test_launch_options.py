@@ -7,21 +7,21 @@ from pathlib import Path
 
 import pytest
 
-from appforge.core.database import Database
-from appforge.core.desktop import DesktopError, render_entry
-from appforge.core.launch_options import (
+from tuxshelf.core.database import Database
+from tuxshelf.core.desktop import DesktopError, render_entry
+from tuxshelf.core.launch_options import (
     ARGUMENTS, DIRECTORY, TERMINAL, LaunchOptionsError, options_of, parse_arguments,
     validate_launch_options,
 )
-from appforge.core.library import LibraryError, LibraryService
-from appforge.core.library_transfer import export_library, read_export, preview_import, prepare_import, validate_record, TransferError
-from appforge.core.models import AppEntry
-from appforge.core.updates.installer import InstallResult, backup_dir_for
-from appforge.core.updates.service import UpdateService
-from appforge.core.backups import BackupService
-from appforge.services import launcher
-from appforge.ui.dialogs import AddApplicationDialog, EditApplicationDialog
-from appforge.ui.launch_options_dialog import LaunchOptionsDialog
+from tuxshelf.core.library import LibraryError, LibraryService
+from tuxshelf.core.library_transfer import export_library, read_export, preview_import, prepare_import, validate_record, TransferError
+from tuxshelf.core.models import AppEntry
+from tuxshelf.core.updates.installer import InstallResult, backup_dir_for
+from tuxshelf.core.updates.service import UpdateService
+from tuxshelf.core.backups import BackupService
+from tuxshelf.services import launcher
+from tuxshelf.ui.dialogs import AddApplicationDialog, EditApplicationDialog
+from tuxshelf.ui.launch_options_dialog import LaunchOptionsDialog
 from test_desktop import parse_exec, read_entry_from_text
 from test_gui import qapp, wait_for  # noqa: F401
 

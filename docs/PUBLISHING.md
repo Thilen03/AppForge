@@ -1,6 +1,11 @@
-# Publishing AppForge from the local checkout
+# Publishing TuxShelf from the local checkout
 
-Run these commands in a Linux terminal from `/home/thilen/appforge/`.
+Run these commands in a Linux terminal from `/home/thilen/tuxshelf/`.
+The source package, working directory and new assets use TuxShelf. The configured
+GitHub remote remains `https://github.com/Thilen03/AppForge.git`. The publisher checks
+that existing remote and selects only `TuxShelf-<version>-x86_64.AppImage`; it never
+renames or uploads an older binary to make it match the new branding.
+
 Python 3.10+ and Git are required; releases additionally require authenticated `gh`.
 The ChatGPT source-folder sandbox may allow source edits while protecting `.git`;
 that is why publishing is performed from the user's terminal.
@@ -45,7 +50,7 @@ will inspect the current version, previous release notes/tags and verified chang
 If no version was specified, it will propose one and wait for your confirmation.
 It updates relevant version declarations, public README/docs and tests as needed,
 and creates `releases/RELEASE_NOTES_v<version>.md` with the heading
-`# AppForge <version>`. Keep `src/appforge/resources/release_notes.md` identical
+`# TuxShelf <version>`. Keep `src/tuxshelf/resources/release_notes.md` identical
 to those current public notes so the packaged offline popup shows the same text.
 Dates are included only when confirmed. Notes describe
 verified user-visible changes and omit empty sections; historical notes remain
@@ -81,7 +86,7 @@ publication may already have succeeded if a later step fails. Existing local
 release files are never deleted or overwritten by the publisher.
 
 The selected asset is the highest SemVer file matching
-`dist/AppForge-<version>-x86_64.AppImage`. Numeric version ordering is used;
+`dist/TuxShelf-<version>-x86_64.AppImage`. Numeric version ordering is used;
 prereleases sort below their stable version. Build metadata does not affect order;
 equal-precedence candidates stop as ambiguous. Unversioned and other-architecture
 files are not selected. Both project version declarations must match the asset.
@@ -91,12 +96,12 @@ files are not selected. Both project version declarations must match the asset.
 If you use a controlled build/test process that produces evidence, it may supply
 a sidecar named
 `<asset>.provenance.json` beside the AppImage, for example
-`dist/AppForge-0.5.5-x86_64.AppImage.provenance.json`, with this schema:
+`dist/TuxShelf-0.5.5-x86_64.AppImage.provenance.json`, with this schema:
 
 ```json
 {
   "schema": 1,
-  "asset": "AppForge-0.5.5-x86_64.AppImage",
+  "asset": "TuxShelf-0.5.5-x86_64.AppImage",
   "version": "0.5.5",
   "source_commit": "<full 40-character Git commit ID>",
   "source_tree": "<git rev-parse HEAD^{tree}>",

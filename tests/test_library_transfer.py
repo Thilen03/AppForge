@@ -10,16 +10,16 @@ import pytest
 from PySide6.QtCore import QThreadPool, Qt
 from PySide6.QtWidgets import QFileDialog, QMessageBox
 
-from appforge.core.database import Database
-from appforge.core.library import LibraryService
-from appforge.core.library_transfer import (
+from tuxshelf.core.database import Database
+from tuxshelf.core.library import LibraryService
+from tuxshelf.core.library_transfer import (
     FORMAT, SCHEMA_VERSION, ImportCandidate, TransferCancelled, TransferError,
     export_library, read_export, preview_import, prepare_import, validate_record,
 )
-from appforge.core.models import AppEntry, UpdateStatus
-from appforge.core.settings import AppSettings
-from appforge.ui.library_transfer_dialog import LibraryTransferDialog
-from appforge.ui.settings_dialog import SettingsDialog
+from tuxshelf.core.models import AppEntry, UpdateStatus
+from tuxshelf.core.settings import AppSettings
+from tuxshelf.ui.library_transfer_dialog import LibraryTransferDialog
+from tuxshelf.ui.settings_dialog import SettingsDialog
 from test_details import add_script
 from test_gui import qapp, wait_for  # noqa: F401
 
@@ -34,7 +34,7 @@ def record(path='/missing/Example.AppImage', id='portable-id', **kwargs):
 def write_export(tmp_path, records, **kwargs):
     destination = tmp_path / 'library.json'
     destination.write_text(json.dumps(dict(format=FORMAT, schema_version=SCHEMA_VERSION,
-                                           appforge_version='0.5.7', applications=records, **kwargs)))
+                                           tuxshelf_version='0.5.7', applications=records, **kwargs)))
     return destination
 
 
@@ -154,7 +154,7 @@ def test_reject_whole_document_before_any_write(service, tmp_path, change):
     if change == 'json':
         path.write_text('{broken')
     elif change == 'duplicate-key':
-        path.write_text('{"format":"appforge-library", "format":"appforge-library"}')
+        path.write_text('{"format":"tuxshelf-library", "format":"tuxshelf-library"}')
     elif change == 'deep':
         path.write_text('[' * 2000 + ']' * 2000)
     else:
@@ -165,7 +165,7 @@ def test_reject_whole_document_before_any_write(service, tmp_path, change):
 
 
 def test_size_limits_regular_files_and_icon_errors(service, tmp_path, monkeypatch):
-    import appforge.core.library_transfer as core
+    import tuxshelf.core.library_transfer as core
     path = write_export(tmp_path, [record()])
     monkeypatch.setattr(core, 'MAX_BYTES', 8)
     with pytest.raises(TransferError, match='32 MiB'):
@@ -238,7 +238,7 @@ def test_unchanged_preview_and_changed_file_race(service, tmp_path):
 
 
 def test_export_atomic_failures_protection_and_cancel(service, tmp_path, monkeypatch):
-    import appforge.core.library_transfer as core
+    import tuxshelf.core.library_transfer as core
     entry = add_script(service, tmp_path)
     path = tmp_path / 'export.json'
     path.write_text('keep this')
@@ -259,7 +259,7 @@ def test_export_atomic_failures_protection_and_cancel(service, tmp_path, monkeyp
     with pytest.raises(TransferError, match='save'):
         export_library([entry], path)
     assert path.read_text() == 'keep this'
-    assert not list(tmp_path.glob('.appforge-export-*'))
+    assert not list(tmp_path.glob('.tuxshelf-export-*'))
 
 
 def test_import_registration_rechecks_id_and_path(service, tmp_path):
@@ -316,7 +316,7 @@ def test_settings_actions_and_import_preview_selection(qapp, service, tmp_path, 
 
 
 def test_gui_export_and_worker_sqlite_thread_ownership(qapp, service, tmp_path, monkeypatch):
-    import appforge.ui.library_transfer_dialog as ui
+    import tuxshelf.ui.library_transfer_dialog as ui
     entry = add_script(service, tmp_path)
     path = tmp_path / 'gui.json'
     main_thread = threading.get_ident()
@@ -353,7 +353,7 @@ def test_gui_export_and_worker_sqlite_thread_ownership(qapp, service, tmp_path, 
 
 
 def test_close_during_prepare_discards_pending_row_and_icon(qapp, service, tmp_path, monkeypatch):
-    import appforge.ui.library_transfer_dialog as ui
+    import tuxshelf.ui.library_transfer_dialog as ui
     entered, unblock = threading.Event(), threading.Event()
     raw = record()
     raw['icon'] = {'extension': '.png', 'data': 'YWJj'}
@@ -424,7 +424,7 @@ def test_reject_registration_when_alias_added_after_preparation(service, tmp_pat
 
 
 def test_directory_is_not_importable_and_permission_failure_is_preserved(service, tmp_path, monkeypatch):
-    import appforge.core.library_transfer as core
+    import tuxshelf.core.library_transfer as core
     directory = preview_import([record(path=str(tmp_path))], [])[0]
     assert directory.invalid_file
     raw = record(path='/unavailable/Example.AppImage')
@@ -463,7 +463,7 @@ def test_database_upgrade_and_reopen_preserves_import_and_settings(service, tmp_
 
 
 def test_main_window_settings_route_transfer_actions(qapp, service, monkeypatch):
-    from appforge.ui.main_window import MainWindow
+    from tuxshelf.ui.main_window import MainWindow
     win = MainWindow(service)
     calls = []
     monkeypatch.setattr(win, 'open_library_transfer', lambda mode, parent=None: calls.append(mode))
@@ -490,7 +490,7 @@ def test_export_appended_extension_does_not_overwrite_without_confirmation(qapp,
 
 
 def test_imported_inaccessible_paths_do_not_crash_card_state(monkeypatch):
-    from appforge.core.library import file_state, FileState
+    from tuxshelf.core.library import file_state, FileState
     entry = AppEntry(name='Inaccessible', path='/unavailable/Example.AppImage')
     monkeypatch.setattr(Path, 'exists', lambda _: (_ for _ in ()).throw(PermissionError()))
     assert file_state(entry) is FileState.MISSING

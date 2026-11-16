@@ -11,12 +11,12 @@ from pathlib import Path
 import pytest
 
 import make_fixtures
-from appforge.core.models import UpdateStatus
-from appforge.core.updates import installer
-from appforge.core.updates.assets import choose_asset
-from appforge.core.updates.checker import check_for_update
-from appforge.core.updates.github import Asset, GitHubClient, GitHubError, Release
-from appforge.core.updates.service import UpdateService, can_update, pattern_from_asset
+from tuxshelf.core.models import UpdateStatus
+from tuxshelf.core.updates import installer
+from tuxshelf.core.updates.assets import choose_asset
+from tuxshelf.core.updates.checker import check_for_update
+from tuxshelf.core.updates.github import Asset, GitHubClient, GitHubError, Release
+from tuxshelf.core.updates.service import UpdateService, can_update, pattern_from_asset
 
 
 # ---------------------------------------------------------------- asset selection
@@ -76,7 +76,7 @@ def test_client_parses_releases_and_sends_headers():
     assert rels[1].assets[0].digest.startswith("sha256:")
     assert seen["req"].full_url == "https://api.github.com/repos/o/r/releases?per_page=30"
     assert seen["req"].get_header("Authorization") == "Bearer tok"
-    assert "AppForge" in seen["req"].get_header("User-agent")
+    assert "TuxShelf" in seen["req"].get_header("User-agent")
 
 
 @pytest.mark.parametrize("code,headers,kind", [(404, {}, "not_found"), (403, {"X-RateLimit-Remaining": "0"}, "rate_limit"),
@@ -319,6 +319,6 @@ def test_failed_check_does_not_offer_update(service, fixtures):
     e = service.add_application(str(fixtures["alpha"]), github_repo="o/r")
     us = UpdateService(service)
     e = us.apply_check(e.id, check("2.0.0"))               # up to date, has asset info
-    from appforge.core.updates.checker import CheckOutcome
+    from tuxshelf.core.updates.checker import CheckOutcome
     e = us.apply_check(e.id, CheckOutcome(UpdateStatus.FAILED, "offline"))
     assert e.update_status is UpdateStatus.FAILED and not can_update(e)

@@ -6,13 +6,13 @@ from pathlib import Path
 
 import pytest
 
-from appforge.core.backups import DEFAULT_KEEP, BackupService, is_backup_file
-from appforge.core.backups import service as backups_mod
-from appforge.core.database import MIGRATIONS, Database
-from appforge.core.library import LibraryError
-from appforge.core.models import AppEntry, UpdateStatus
-from appforge.core.updates.installer import InstallError, InstallResult
-from appforge.core.updates.service import UpdateService
+from tuxshelf.core.backups import DEFAULT_KEEP, BackupService, is_backup_file
+from tuxshelf.core.backups import service as backups_mod
+from tuxshelf.core.database import MIGRATIONS, Database
+from tuxshelf.core.library import LibraryError
+from tuxshelf.core.models import AppEntry, UpdateStatus
+from tuxshelf.core.updates.installer import InstallError, InstallResult
+from tuxshelf.core.updates.service import UpdateService
 
 
 @pytest.fixture(autouse=True)
@@ -257,12 +257,12 @@ def test_rollback_unknown_backup(service, tmp_path):
 
 def test_refresh_does_not_overwrite_a_rolled_back_version(service, tmp_path, monkeypatch):
     """After a rollback the file's embedded version must not silently replace the recorded one."""
-    from appforge.core.formats import AppMetadata
+    from tuxshelf.core.formats import AppMetadata
     entry, _ = make_app(service, tmp_path, version="2.0")
     e = service.db.get(entry.id)
     e.metadata["installed_version_source"] = "rollback"
     service.db.update(e)
     md = AppMetadata(format_id="appimage", name_suggestion="Dolphin", version="9.9.9")
-    monkeypatch.setattr("appforge.core.library.inspect_file", lambda p: md)
+    monkeypatch.setattr("tuxshelf.core.library.inspect_file", lambda p: md)
     service.refresh_metadata(entry.id)
     assert service.db.get(entry.id).installed_version == "2.0"

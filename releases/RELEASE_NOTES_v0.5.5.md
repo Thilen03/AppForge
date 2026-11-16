@@ -1,4 +1,4 @@
-# AppForge 0.5.5
+# TuxShelf 0.5.5
 
 ## New features
 
@@ -34,7 +34,7 @@
 
 ## Installation and upgrade
 
-- Use `AppForge-0.5.5-x86_64.AppImage` for Linux x86_64. Make it executable before
+- Use `TuxShelf-0.5.5-x86_64.AppImage` for Linux x86_64. Make it executable before
   launching it. Keep your existing library and settings; no database migration or
   manual re-import is required for this update.
 - After upgrading, open **Discover apps…** to review additional applications.

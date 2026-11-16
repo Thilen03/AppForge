@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=TuxShelf
+GenericName=Application Manager
+Comment=Library and launcher for AppImages
+Exec=tuxshelf %F
+Icon=tuxshelf
+Terminal=false
+StartupNotify=true
+StartupWMClass=tuxshelf
+Categories=Utility;
+Keywords=AppImage;launcher;apps;

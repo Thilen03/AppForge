@@ -5,11 +5,11 @@ import pytest
 from PySide6.QtGui import QIcon
 
 from test_gui import qapp  # noqa: F401
-from appforge.core.models import AppEntry, UpdateStatus
-from appforge.core.tray import TrayShortcuts, FAVORITES_KEY, RECENT_KEY
-from appforge.core.updates.installer import InstallCancelled, InstallResult
-from appforge.ui.tray import TrayController
-from appforge.ui.main_window import MainWindow
+from tuxshelf.core.models import AppEntry, UpdateStatus
+from tuxshelf.core.tray import TrayShortcuts, FAVORITES_KEY, RECENT_KEY
+from tuxshelf.core.updates.installer import InstallCancelled, InstallResult
+from tuxshelf.ui.tray import TrayController
+from tuxshelf.ui.main_window import MainWindow
 
 
 def add(service, tmp_path, name="Tool"):
@@ -29,7 +29,7 @@ def available(service, e):
 
 @pytest.fixture
 def window(qapp, service, monkeypatch):
-    import appforge.ui.main_window as mw
+    import tuxshelf.ui.main_window as mw
     monkeypatch.setattr(mw, "tray_available", lambda: True)
     w = MainWindow(service, tray_icon=QIcon())
     yield w
@@ -105,7 +105,7 @@ def test_status_progress_and_busy_shortcuts(window, service, tmp_path):
 
 
 def test_launch_reuses_environment_and_records_only_success(window, service, tmp_path, monkeypatch):
-    import appforge.ui.main_window as mw
+    import tuxshelf.ui.main_window as mw
     e = add(service, tmp_path)
     e.metadata["env_vars"] = {"CUSTOM": "hello"}
     service.db.update(e)
@@ -133,7 +133,7 @@ def test_navigation_and_update_all_route(window, monkeypatch):
     window.tray.settingsRequested.emit()
     assert calls == ["open", "update", "open", "settings"]
     labels = [action.text() for action in window.tray._menu.actions()]
-    assert labels.count("Open AppForge") == 1
+    assert labels.count("Open TuxShelf") == 1
     assert "Open application library" not in labels
 
 
@@ -194,7 +194,7 @@ def test_tray_failure_restores_window(window, monkeypatch):
 
 
 def test_initial_tray_failure_is_optional(qapp, service, monkeypatch):
-    import appforge.ui.main_window as mw
+    import tuxshelf.ui.main_window as mw
     monkeypatch.setattr(mw, "tray_available", lambda: (_ for _ in ()).throw(RuntimeError("No host")))
     w = MainWindow(service, tray_icon=QIcon())
     assert w.tray is None
@@ -242,8 +242,8 @@ def test_successful_hidden_install_notifies_and_refreshes_count(window, service,
 
 
 def test_failed_launch_not_recorded_and_error_visible(window, service, tmp_path, monkeypatch):
-    from appforge.services import launcher
-    from appforge.core.library import FileState
+    from tuxshelf.services import launcher
+    from tuxshelf.core.library import FileState
     e = add(service, tmp_path)
     errors = []
     monkeypatch.setattr(launcher, "launch", lambda entry: (_ for _ in ()).throw(launcher.LaunchError("Missing", FileState.MISSING)))

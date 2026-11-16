@@ -3,11 +3,11 @@ import pytest
 
 from test_gui import qapp  # noqa: F401
 from test_tray import window, add  # noqa: F401
-from appforge.core.organize import SORT_NAME, SORT_RECENT, SORT_STATUS
-from appforge.core.models import UpdateStatus
-from appforge.core.tray import TrayShortcuts
-from appforge.ui.main_window import MainWindow
-from appforge.ui.popups import RoundedMenu
+from tuxshelf.core.organize import SORT_NAME, SORT_RECENT, SORT_STATUS
+from tuxshelf.core.models import UpdateStatus
+from tuxshelf.core.tray import TrayShortcuts
+from tuxshelf.ui.main_window import MainWindow
+from tuxshelf.ui.popups import RoundedMenu
 
 
 def favorite_action(card):
@@ -17,7 +17,7 @@ def favorite_action(card):
 
 @pytest.mark.parametrize('sort', [SORT_NAME, SORT_RECENT, SORT_STATUS])
 def test_favorites_first_preserve_selected_sort(window, service, tmp_path, sort):
-    from appforge.core.organize import sort_entries
+    from tuxshelf.core.organize import sort_entries
     entries = [add(service, tmp_path, name) for name in ['Alpha', 'Beta', 'Gamma', 'Delta']]
     for i, e in enumerate(entries):
         e.added_at = 100 + i
@@ -111,9 +111,9 @@ def test_hover_star_click_synchronizes_favorites(window, service, tmp_path, qapp
 
 
 def test_hover_star_reserves_space_and_hides_on_leave(qapp):
-    from appforge.ui.app_card import AppCard
-    from appforge.core.models import AppEntry
-    from appforge.core.library import FileState
+    from tuxshelf.ui.app_card import AppCard
+    from tuxshelf.core.models import AppEntry
+    from tuxshelf.core.library import FileState
     card = AppCard(AppEntry(name='Long application name that needs eliding', path='/bin/sh'), FileState.OK)
     card.show()
     qapp.processEvents()
@@ -131,9 +131,9 @@ def test_hover_star_reserves_space_and_hides_on_leave(qapp):
 def test_star_keyboard_and_double_click_do_not_launch(qapp):
     from PySide6.QtCore import Qt
     from PySide6.QtTest import QTest
-    from appforge.ui.app_card import AppCard
-    from appforge.core.models import AppEntry
-    from appforge.core.library import FileState
+    from tuxshelf.ui.app_card import AppCard
+    from tuxshelf.core.models import AppEntry
+    from tuxshelf.core.library import FileState
     e = AppEntry(name='Tool', path='/bin/sh')
     card = AppCard(e, FileState.OK)
     changed, launched = [], []

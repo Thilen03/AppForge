@@ -7,10 +7,10 @@ from PySide6.QtWidgets import QDialog
 
 from test_gui import qapp  # noqa: F401
 from test_tray import add, window  # noqa: F401
-from appforge.core.database import Database
-from appforge.core.settings import AppSettings
-from appforge.ui import theme
-from appforge.ui.main_window import MainWindow
+from tuxshelf.core.database import Database
+from tuxshelf.core.settings import AppSettings
+from tuxshelf.ui import theme
+from tuxshelf.ui.main_window import MainWindow
 
 
 def test_setting_default_validation_and_reopen(service):

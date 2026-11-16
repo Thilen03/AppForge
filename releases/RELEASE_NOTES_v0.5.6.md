@@ -1,10 +1,10 @@
-# AppForge 0.5.6
+# TuxShelf 0.5.6
 
 ## New features
 
 - **Application details.** Choose **Details…** from an application's card menu
   to see its icon, name, description, format, installed version, file location,
-  current file size, and date added to AppForge.
+  current file size, and date added to TuxShelf.
 - **Update information in one place.** See the linked repository, latest known
   version, update status, last check time, and stable or prerelease preference.
   Open the known release page in your browser when one is available.
@@ -18,7 +18,7 @@
   button that matches the other header buttons' height, blue background, and
   text colour.
 - Launch, check for updates, update, edit, open the installation folder, and manage
-  backups directly from the details window using AppForge's existing workflows.
+  backups directly from the details window using TuxShelf's existing workflows.
 - Details refresh after edits, updates, relocation, and rollback. Periodic refreshes
   and a **Refresh** button also pick up file and backup changes on disk.
 - File and backup inspection runs in the background without launching application
@@ -48,7 +48,7 @@
 
 ## Installation and upgrade
 
-- The AppImage filename for this version is `AppForge-0.5.6-x86_64.AppImage`.
+- The AppImage filename for this version is `TuxShelf-0.5.6-x86_64.AppImage`.
   Make it executable before launching it.
 - Existing library records and settings are preserved. This update requires no
   database migration or manual re-import.

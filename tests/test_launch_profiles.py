@@ -8,24 +8,24 @@ from PySide6.QtCore import QTimer, Qt
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication
 
-from appforge.core.database import Database
-from appforge.core.envvars import ENV_KEY
-from appforge.core.launch_options import ARGUMENTS, DIRECTORY, TERMINAL, LaunchOptionsError
-from appforge.core.launch_profiles import (
+from tuxshelf.core.database import Database
+from tuxshelf.core.envvars import ENV_KEY
+from tuxshelf.core.launch_options import ARGUMENTS, DIRECTORY, TERMINAL, LaunchOptionsError
+from tuxshelf.core.launch_profiles import (
     DEFAULT_PROFILE, PROFILES_KEY, entry_for_profile, profile_choices, validate_profiles,
 )
-from appforge.core.library import LibraryError
-from appforge.core.models import UpdateStatus
-from appforge.core.library_transfer import export_library, read_export, prepare_import, preview_import, TransferError
-from appforge.services import launcher
-from appforge.ui.launch_profiles_dialog import LaunchProfilesDialog
-from appforge.ui.main_window import MainWindow
+from tuxshelf.core.library import LibraryError
+from tuxshelf.core.models import UpdateStatus
+from tuxshelf.core.library_transfer import export_library, read_export, prepare_import, preview_import, TransferError
+from tuxshelf.services import launcher
+from tuxshelf.ui.launch_profiles_dialog import LaunchProfilesDialog
+from tuxshelf.ui.main_window import MainWindow
 from test_gui import qapp, wait_for  # noqa: F401
 from test_tray import add
 
 
 def debug_profile(**values):
-    return {'id': 'debug-id', 'name': 'Debug', ENV_KEY: {'APPFORGE_PROFILE_MODE': 'debug'},
+    return {'id': 'debug-id', 'name': 'Debug', ENV_KEY: {'TUXSHELF_PROFILE_MODE': 'debug'},
             ARGUMENTS: '--debug', **values}
 
 
@@ -52,7 +52,7 @@ def test_default_compatibility_independent_snapshots_and_atomic_validation(servi
     assert entry_for_profile(before) is before
     updated = service.update_application(entry.id, launch_profiles=[debug_profile()])
     resolved = entry_for_profile(updated, 'debug-id')
-    assert resolved.metadata[ENV_KEY] == {'APPFORGE_PROFILE_MODE': 'debug'}
+    assert resolved.metadata[ENV_KEY] == {'TUXSHELF_PROFILE_MODE': 'debug'}
     assert resolved.metadata[ARGUMENTS] == '--debug'
     assert updated.metadata[ARGUMENTS] == '--default' and updated.metadata[ENV_KEY] == {'MODE': 'default'}
     with pytest.raises(LibraryError):
@@ -72,14 +72,14 @@ def test_real_launch_uses_profile_environment_arguments_and_directory(service, t
     script = tmp_path / 'inspect.py'
     script.write_text(f'#!{sys.executable}\nimport json, os, sys\n'
                       'print(json.dumps({"args": sys.argv[1:], "cwd": os.getcwd(), '
-                      '"mode": os.getenv("APPFORGE_PROFILE_MODE"), '
-                      '"only_default": os.getenv("APPFORGE_PROFILE_DEFAULT_ONLY")}))\n')
+                      '"mode": os.getenv("TUXSHELF_PROFILE_MODE"), '
+                      '"only_default": os.getenv("TUXSHELF_PROFILE_DEFAULT_ONLY")}))\n')
     script.chmod(0o755)
     work = tmp_path / 'debug-work'
     work.mkdir()
-    monkeypatch.delenv('APPFORGE_PROFILE_DEFAULT_ONLY', raising=False)
+    monkeypatch.delenv('TUXSHELF_PROFILE_DEFAULT_ONLY', raising=False)
     entry = service.add_application(str(script), env_vars={
-        'APPFORGE_PROFILE_MODE': 'default', 'APPFORGE_PROFILE_DEFAULT_ONLY': 'yes'},
+        'TUXSHELF_PROFILE_MODE': 'default', 'TUXSHELF_PROFILE_DEFAULT_ONLY': 'yes'},
         launch_options={ARGUMENTS: '--default'})
     entry = service.update_application(entry.id, launch_profiles=[debug_profile(
         launch_arguments='--debug "$HOME" "a;b" ""', launch_directory=str(work))])
@@ -106,7 +106,7 @@ def test_missing_profile_bad_directory_and_terminal_route(service, tmp_path, mon
     entry = service.update_application(entry.id, launch_profiles=[debug_profile(run_in_terminal=True)])
     called = []
     def terminal(argv, env):
-        called.append((argv, env['APPFORGE_PROFILE_MODE']))
+        called.append((argv, env['TUXSHELF_PROFILE_MODE']))
         return argv  # real fixture script, without requiring an installed desktop terminal
     monkeypatch.setattr(launcher, 'terminal_command', terminal)
     handle = launcher.launch(entry, 'debug-id')
@@ -138,7 +138,7 @@ def test_transfer_profiles_honors_nested_environment_opt_out(service, tmp_path, 
     assert bool(profile.get(ENV_KEY)) == (export_env and import_env)
     assert bool(prepared.record['metadata'].get(ENV_KEY)) == (export_env and import_env)
     if not export_env:
-        assert 'private' not in path.read_text() and 'APPFORGE_PROFILE_MODE' not in path.read_text()
+        assert 'private' not in path.read_text() and 'TUXSHELF_PROFILE_MODE' not in path.read_text()
     service.remove_application(entry.id)
     restored = service.import_configuration(prepared)
     assert restored.metadata[PROFILES_KEY] == validate_profiles(prepared.record['metadata'][PROFILES_KEY])
@@ -279,7 +279,7 @@ def test_real_edit_profiles_menu_flow(window, service, qapp):
 @pytest.mark.parametrize('mode', ['light', 'dark'])
 @pytest.mark.parametrize('retry', [False, True])
 def test_split_launch_button_geometry_with_update_and_actions(window, service, qapp, mode, retry):
-    from appforge.ui import theme
+    from tuxshelf.ui import theme
     win, entry = window
     entry = service.get(entry.id)
     entry.github_repo = 'https://github.com/example/app'

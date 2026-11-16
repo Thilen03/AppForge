@@ -5,11 +5,11 @@ from pathlib import Path
 
 import pytest
 
-from appforge.core.desktop import render_entry
-from appforge.core.envvars import EnvVarError, parse_env_text
-from appforge.core.library import LibraryError
-from appforge.core.models import AppEntry
-from appforge.services import launcher
+from tuxshelf.core.desktop import render_entry
+from tuxshelf.core.envvars import EnvVarError, parse_env_text
+from tuxshelf.core.library import LibraryError
+from tuxshelf.core.models import AppEntry
+from tuxshelf.services import launcher
 
 sys.path.insert(0, str(Path(__file__).parent))
 from test_desktop import make_app, parse_exec, read_entry_from_text  # noqa: E402
@@ -86,11 +86,11 @@ def test_library_rejects_invalid_input(service, tmp_path):
 def test_launch_applies_env_vars(service, tmp_path, data_dir, monkeypatch):
     out = tmp_path / "out.txt"
     script = tmp_path / "run.sh"
-    script.write_text(f'#!/bin/sh\nprintf "%s|%s" "$APPFORGE_TEST_VAR" "$APPDIR" > "{out}"\n')
+    script.write_text(f'#!/bin/sh\nprintf "%s|%s" "$TUXSHELF_TEST_VAR" "$APPDIR" > "{out}"\n')
     script.chmod(0o755)
     monkeypatch.setenv("APPDIR", "/leaky")
     entry = AppEntry(name="Run", path=str(script), format="executable",
-                     metadata={"env_vars": {"APPFORGE_TEST_VAR": "hello world"}})
+                     metadata={"env_vars": {"TUXSHELF_TEST_VAR": "hello world"}})
     handle = launcher.launch(entry)
     handle.process.wait(timeout=10)
     assert out.read_text() == "hello world|"       # variable set, leaky AppImage var still stripped

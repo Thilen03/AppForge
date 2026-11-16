@@ -14,8 +14,8 @@
   accepted).
   - In the `.desktop` file they are written as `Exec=env NAME=value … /path/to/app`, the same way KDE's menu
     editor does it.
-  - When you press **Launch** in AppForge, the same variables are applied to the started process. They are
-    applied after AppForge's own environment clean-up, so they always win.
+  - When you press **Launch** in TuxShelf, the same variables are applied to the started process. They are
+    applied after TuxShelf's own environment clean-up, so they always win.
   - Invalid lines are reported inline and block *Add to library* / *Save changes* until fixed.
 
 ## Modified functionality
@@ -33,7 +33,7 @@
 - `core/desktop/service.py`: `MENU_CATEGORIES`, `menu_category_of()`, category merging and the `env` prefix in
   `render_entry()`; arguments are quoted with the existing spec-conformant Exec quoting.
 - `services/launcher.py`: `launch()` merges the app's variables into the child environment.
-- Version bumped 0.5.1 → 0.5.2 (`pyproject.toml`, `appforge/__init__.py`, README).
+- Version bumped 0.5.1 → 0.5.2 (`pyproject.toml`, `tuxshelf/__init__.py`, README).
 - README documents both options.
 - New tests in `tests/test_menu_env.py` (13 cases, including a real launch that checks the variable reaches
   the process); the full suite passes (160 tests).

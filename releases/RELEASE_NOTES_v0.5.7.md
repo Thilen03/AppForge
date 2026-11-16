@@ -1,8 +1,8 @@
-# AppForge 0.5.7
+# TuxShelf 0.5.7
 
 ## New features
 
-- Read release notes inside AppForge before updating. Open **Release notes…** from
+- Read release notes inside TuxShelf before updating. Open **Release notes…** from
   an application's card menu or details view after checking for updates, or from
   the **Update All** confirmation.
 - See the release version, title, publication date, stable or prerelease status,
@@ -22,14 +22,14 @@
 ## Improvements
 
 - Notes are saved for the selected repository and release, so cached descriptions
-  remain available after restarting AppForge. Refresh runs in the background and
+  remain available after restarting TuxShelf. Refresh runs in the background and
   keeps cached text visible if the provider cannot be reached.
 - Missing descriptions have a clear explanation. Reading notes never installs an
   update or changes the installed application.
 - Export and import file work runs in the background with cancellation. Completed
   imports are kept when an operation is stopped. Application files are never
   executed, moved or changed by a transfer.
-- AppForge access tokens and runtime update data are excluded from exports.
+- TuxShelf access tokens and runtime update data are excluded from exports.
   Per-application environment variables are optional and disabled by default on
   both export and import.
 

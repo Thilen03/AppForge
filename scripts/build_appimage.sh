@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# Build AppForge into a self-contained AppImage.  Output: dist/AppForge-<version>-x86_64.AppImage
+# Build TuxShelf into a self-contained AppImage.  Output: dist/TuxShelf-<version>-x86_64.AppImage
 set -euo pipefail
 cd "$(dirname "$0")/.."
 ROOT="$PWD"
-VERSION="$(python3 -c 'import re,pathlib;print(re.search(r"__version__ = \"(.+?)\"",pathlib.Path("src/appforge/__init__.py").read_text()).group(1))')"
+VERSION="$(python3 -c 'import re,pathlib;print(re.search(r"__version__ = \"(.+?)\"",pathlib.Path("src/tuxshelf/__init__.py").read_text()).group(1))')"
 ARCH="${ARCH:-x86_64}"
 BUILD="$ROOT/build"
 VENV="$ROOT/.venv-build"
-OUT="$ROOT/dist/AppForge-${VERSION}-${ARCH}.AppImage"
+OUT="$ROOT/dist/TuxShelf-${VERSION}-${ARCH}.AppImage"
 
 echo "==> Python build environment"
 [ -d "$VENV" ] || python3 -m venv "$VENV"
@@ -16,18 +16,18 @@ echo "==> Python build environment"
 
 echo "==> PyInstaller bundle"
 rm -rf "$BUILD/dist" "$BUILD/work"
-"$VENV/bin/pyinstaller" --noconfirm --clean --distpath "$BUILD/dist" --workpath "$BUILD/work" packaging/appforge.spec
+"$VENV/bin/pyinstaller" --noconfirm --clean --distpath "$BUILD/dist" --workpath "$BUILD/work" packaging/tuxshelf.spec
 
 echo "==> Assemble AppDir"
 APPDIR="$BUILD/AppDir"
 rm -rf "$APPDIR"
 mkdir -p "$APPDIR/usr/lib" "$APPDIR/usr/share/icons/hicolor/256x256/apps"
-cp -a "$BUILD/dist/appforge" "$APPDIR/usr/lib/appforge"
+cp -a "$BUILD/dist/tuxshelf" "$APPDIR/usr/lib/tuxshelf"
 install -m755 packaging/AppRun "$APPDIR/AppRun"
-cp packaging/appforge.desktop "$APPDIR/appforge.desktop"
-cp src/appforge/resources/appforge.png "$APPDIR/appforge.png"
-cp src/appforge/resources/appforge.png "$APPDIR/.DirIcon"
-cp src/appforge/resources/appforge.png "$APPDIR/usr/share/icons/hicolor/256x256/apps/appforge.png"
+cp packaging/tuxshelf.desktop "$APPDIR/tuxshelf.desktop"
+cp src/tuxshelf/resources/tuxshelf.png "$APPDIR/tuxshelf.png"
+cp src/tuxshelf/resources/tuxshelf.png "$APPDIR/.DirIcon"
+cp src/tuxshelf/resources/tuxshelf.png "$APPDIR/usr/share/icons/hicolor/256x256/apps/tuxshelf.png"
 
 echo "==> appimagetool"
 TOOL="$(command -v appimagetool || true)"

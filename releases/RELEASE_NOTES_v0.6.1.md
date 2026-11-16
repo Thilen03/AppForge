@@ -1,4 +1,4 @@
-# AppForge 0.6.1
+# TuxShelf 0.6.1
 
 ## New features
 
@@ -21,7 +21,7 @@
   usage guide and links to the other feature guides.
 - Update checks can use a version from the release title or selected filename when
   the repository uses an unnumbered tag such as `continuous`.
-- When versions cannot be compared, AppForge can compare the installed file with
+- When versions cannot be compared, TuxShelf can compare the installed file with
   the selected release file's published SHA-256 or SHA-512 checksum. Matching files
   show as up to date. Different files can be installed after a warning that their
   version order is unknown. The same check can detect rolling release rebuilds
@@ -49,7 +49,7 @@
 
 ## Known issues
 
-- If neither usable version information nor a published checksum exists, AppForge
+- If neither usable version information nor a published checksum exists, TuxShelf
   cannot determine whether the installed file needs updating. Set its installed
   version in Edit when known.
 - Different checksums establish that files differ, not which one is newer. Review
@@ -57,8 +57,8 @@
 
 ## Installation/upgrade instructions
 
-Once this release is published, use AppForge's self-update or download
-`AppForge-0.6.1-x86_64.AppImage`, make it executable and launch it. Existing library
+Once this release is published, use TuxShelf's self-update or download
+`TuxShelf-0.6.1-x86_64.AppImage`, make it executable and launch it. Existing library
 settings and registered applications are retained; no database migration is required.
 
 Repository downloads and updates require an AppImage or raw Linux executable.

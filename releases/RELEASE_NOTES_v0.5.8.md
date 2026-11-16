@@ -1,4 +1,4 @@
-# AppForge 0.5.8
+# TuxShelf 0.5.8
 
 ## New features
 

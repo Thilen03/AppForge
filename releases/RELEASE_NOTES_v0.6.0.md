@@ -1,10 +1,10 @@
-# AppForge 0.6.0
+# TuxShelf 0.6.0
 
 ## New features
 
 - Advanced launch options in Add and Edit let you set command-line arguments,
   choose a working directory and run apps in a terminal. The same preferences
-  apply to AppForge, tray and desktop-menu launches, survive updates and rollback,
+  apply to TuxShelf, tray and desktop-menu launches, survive updates and rollback,
   and are included in library export/import.
 - Switch between light and dark mode using the sun/moon button to the right of
   Settings. The whole app changes immediately, and your choice is remembered
@@ -32,7 +32,7 @@
   scrolling remain available when applications extend below the window.
 - Add and Edit now use one Category dropdown with standard desktop categories
   such as Games, Internet and Multimedia. The same selection organizes the app
-  in AppForge and its KDE Plasma application-menu launcher. AppForge's category
+  in TuxShelf and its KDE Plasma application-menu launcher. TuxShelf's category
   filters and searches use that selection even when menu integration is disabled.
 - Existing desktop-menu category choices are reused. Older standard library
   categories are recognized, and custom library categories are preserved until
@@ -51,20 +51,20 @@
 ## Known issues
 
 - Terminal selection and whether a terminal stays open after the app exits depend
-  on the installed terminal and desktop settings. AppForge may not receive the
+  on the installed terminal and desktop settings. TuxShelf may not receive the
   application's output or exit status when a terminal hands it to an existing process.
 - Update pause/skip preferences are local and are not included in library exports.
 - The category dropdown uses standard desktop categories; custom or renamed
   Plasma application-menu sections are not detected automatically.
-- Apps without recognizable category metadata appear under Other in AppForge
+- Apps without recognizable category metadata appear under Other in TuxShelf
   when Automatic is selected.
 
 ## Installation/upgrade instructions
 
-- Use AppForge 0.6.0 to import library exports containing the new launch options;
+- Use TuxShelf 0.6.0 to import library exports containing the new launch options;
   older versions may reject those fields. Existing exports can still be imported.
-- Exit any running AppForge instance using Exit AppForge in the tray before
-  launching AppForge-0.6.0-x86_64.AppImage.
+- Exit any running TuxShelf instance using Exit TuxShelf in the tray before
+  launching TuxShelf-0.6.0-x86_64.AppImage.
 - Your existing library and preferences are preserved; no database migration is
   required. If an older record has different library and desktop-menu categories,
-  its explicit desktop-menu choice takes precedence in AppForge.
+  its explicit desktop-menu choice takes precedence in TuxShelf.

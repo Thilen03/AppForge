@@ -4,14 +4,14 @@ from PySide6.QtCore import Qt
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QComboBox, QLabel
 
-from appforge.core.database import Database
-from appforge.core.desktop import MENU_CATEGORIES, menu_category_of, render_entry
-from appforge.core.library import LibraryService
-from appforge.core.library_transfer import export_library, read_export, preview_import, prepare_import
-from appforge.core.models import AppEntry
-from appforge.core.organize import category_of, categories_in_use, matches, Filter
-from appforge.ui.dialogs import AddApplicationDialog, EditApplicationDialog
-from appforge.ui.main_window import MainWindow
+from tuxshelf.core.database import Database
+from tuxshelf.core.desktop import MENU_CATEGORIES, menu_category_of, render_entry
+from tuxshelf.core.library import LibraryService
+from tuxshelf.core.library_transfer import export_library, read_export, preview_import, prepare_import
+from tuxshelf.core.models import AppEntry
+from tuxshelf.core.organize import category_of, categories_in_use, matches, Filter
+from tuxshelf.ui.dialogs import AddApplicationDialog, EditApplicationDialog
+from tuxshelf.ui.main_window import MainWindow
 from test_gui import qapp, wait_for  # noqa: F401
 
 

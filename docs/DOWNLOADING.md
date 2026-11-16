@@ -1,7 +1,7 @@
 # Downloading and adding applications
 
 Click **Add Application**, then choose **Add a local file…** or **Download from a
-link…**. Dropping an existing AppImage onto AppForge still opens the local Add form
+link…**. Dropping an existing AppImage onto TuxShelf still opens the local Add form
 directly.
 
 ## Download from a repository
@@ -9,7 +9,7 @@ directly.
 1. Paste a repository or release link and click **Find releases**. GitHub,
    GitLab.com, Codeberg and the self-hosted Forgejo/Gitea/GitLab sources used by
    update checks are supported. GitHub `owner/repo` shorthand also works.
-2. Select a release file from the table. AppForge lists AppImages and possible raw
+2. Select a release file from the table. TuxShelf lists AppImages and possible raw
    Linux executables for your CPU architecture from the provider's recent releases.
    Archives, packages, metadata and clearly incompatible platforms are excluded.
    Unknown-architecture filenames remain candidates and are validated after download.
@@ -31,7 +31,7 @@ directly.
 The destination uses the release asset's filename. Existing files, directories and
 symlinks are never overwritten, even if another process creates a file while the
 transfer is running. If a regular file with the selected name already exists,
-AppForge checks its size, format and any available published checksum, then
+TuxShelf checks its size, format and any available published checksum, then
 continues to the Add form using that file without downloading it again. This
 works across restarts and requires no manual file selection. Invalid or mismatched
 files are reported and left untouched; directories and symlinks cannot be reused.
@@ -40,7 +40,7 @@ Downloading and inspecting an app never runs it.
 
 ## Validation and cancellation
 
-Downloads use HTTPS and the existing update download/validation pipeline. AppForge
+Downloads use HTTPS and the existing update download/validation pipeline. TuxShelf
 checks the published size when available, validates the application format and
 verifies a published SHA-256/SHA-512 digest or supported checksum file when present.
 The final Add form reports the checksum result. Missing checksums do not prevent a

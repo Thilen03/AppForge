@@ -13,7 +13,7 @@ You can pause an app before linking an update source.
 
 A missing file or missing executable permission still shows its repair warning
 on the card. Pausing does not change launching, desktop launchers, backups or
-rollback. It applies to the selected library app, not AppForge's own self-update.
+rollback. It applies to the selected library app, not TuxShelf's own self-update.
 
 ## Skip this version
 

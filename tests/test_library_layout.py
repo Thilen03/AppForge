@@ -6,15 +6,15 @@ from PySide6.QtCore import QPoint, QPointF, QRect, QSettings, Qt
 from PySide6.QtGui import QWheelEvent
 from PySide6.QtWidgets import QApplication
 
-from appforge.core.models import AppEntry
-from appforge.ui.main_window import MainWindow, CARD_GAP
-from appforge.ui.app_card import CARD_W
+from tuxshelf.core.models import AppEntry
+from tuxshelf.ui.main_window import MainWindow, CARD_GAP
+from tuxshelf.ui.app_card import CARD_W
 from test_gui import qapp  # noqa: F401
 
 
 @pytest.fixture
 def window_factory(qapp, service, tmp_path, monkeypatch):
-    import appforge.ui.main_window as module
+    import tuxshelf.ui.main_window as module
     settings = QSettings(str(tmp_path / 'window.ini'), QSettings.IniFormat)
     monkeypatch.setattr(module, 'QSettings', lambda: settings)
     windows = []

@@ -1,7 +1,7 @@
 # Exporting and importing your library
 
 Open **Settings** beside **Add Application**. Use **Export Library…** to save an
-AppForge JSON file, or **Import Library…** to preview a previously exported file.
+TuxShelf JSON file, or **Import Library…** to preview a previously exported file.
 These actions apply immediately; the Settings Save/Cancel buttons only apply to
 the preferences above them.
 
@@ -22,10 +22,10 @@ application still exports.
 
 Named launch profiles are included with their arguments, working directory and
 terminal preference. The environment-variable opt-in applies to Default and all
-named profiles on both export and import. Older AppForge versions may reject
+named profiles on both export and import. Older TuxShelf versions may reject
 exports containing launch profiles.
 
-Application executables, backups, global Settings preferences, AppForge access
+Application executables, backups, global Settings preferences, TuxShelf access
 tokens, download URLs, update status and release-note caches are excluded.
 Environment variables are excluded by default. Unknown internal metadata is not
 copied into the portable file.
@@ -79,14 +79,14 @@ in progress.
 
 Menu creation failures do not lose the imported application. They appear as
 warnings, and the saved preference allows normal launcher repair to retry later.
-Backups are not transferred, but AppForge's existing backup management can discover
+Backups are not transferred, but TuxShelf's existing backup management can discover
 local backups beside the reconnected application file.
 
 ## Format and limits
 
-The JSON envelope identifies `format: "appforge-library"`, `schema_version: 1`,
-`appforge_version`, and an `applications` list. Schema versions are separate from
-AppForge's application version. Unsupported schemas, duplicate JSON keys, unknown
+The JSON envelope identifies `format: "tuxshelf-library"`, `schema_version: 1`,
+`tuxshelf_version`, and an `applications` list. Schema versions are separate from
+TuxShelf's application version. Unsupported schemas, duplicate JSON keys, unknown
 fields and malformed configuration are rejected before any import begins.
 
 Exports are limited to 32 MiB and 10,000 applications; each embedded icon is limited
@@ -100,5 +100,5 @@ or overwrite saved tokens. Check for updates after import to obtain fresh releas
 metadata and available download files.
 
 Launch arguments are included as plain text. Custom working-directory paths stay
-absolute and may need changing on another computer. Older AppForge builds may
+absolute and may need changing on another computer. Older TuxShelf builds may
 reject files with the new launch-option fields. See [Launch options](LAUNCH_OPTIONS.md).

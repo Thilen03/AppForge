@@ -1,7 +1,7 @@
 # Storage manager
 
 Choose **Storage…** beside the library's discovery control. The blue/teal donut
-compares current application file bytes with AppForge-managed backup bytes. It
+compares current application file bytes with TuxShelf-managed backup bytes. It
 also shows registered app count, measured backup count, the largest application
 and the application with the largest backup collection. Empty libraries show an
 empty ring. Nothing is executed while measuring.

@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="src/appforge/resources/appforge-512.png" alt="AppForge logo" width="160">
+  <img src="src/tuxshelf/resources/tuxshelf-512.png" alt="TuxShelf logo" width="160">
 </p>
 
-<h1 align="center">AppForge</h1>
+<h1 align="center">TuxShelf</h1>
 
 <p align="center">
   <b>A library, launcher and updater for your AppImages and other standalone Linux executables.</b><br>
@@ -10,16 +10,35 @@
 </p>
 
 <p align="center">
-  <img alt="version" src="https://img.shields.io/badge/version-0.6.5-2B63D9">
+  <img alt="version" src="https://img.shields.io/badge/version-0.6.6-2B63D9">
   <img alt="platform" src="https://img.shields.io/badge/platform-Linux-informational">
   <img alt="python" src="https://img.shields.io/badge/python-3.10%2B-blue">
   <img alt="Qt" src="https://img.shields.io/badge/Qt-6%20(PySide6)-41cd52">
 </p>
 
-AppForge keeps portable Linux apps in one library: launch them, add desktop-menu
+> **AppForge is now TuxShelf!** Starting with version **0.6.6**, the project has
+> a new name to give it a more distinctive identity and make it easier to tell
+> apart from other applications. It's the same portable Linux app manager,
+> with your existing library and settings preserved.
+
+TuxShelf keeps portable Linux apps in one library: launch them, add desktop-menu
 shortcuts, check for updates and restore previous versions. It supports AppImages,
 standalone ELF binaries and `#!` scripts. Existing local files stay where they are;
-AppForge reads their metadata without running them.
+TuxShelf reads their metadata without running them.
+
+## What's new in 0.6.6
+
+- **A new name: TuxShelf.** Updated application windows, settings, notifications,
+  menu entries and documentation, along with the `tuxshelf` command and AppImage
+  filenames for new builds.
+- **Continuity for existing users.** Existing libraries, settings, icons and
+  backup records remain available. Earlier library exports can still be imported,
+  and managed shortcuts keep working with the renamed application.
+- **A cleaner title bar.** The main window shows `TuxShelf 0.6.6` without repeating
+  the application name.
+
+See the [full 0.6.6 release notes](releases/RELEASE_NOTES_v0.6.6.md) and
+[upgrade guidance](docs/USAGE.md#upgrading-from-an-earlier-name).
 
 ## Features
 
@@ -40,21 +59,24 @@ AppForge reads their metadata without running them.
   Select several apps to change categories or update settings, create menu shortcuts,
   or remove library entries together.
 - **Stay in the background.** Scheduled checks, notifications, optional tray mode and
-  login startup, light/dark themes, customizable card badge colors and AppForge self-updates.
-  Read bundled release notes after each AppForge update, with an option to hide them.
-  Choose whether to add AppForge to Utilities on first launch or in Settings. If its
-  AppImage moves, AppForge asks before updating the shortcut to the new location.
-
-What's new: [AppForge 0.6.5 release notes](releases/RELEASE_NOTES_v0.6.5.md).
+  login startup, light/dark themes, customizable card badge colors and TuxShelf self-updates.
+  Read bundled release notes after each TuxShelf update, with an option to hide them.
+  Choose whether to add TuxShelf to Utilities on first launch or in Settings. If its
+  AppImage moves, TuxShelf asks before updating the shortcut to the new location.
 
 ## Install
 
-Download `AppForge-<version>-x86_64.AppImage` from
+The application is now named **TuxShelf**. The GitHub repository still uses its
+original address; the release and clone links below point to that existing
+repository. Older releases retain their original filenames. See the
+[upgrade notes](docs/USAGE.md#upgrading-from-an-earlier-name) for data compatibility.
+
+Download `TuxShelf-<version>-x86_64.AppImage` from
 [GitHub Releases](https://github.com/Thilen03/AppForge/releases), then:
 
 ```bash
-chmod +x AppForge-*-x86_64.AppImage
-./AppForge-*-x86_64.AppImage
+chmod +x TuxShelf-*-x86_64.AppImage
+./TuxShelf-*-x86_64.AppImage
 ```
 
 Run these commands in the folder containing the downloaded AppImage. Python and Qt
@@ -69,8 +91,8 @@ are bundled. If FUSE is unavailable, launch with `--appimage-extract-and-run`; s
    skipping unrelated files such as ROMs. Checkboxes control background watching only.
 2. For downloads, paste a repository/release link, select a file and destination, then
    review the Add form. **Add folder…** saves a new destination for discovery too.
-   If the selected file already exists, AppForge checks it and continues to the Add
-   form automatically, including after cancellation or restarting AppForge.
+   If the selected file already exists, TuxShelf checks it and continues to the Add
+   form automatically, including after cancellation or restarting TuxShelf.
 3. Review the name, icon, category and optional **Add to the application menu** choice.
    Local AppImages may suggest an update-source repository; review, change or clear it.
 4. Launch from the card; its arrow selects or edits launch profiles.
@@ -91,14 +113,14 @@ update; downloading starts when you choose **Update**.
 | Self-hosted Forgejo / Gitea / GitLab | `https://git.example.dev/owner/repo` |
 
 Repository and release links are supported; self-hosted sources require HTTPS.
-AppForge uses release APIs, not website scraping. Downloads and updates require an
+TuxShelf uses release APIs, not website scraping. Downloads and updates require an
 AppImage or raw executable; archives and packages are not unpacked.
 
 ## Documentation
 
 | Topic | Guide |
 | --- | --- |
-| Everyday use, tray/startup, backups, data locations and troubleshooting | [Using AppForge](docs/USAGE.md) |
+| Everyday use, tray/startup, backups, data locations and troubleshooting | [Using TuxShelf](docs/USAGE.md) |
 | Download from a repository | [Downloading applications](docs/DOWNLOADING.md) |
 | Scan folders and import existing apps | [Discovery](docs/DISCOVERY.md) |
 | Shared library/desktop-menu categories | [Categories](docs/CATEGORIES.md) |
@@ -110,17 +132,17 @@ AppImage or raw executable; archives and packages are not unpacked.
 ## Privacy and limitations
 
 No telemetry. Network access is limited to release APIs and download/checksum URLs
-for chosen sources, plus AppForge's own releases. Files are inspected without execution;
+for chosen sources, plus TuxShelf's own releases. Files are inspected without execution;
 checksums are verified where published, but GPG/minisign signatures are not.
 
 An optional GitHub token is sent only to `api.github.com`. A token saved in Settings
 is stored **unencrypted** in the local library database (mode 0600); `GITHUB_TOKEN`
 or `GH_TOKEN` avoids storing it there.
 
-Linux only. Discovery supports manual scans and optional folder watching while AppForge
+Linux only. Discovery supports manual scans and optional folder watching while TuxShelf
 is running; symlink paths are excluded. Tray/login behavior
 depends on desktop support. If neither usable versions nor published checksums are
-available, AppForge cannot determine whether an update is needed. Different
+available, TuxShelf cannot determine whether an update is needed. Different
 checksums identify different files, not which version is newer.
 
 ## Development
@@ -131,28 +153,28 @@ Built with Python 3.10+, PySide6 (Qt 6) and SQLite.
 <summary>Run from source, build and test</summary>
 
 ```bash
-git clone https://github.com/Thilen03/AppForge.git
-cd AppForge
+git clone https://github.com/Thilen03/AppForge.git TuxShelf
+cd TuxShelf
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements-dev.txt
-PYTHONPATH=src python -m appforge
+PYTHONPATH=src python -m tuxshelf
 ```
 
 On Arch/CachyOS, Qt may also need `xcb-util-cursor`.
 
 Build the AppImage with `./scripts/build_appimage.sh`. It uses PyInstaller and
 appimagetool, requires `squashfs-tools` and `curl`, and writes
-`dist/AppForge-<version>-x86_64.AppImage`.
+`dist/TuxShelf-<version>-x86_64.AppImage`.
 
 ```bash
 PYTHONPATH=src QT_QPA_PLATFORM=offscreen python -m pytest -q -ra
-PYTHONPATH=src QT_QPA_PLATFORM=offscreen python -m appforge --selftest
+PYTHONPATH=src QT_QPA_PLATFORM=offscreen python -m tuxshelf --selftest
 ```
 
 Real AppImage fixtures need appimagetool and squashfs-tools. Set `APPIMAGETOOL` to
 choose the tool and `APPIMAGE_RUNTIME_FILE` for an offline local Type 2 runtime.
-Socket-dependent tests report skips on restricted hosts. Use `APPFORGE_DATA_DIR`
+Socket-dependent tests report skips on restricted hosts. Use `TUXSHELF_DATA_DIR`
 for a temporary library and isolated desktop launchers.
 
 See the [integration verification report](docs/PHASE_7_PLAN.md) and

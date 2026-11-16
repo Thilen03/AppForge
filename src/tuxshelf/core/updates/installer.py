@@ -1,0 +1,274 @@
+"""Safe in-place AppImage replacement. Pure filesystem/network code, no database.
+
+Guarantees (see tests/test_installer.py):
+* The new file is downloaded to a hidden temp file *in the same directory*; the active AppImage is
+  untouched until the download is complete, size-checked, validated and checksum-verified.
+* The previous version is preserved in ``.<Name>.backups/`` (hard-linked, so nothing is copied or
+  lost) before the active file is atomically swapped with ``os.replace``.
+* Any failure or cancellation removes the temp file and leaves the original and backups intact.
+* Filename and executable permissions of the original are preserved.
+"""
+from __future__ import annotations
+
+import hashlib
+import os
+import re
+import shutil
+import stat
+import tempfile
+import threading
+import time
+import urllib.error
+import urllib.request
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Callable
+
+from ..formats.appimage import appimage_type, find_squashfs_offset
+from ..formats.executable import executable_kind
+from .github import user_agent
+from .net import urlopen
+
+Progress = Callable[[int, int], None]   # (bytes_done, bytes_total or 0)
+MIN_APPIMAGE_BYTES = 64 * 1024
+_STALE_PART_SECONDS = 3600
+
+
+class InstallError(Exception):
+    """User-presentable failure; the original application is untouched."""
+
+
+class InstallCancelled(InstallError):
+    pass
+
+
+@dataclass
+class InstallResult:
+    path: str
+    backup_path: str | None
+    checksum: str            # "verified (sha256)" | "not available"
+    size: int
+
+
+# -- helpers ------------------------------------------------------------------------------
+def backup_dir_for(path: Path) -> Path:
+    stem = re.sub(r"\.appimage$", "", path.name, flags=re.IGNORECASE)
+    return path.parent / f".{stem}.backups"
+
+
+def backup_suffix(format_id: str) -> str:
+    """File extension of backup copies: ``.AppImage`` for AppImages, ``.bak`` for everything else."""
+    return ".AppImage" if format_id == "appimage" else ".bak"
+
+
+def _safe_label(text: str | None) -> str:
+    return re.sub(r"[^A-Za-z0-9._+-]+", "_", (text or "").strip()) or "previous"
+
+
+def _open(url: str, timeout: float = 30):
+    req = urllib.request.Request(url, headers={"User-Agent": user_agent()})
+    return urlopen(req, timeout=timeout)
+
+
+def _download(url: str, fd: int, expected: int, progress: Progress | None,
+              cancel: threading.Event | None) -> tuple[int, str]:
+    sha = hashlib.sha256()
+    done = 0
+    try:
+        # Own the descriptor before opening the URL: connection failures must
+        # close the temporary file too, especially after repeated retries.
+        with os.fdopen(fd, "wb") as out, _open(url) as resp:
+            total = int(resp.headers.get("Content-Length") or expected or 0)
+            last = 0.0
+            while True:
+                if cancel and cancel.is_set():
+                    raise InstallCancelled("Update cancelled.")
+                chunk = resp.read(256 * 1024)
+                if not chunk:
+                    break
+                out.write(chunk)
+                sha.update(chunk)
+                done += len(chunk)
+                now = time.monotonic()
+                if progress and now - last > 0.1:
+                    progress(done, total)
+                    last = now
+            out.flush()
+            os.fsync(out.fileno())
+            if progress:
+                progress(done, total)
+            if total and done != total:
+                raise InstallError(f"The download was incomplete ({done} of {total} bytes).")
+    except urllib.error.HTTPError as exc:
+        raise InstallError(f"The download failed (HTTP {exc.code}).") from exc
+    except (urllib.error.URLError, OSError, TimeoutError) as exc:
+        raise InstallError(f"The download failed: {getattr(exc, 'reason', exc)}") from exc
+    return done, sha.hexdigest()
+
+
+def _fetch_text(url: str, limit: int = 1024 * 1024) -> str | None:
+    try:
+        with _open(url, timeout=20) as resp:
+            return resp.read(limit).decode("utf-8", "replace")
+    except (urllib.error.URLError, OSError, TimeoutError):
+        return None
+
+
+def _parse_checksum_text(text: str, filename: str, *, allow_bare: bool = True) -> str | None:
+    """Return the hex digest listed for exactly ``filename`` (GNU, BSD or bare-hash formats)."""
+    hexp = r"[0-9a-fA-F]{64}(?:[0-9a-fA-F]{64})?"
+    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+    if allow_bare and len(lines) == 1 and re.fullmatch(hexp, lines[0]):
+        return lines[0].lower()                      # a sidecar file containing only the hash
+    for ln in lines:
+        m = re.fullmatch(rf"({hexp})\s+\*?(.+)", ln) or None
+        if m and os.path.basename(m.group(2).strip()) == filename:
+            return m.group(1).lower()
+        b = re.fullmatch(rf"SHA\d+ \((.+)\) = ({hexp})", ln)
+        if b and os.path.basename(b.group(1)) == filename:
+            return b.group(2).lower()
+    return None
+
+
+def find_expected_checksum(asset: dict, assets: list[dict]) -> tuple[str, str] | None:
+    """Return (algorithm, hex digest) published for ``asset`` or None when nothing is available."""
+    digest = asset.get("digest")
+    if digest and ":" in digest:
+        algo, _, value = digest.partition(":")
+        length = {"sha256": 64, "sha512": 128}.get(algo.lower())
+        if length:
+            if not re.fullmatch(rf"[0-9a-fA-F]{{{length}}}", value):
+                raise InstallError("The publisher supplied an invalid asset checksum.")
+            return algo.lower(), value.lower()
+    name = asset["name"]
+    sidecars = [a for a in assets if a["name"] in (f"{name}.sha256", f"{name}.sha256sum", f"{name}.sha512")]
+    sums = [a for a in assets if re.search(r"(sha256sums?|sha512sums?|checksums?)", a["name"], re.I)
+            and a["name"] != name]
+    for a in sidecars + sums:
+        text = _fetch_text(a["url"])
+        if not text:
+            continue
+        hexval = _parse_checksum_text(text, name, allow_bare=a in sidecars)
+        if hexval:
+            return ("sha512" if len(hexval) == 128 else "sha256"), hexval
+    return None
+
+
+def validate_appimage_file(path: Path) -> None:
+    if path.stat().st_size < MIN_APPIMAGE_BYTES:
+        raise InstallError("The downloaded file is too small to be an AppImage.")
+    kind = appimage_type(path)
+    if kind is None:
+        raise InstallError("The downloaded file is not a valid AppImage (wrong file type).")
+    if kind == 2 and find_squashfs_offset(path) is None:
+        raise InstallError("The downloaded AppImage is damaged (no embedded file system found).")
+
+
+def validate_executable_file(path: Path) -> None:
+    """A downloaded standalone executable must be a real ELF binary or a ``#!`` script."""
+    if path.stat().st_size < 20:
+        raise InstallError("The downloaded file is too small to be a program.")
+    if executable_kind(path) is None:
+        raise InstallError("The downloaded file is not a Linux executable (not an ELF binary or "
+                           "script) - the release may only offer an archive or package.")
+
+
+def validate_for_format(path: Path, format_id: str) -> None:
+    (validate_appimage_file if format_id == "appimage" else validate_executable_file)(path)
+
+
+def _hash_file(path: Path, algo: str) -> str:
+    h = hashlib.new(algo)
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def clean_stale_parts(path: Path) -> None:
+    for p in path.parent.glob(f".{path.name}.*.part"):
+        try:
+            if time.time() - p.stat().st_mtime > _STALE_PART_SECONDS:
+                p.unlink()
+        except OSError:
+            pass
+
+
+def download_verified(path: Path, fd: int, asset: dict, assets: list[dict], *,
+                      format_id: str, progress: Progress | None = None,
+                      cancel: threading.Event | None = None) -> tuple[int, str]:
+    """Shared new-download/update validation; _download owns and closes fd."""
+    size, sha256_hex = _download(asset["url"], fd, int(asset.get("size") or 0), progress, cancel)
+    if asset.get("size") and size != int(asset["size"]):
+        raise InstallError("The download size does not match the published asset size.")
+    validate_for_format(path, format_id)
+    expected = find_expected_checksum(asset, assets)
+    if expected:
+        algo, want = expected
+        got = sha256_hex if algo == "sha256" else _hash_file(path, algo)
+        if got != want:
+            raise InstallError(f"Checksum mismatch ({algo}): the download doesn't match what the "
+                               "publisher listed. The update was discarded.")
+        checksum = f"verified ({algo})"
+    else:
+        checksum = "not available"
+    if cancel and cancel.is_set():
+        raise InstallCancelled("Download cancelled.")
+    return size, checksum
+
+
+# -- main entry point ---------------------------------------------------------------------
+def install_update(path: str | os.PathLike, asset: dict, assets: list[dict], *,
+                   old_version: str | None, progress: Progress | None = None,
+                   cancel: threading.Event | None = None,
+                   format_id: str = "appimage") -> InstallResult:
+    target = Path(path)
+    if not target.is_file():
+        raise InstallError("The installed AppImage was not found, so it can't be updated.")
+    if not os.access(target.parent, os.W_OK):
+        raise InstallError(f"TuxShelf can't write to {target.parent}.")
+    size_hint = int(asset.get("size") or 0)
+    if size_hint and shutil.disk_usage(target.parent).free < size_hint * 1.1:
+        raise InstallError("There isn't enough free disk space to download this update.")
+
+    clean_stale_parts(target)
+    fd, tmp_name = tempfile.mkstemp(dir=target.parent, prefix=f".{target.name}.", suffix=".part")
+    tmp = Path(tmp_name)
+    backup: Path | None = None
+    try:
+        size, checksum = download_verified(tmp, fd, asset, assets, format_id=format_id,
+                                           progress=progress, cancel=cancel)
+
+        # permissions: keep the user's mode, make sure it's executable
+        try:
+            mode = stat.S_IMODE(target.stat().st_mode) | 0o111
+        except OSError:
+            mode = 0o755
+        os.chmod(tmp, mode)
+
+        if cancel and cancel.is_set():
+            raise InstallCancelled("Update cancelled.")
+
+        # preserve the current version, then atomically swap
+        bdir = backup_dir_for(target)
+        bdir.mkdir(exist_ok=True)
+        stem = re.sub(r"\.appimage$", "", target.name, flags=re.IGNORECASE)
+        label = _safe_label(old_version)
+        ext = backup_suffix(format_id)
+        backup = bdir / f"{stem}-{label}{ext}"
+        n = 2
+        while backup.exists():
+            backup = bdir / f"{stem}-{label}-{n}{ext}"
+            n += 1
+        try:
+            os.link(target, backup)
+        except OSError:
+            shutil.copy2(target, backup)
+        try:
+            os.replace(tmp, target)
+        except OSError as exc:
+            backup.unlink(missing_ok=True)      # nothing changed, drop the just-made backup
+            raise InstallError(f"Couldn't replace the AppImage: {exc.strerror or exc}") from exc
+        return InstallResult(str(target), str(backup), checksum, size)
+    finally:
+        tmp.unlink(missing_ok=True)

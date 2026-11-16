@@ -4,10 +4,10 @@ from pathlib import Path
 import threading
 
 from test_gui import qapp, wait_for  # noqa: F401
-from appforge.core.details import inspect_details
-from appforge.core.models import UpdateStatus
-from appforge.core.updates.installer import backup_dir_for
-from appforge.ui.main_window import MainWindow
+from tuxshelf.core.details import inspect_details
+from tuxshelf.core.models import UpdateStatus
+from tuxshelf.core.updates.installer import backup_dir_for
+from tuxshelf.ui.main_window import MainWindow
 
 
 def add_script(service, tmp_path):
@@ -37,7 +37,7 @@ def test_read_only_snapshot_sizes_and_missing(service, tmp_path):
 
 def test_permission_failure_is_unavailable(service, tmp_path, monkeypatch):
     entry = add_script(service, tmp_path)
-    import appforge.core.details as details
+    import tuxshelf.core.details as details
     monkeypatch.setattr(details, 'scan_backup_records', lambda _: (_ for _ in ()).throw(PermissionError()))
     result = inspect_details(entry)
     assert result.backup_count is None and result.backup_error
@@ -101,7 +101,7 @@ def test_details_menu_refresh_actions_and_removed(qapp, service, tmp_path, monke
 
 
 def test_worker_uses_no_sqlite_and_ignores_stale_results(qapp, service, tmp_path, monkeypatch):
-    import appforge.ui.details_dialog as ui
+    import tuxshelf.ui.details_dialog as ui
     entry = add_script(service, tmp_path)
     entered, release = threading.Event(), threading.Event()
     original = ui.inspect_details
@@ -130,8 +130,8 @@ def test_worker_uses_no_sqlite_and_ignores_stale_results(qapp, service, tmp_path
 
 
 def test_details_follow_update_install_and_real_rollback(qapp, service, tmp_path):
-    from appforge.core.updates.checker import CheckOutcome
-    from appforge.core.updates.installer import InstallResult
+    from tuxshelf.core.updates.checker import CheckOutcome
+    from tuxshelf.core.updates.installer import InstallResult
     entry = add_script(service, tmp_path)
     win = MainWindow(service)
     win.show_details(entry.id)
@@ -164,7 +164,7 @@ def test_details_follow_update_install_and_real_rollback(qapp, service, tmp_path
 
 
 def test_close_during_scan_does_not_touch_closed_database(qapp, service, tmp_path, monkeypatch):
-    import appforge.ui.details_dialog as ui
+    import tuxshelf.ui.details_dialog as ui
     from PySide6.QtCore import QThreadPool
     entry = add_script(service, tmp_path)
     entered, release = threading.Event(), threading.Event()
@@ -187,7 +187,7 @@ def test_close_during_scan_does_not_touch_closed_database(qapp, service, tmp_pat
 
 
 def test_missing_metadata_and_appimage_elf_formats(qapp, service, tmp_path):
-    from appforge.core.models import AppEntry
+    from tuxshelf.core.models import AppEntry
     for format_id, metadata, expected in (
         ('appimage', {}, 'AppImage'),
         ('executable', {'executable_kind': 'elf'}, 'ELF binary'),

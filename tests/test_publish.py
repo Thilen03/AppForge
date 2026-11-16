@@ -5,6 +5,7 @@ import importlib.util
 import json
 from pathlib import Path
 import subprocess
+import sys
 
 import pytest
 
@@ -12,6 +13,34 @@ SPEC = importlib.util.spec_from_file_location(
     'publish_local', Path(__file__).resolve().parents[1] / 'scripts/publish_local.py')
 pub = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(pub)
+
+
+@pytest.mark.parametrize('command', ['push', 'release'])
+def test_cli_accepts_renamed_checkout(command, monkeypatch):
+    monkeypatch.setattr(pub, '__file__', '/home/thilen/tuxshelf/scripts/publish_local.py')
+    monkeypatch.setattr(sys, 'argv', ['publish_local.py', command, '--dry-run'])
+    calls = []
+    class FakePublisher:
+        def __init__(self, root, dry_run):
+            calls.append((root, dry_run))
+
+        def push(self):
+            calls.append('push')
+
+        def release(self):
+            calls.append('release')
+
+    monkeypatch.setattr(pub, 'Publisher', FakePublisher)
+    pub.main()
+    assert calls == [(Path('/home/thilen/tuxshelf'), True), command]
+
+
+@pytest.mark.parametrize('root', ['/home/thilen/appforge', '/home/thilen/appforge-git', '/tmp/tuxshelf'])
+def test_cli_rejects_other_checkouts(root, monkeypatch):
+    monkeypatch.setattr(pub, '__file__', root + '/scripts/publish_local.py')
+    monkeypatch.setattr(sys, 'argv', ['publish_local.py', 'push', '--dry-run'])
+    with pytest.raises(pub.Stop, match='from /home/thilen/tuxshelf/ only'):
+        pub.main()
 
 
 @pytest.fixture
@@ -23,7 +52,7 @@ def publisher(tmp_path, monkeypatch):
 
 
 @pytest.mark.parametrize('name', [
-    'build/x', 'dist/AppForge-1.0.0-x86_64.AppImage', 'roadmap.md', 'AGENTS.md',
+    'build/x', 'dist/TuxShelf-1.0.0-x86_64.AppImage', 'roadmap.md', 'AGENTS.md',
     'development-instructions.md', 'releases/old.md', '.git/config',
     'src/.env.production', 'src/.envrc', 'docs/secrets/data.txt', 'scripts/private.key',
     'tests/__pycache__/x.pyc', 'src/build/x', 'src/.aws/credentials',
@@ -33,7 +62,7 @@ def test_policy_excludes_private_and_generated(name):
 
 
 @pytest.mark.parametrize('name', ['.gitignore', 'README.md', 'pyproject.toml',
-    'requirements-dev.txt', 'src/appforge/core/discovery.py', 'docs/PUBLISHING.md',
+    'requirements-dev.txt', 'src/tuxshelf/core/discovery.py', 'docs/PUBLISHING.md',
     'scripts/publish_local.py', 'tests/test_publish.py', 'packaging/AppRun',
     'releases/RELEASE_NOTES_v1.2.3.md'])
 def test_policy_approves_public_paths(name):
@@ -127,29 +156,29 @@ def test_confirmation_rejection_never_commits_or_pushes(publisher, monkeypatch):
 def configure_asset(publisher, version='0.10.0'):
     root = publisher.root
     (root / 'dist').mkdir(exist_ok=True)
-    (root / 'src/appforge').mkdir(parents=True, exist_ok=True)
+    (root / 'src/tuxshelf').mkdir(parents=True, exist_ok=True)
     (root / 'pyproject.toml').write_text(f'[project]\nversion = "{version}"\n')
-    (root / 'src/appforge/__init__.py').write_text(f'__version__ = "{version}"\n')
-    path = root / 'dist' / f'AppForge-{version}-x86_64.AppImage'
+    (root / 'src/tuxshelf/__init__.py').write_text(f'__version__ = "{version}"\n')
+    path = root / 'dist' / f'TuxShelf-{version}-x86_64.AppImage'
     path.write_bytes(b'fixture AppImage bytes')
     notes = root / 'releases' / f'RELEASE_NOTES_v{version}.md'
     notes.parent.mkdir(exist_ok=True)
-    notes.write_text(f'# AppForge {version}\n\n## Bug fixes\n- Verified fixture change.\n')
+    notes.write_text(f'# TuxShelf {version}\n\n## Bug fixes\n- Verified fixture change.\n')
     return path
 
 
 def test_highest_version_is_numeric_and_project_match(publisher):
     expected = configure_asset(publisher)
-    (publisher.root / 'dist/AppForge-0.9.9-x86_64.AppImage').write_bytes(b'older')
+    (publisher.root / 'dist/TuxShelf-0.9.9-x86_64.AppImage').write_bytes(b'older')
     assert publisher.select_release() == ('0.10.0', expected)
-    (publisher.root / 'dist/AppForge-0.11.0-x86_64.AppImage').write_bytes(b'newer')
+    (publisher.root / 'dist/TuxShelf-0.11.0-x86_64.AppImage').write_bytes(b'newer')
     with pytest.raises(pub.Stop, match='version declarations'):
         publisher.select_release()
 
 
 def test_empty_and_tied_assets_stop(publisher):
     path = configure_asset(publisher, '1.0.0+one')
-    other = path.with_name('AppForge-1.0.0+two-x86_64.AppImage')
+    other = path.with_name('TuxShelf-1.0.0+two-x86_64.AppImage')
     other.write_bytes(b'different build')
     with pytest.raises(pub.Stop, match='equal SemVer'):
         publisher.select_release()
@@ -290,7 +319,7 @@ def test_confirmed_release_uploads_only_asset_to_exact_commit(publisher, monkeyp
     publisher.release()
     create = next(call for call in calls if call[:3] == ['gh', 'release', 'create'])
     assert create == ['gh', 'release', 'create', 'v0.10.0', str(asset), '--repo', pub.REPO,
-                      '--title', 'AppForge 0.10.0', '--notes-file',
+                      '--title', 'TuxShelf 0.10.0', '--notes-file',
                       str(publisher.root / 'releases/RELEASE_NOTES_v0.10.0.md'),
                       '--target', 'a' * 40]
     assert calls[0] == ['gh', 'auth', 'status']
@@ -362,7 +391,7 @@ def test_public_release_notes_allowlist_is_narrow(name):
 def test_valid_release_notes_are_staged_and_historical_notes_preserved(publisher, monkeypatch):
     path = publisher.root / 'releases/RELEASE_NOTES_v0.5.4.md'
     path.parent.mkdir()
-    path.write_text('# AppForge 0.5.4\n\nHistorical notes remain.\n')
+    path.write_text('# TuxShelf 0.5.4\n\nHistorical notes remain.\n')
     original = path.read_bytes()
     monkeypatch.setattr(publisher, 'names', lambda *args:
                         [] if '--ignored' in args or '--others' in args else
@@ -383,7 +412,7 @@ def test_missing_notes_stop_before_source_push(publisher, monkeypatch):
 def test_wrong_notes_heading_and_symlink_stop(publisher):
     configure_asset(publisher)
     path = publisher.root / 'releases/RELEASE_NOTES_v0.10.0.md'
-    path.write_text('# AppForge 0.9.9\n\nWrong version\n')
+    path.write_text('# TuxShelf 0.9.9\n\nWrong version\n')
     with pytest.raises(pub.Stop, match='version heading'):
         publisher.release_notes('0.10.0')
     path.unlink()
@@ -412,7 +441,7 @@ def test_notes_change_during_push_invalidates_approval(publisher, monkeypatch):
     monkeypatch.setattr(publisher, 'confirm', lambda *args: None)
     path = publisher.root / 'releases/RELEASE_NOTES_v0.10.0.md'
     monkeypatch.setattr(publisher, 'push', lambda: path.write_text(
-        '# AppForge 0.10.0\n\nChanged after approval\n'))
+        '# TuxShelf 0.10.0\n\nChanged after approval\n'))
     calls = []
     monkeypatch.setattr(publisher, 'run', lambda args, **kw:
         calls.append(args) or subprocess.CompletedProcess(args, 0, b'', b''))

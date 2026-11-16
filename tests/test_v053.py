@@ -12,10 +12,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from appforge.core import selfupdate
-from appforge.core.desktop import selflauncher
-from appforge.core.instance import InstanceGuard
-from appforge.core.updates.github import Asset, Release
+from tuxshelf.core import selfupdate
+from tuxshelf.core.desktop import selflauncher
+from tuxshelf.core.instance import InstanceGuard
+from tuxshelf.core.updates.github import Asset, Release
 
 
 def _second_launch(lock, sock, q):
@@ -71,34 +71,34 @@ class InstanceGuardTests(unittest.TestCase):
 class SelfLauncherTests(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp(prefix="afl-"))
-        os.environ["APPFORGE_DATA_DIR"] = str(self.tmp / "data")
-        (self.tmp / "AppForge x.AppImage").write_bytes(b"x")
-        self.exe = self.tmp / "AppForge x.AppImage"
+        os.environ["TUXSHELF_DATA_DIR"] = str(self.tmp / "data")
+        (self.tmp / "TuxShelf x.AppImage").write_bytes(b"x")
+        self.exe = self.tmp / "TuxShelf x.AppImage"
         self.icon = self.tmp / "i.png"
         self.icon.write_bytes(b"png")
         self.apps = self.tmp / "apps"
 
     def test_writes_matching_entry_once(self):
         self.assertTrue(selflauncher.ensure_self_launcher(self.icon, self.exe, self.apps))
-        text = (self.apps / "appforge.desktop").read_text()
-        self.assertIn("StartupWMClass=appforge", text)
+        text = (self.apps / "tuxshelf.desktop").read_text()
+        self.assertIn("StartupWMClass=tuxshelf", text)
         self.assertIn(f"TryExec={self.exe}", text)
         self.assertIn('Exec="' + str(self.exe), text)       # path contains a space -> quoted
-        self.assertIn("Icon=" + str(self.tmp / "data" / "appforge.png"), text)
+        self.assertIn("Icon=" + str(self.tmp / "data" / "tuxshelf.png"), text)
         self.assertFalse(selflauncher.ensure_self_launcher(self.icon, self.exe, self.apps))  # unchanged
 
     def test_follows_a_moved_appimage(self):
         selflauncher.ensure_self_launcher(self.icon, self.exe, self.apps)
-        moved = self.tmp / "AppForge-new.AppImage"
+        moved = self.tmp / "TuxShelf-new.AppImage"
         moved.write_bytes(b"x")
         self.assertTrue(selflauncher.ensure_self_launcher(self.icon, moved, self.apps))
-        self.assertIn(str(moved), (self.apps / "appforge.desktop").read_text())
+        self.assertIn(str(moved), (self.apps / "tuxshelf.desktop").read_text())
 
     def test_foreign_file_is_left_alone(self):
         self.apps.mkdir()
-        (self.apps / "appforge.desktop").write_text("[Desktop Entry]\nName=Mine\n")
+        (self.apps / "tuxshelf.desktop").write_text("[Desktop Entry]\nName=Mine\n")
         self.assertFalse(selflauncher.ensure_self_launcher(self.icon, self.exe, self.apps))
-        self.assertIn("Mine", (self.apps / "appforge.desktop").read_text())
+        self.assertIn("Mine", (self.apps / "tuxshelf.desktop").read_text())
 
     def test_source_run_writes_nothing(self):
         os.environ.pop("APPIMAGE", None)
@@ -115,7 +115,7 @@ class _Client:
 
 
 def _rel(tag, **kw):
-    assets = [Asset(f"AppForge-{tag.lstrip('v')}-x86_64.AppImage", "https://x/a", 100),
+    assets = [Asset(f"TuxShelf-{tag.lstrip('v')}-x86_64.AppImage", "https://x/a", 100),
               Asset("SHA256SUMS", "https://x/s", 10)]
     return Release(tag=tag, html_url="https://github.com/Thilen03/AppForge/releases/tag/" + tag,
                    assets=assets, **kw)
@@ -125,7 +125,7 @@ class SelfUpdateTests(unittest.TestCase):
     def test_newer_release_carries_the_appimage_asset(self):
         up = selfupdate.check_self_update(_Client([_rel("v0.5.4"), _rel("v0.5.3")]), current="0.5.3")
         self.assertEqual(up.version, "0.5.4")
-        self.assertEqual(up.asset["name"], "AppForge-0.5.4-x86_64.AppImage")
+        self.assertEqual(up.asset["name"], "TuxShelf-0.5.4-x86_64.AppImage")
         self.assertEqual(len(up.assets), 2)
 
     def test_up_to_date_and_prereleases_ignored(self):
@@ -138,7 +138,7 @@ class SelfUpdateTests(unittest.TestCase):
         os.environ.pop("APPIMAGE", None)
         self.assertIn("AppImage", selfupdate.install_blocker(up))
         tmp = Path(tempfile.mkdtemp())
-        f = tmp / "AppForge.AppImage"
+        f = tmp / "TuxShelf.AppImage"
         f.write_bytes(b"x")
         os.environ["APPIMAGE"] = str(f)
         self.assertIsNone(selfupdate.install_blocker(up))
@@ -147,17 +147,17 @@ class SelfUpdateTests(unittest.TestCase):
 
     def test_prune_keeps_newest_two(self):
         tmp = Path(tempfile.mkdtemp())
-        target = tmp / "AppForge.AppImage"
+        target = tmp / "TuxShelf.AppImage"
         target.write_bytes(b"x")
-        bdir = tmp / ".AppForge.backups"
+        bdir = tmp / ".TuxShelf.backups"
         bdir.mkdir()
         for i in range(5):
-            p = bdir / f"AppForge-0.{i}.AppImage"
+            p = bdir / f"TuxShelf-0.{i}.AppImage"
             p.write_bytes(b"x")
             os.utime(p, (1000 + i, 1000 + i))
         selfupdate.prune_backups(target, keep=2)
         self.assertEqual(sorted(p.name for p in bdir.iterdir()),
-                         ["AppForge-0.3.AppImage", "AppForge-0.4.AppImage"])
+                         ["TuxShelf-0.3.AppImage", "TuxShelf-0.4.AppImage"])
 
 
 if __name__ == "__main__":

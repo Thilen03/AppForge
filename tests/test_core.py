@@ -4,12 +4,12 @@ from pathlib import Path
 
 import pytest
 
-from appforge.core.database import Database
-from appforge.core.formats.appimage import suggest_name_from_filename, version_from_filename
-from appforge.core.github_url import parse_repo
-from appforge.core.library import FileState, LibraryError, LibraryService, file_state, inspect_file
-from appforge.core.paths import database_path, icons_dir
-from appforge.services import launcher
+from tuxshelf.core.database import Database
+from tuxshelf.core.formats.appimage import suggest_name_from_filename, version_from_filename
+from tuxshelf.core.github_url import parse_repo
+from tuxshelf.core.library import FileState, LibraryError, LibraryService, file_state, inspect_file
+from tuxshelf.core.paths import database_path, icons_dir
+from tuxshelf.services import launcher
 
 
 def test_name_and_version_from_filename():
@@ -148,7 +148,7 @@ def test_launch_reports_early_failure(fixtures, service):
 
 def test_clean_environment_restores_ld_library_path():
     env = launcher.clean_environment({"LD_LIBRARY_PATH": "/bundle", "LD_LIBRARY_PATH_ORIG": "/usr/lib",
-                                      "APPDIR": "/x", "_AF_BUNDLED": "1", "HOME": "/h"})
+                                      "APPDIR": "/x", "_TUXSHELF_BUNDLED": "1", "HOME": "/h"})
     assert env == {"LD_LIBRARY_PATH": "/usr/lib", "HOME": "/h"}
-    env = launcher.clean_environment({"LD_LIBRARY_PATH": "/bundle", "_AF_BUNDLED": "1"})
+    env = launcher.clean_environment({"LD_LIBRARY_PATH": "/bundle", "_TUXSHELF_BUNDLED": "1"})
     assert "LD_LIBRARY_PATH" not in env

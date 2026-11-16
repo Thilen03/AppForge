@@ -44,15 +44,15 @@ def fixtures(tmp_path_factory):
 
 @pytest.fixture()
 def data_dir(tmp_path, monkeypatch):
-    monkeypatch.setenv("APPFORGE_DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.setenv("TUXSHELF_DATA_DIR", str(tmp_path / "data"))
     return tmp_path / "data"
 
 
 @pytest.fixture()
 def service(data_dir):
-    from appforge.core.database import Database
-    from appforge.core.library import LibraryService
-    from appforge.core.paths import database_path, icons_dir
+    from tuxshelf.core.database import Database
+    from tuxshelf.core.library import LibraryService
+    from tuxshelf.core.paths import database_path, icons_dir
     db = Database(database_path())
     yield LibraryService(db, icons_dir())
     db.close()

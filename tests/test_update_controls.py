@@ -3,13 +3,13 @@ import pytest
 
 from test_gui import qapp  # noqa: F401
 from test_tray import add, available, window  # noqa: F401
-from appforge.core.database import Database
-from appforge.core.models import UpdateStatus
-from appforge.core.organize import Filter, UPDATES, matches
-from appforge.core.update_policy import updates_paused, version_skipped
-from appforge.core.updates.checker import CheckOutcome
-from appforge.core.updates.service import UpdateService, can_update
-from appforge.ui.popups import RoundedMenu
+from tuxshelf.core.database import Database
+from tuxshelf.core.models import UpdateStatus
+from tuxshelf.core.organize import Filter, UPDATES, matches
+from tuxshelf.core.update_policy import updates_paused, version_skipped
+from tuxshelf.core.updates.checker import CheckOutcome
+from tuxshelf.core.updates.service import UpdateService, can_update
+from tuxshelf.ui.popups import RoundedMenu
 
 
 def action(window, app_id, text):
@@ -153,9 +153,9 @@ def test_controls_disabled_while_busy(window, service, tmp_path):
 
 
 def test_pause_without_source_and_missing_file_still_allows_repair(qapp):
-    from appforge.core.library import FileState
-    from appforge.core.models import AppEntry
-    from appforge.ui.app_card import AppCard
+    from tuxshelf.core.library import FileState
+    from tuxshelf.core.models import AppEntry
+    from tuxshelf.ui.app_card import AppCard
     entry = AppEntry(name='Missing', path='/missing', metadata={'updates_paused': True})
     card = AppCard(entry, FileState.MISSING)
     assert card._status_chip()[:2] == ('Update paused', 'paused')

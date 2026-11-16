@@ -7,11 +7,11 @@ from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import QMessageBox
 
 from test_discovery import program, qapp, wait  # noqa: F401
-from appforge.core.discovery import IGNORED_KEY, ROOTS_KEY, import_candidate, save_paths
-from appforge.core.discovery_watch import WATCHED_KEY, scan_watched
-from appforge.ui.discovery_dialog import DiscoveryDialog
-from appforge.ui.discovery_watch import DiscoveryWatcher
-from appforge.ui.main_window import MainWindow
+from tuxshelf.core.discovery import IGNORED_KEY, ROOTS_KEY, import_candidate, save_paths
+from tuxshelf.core.discovery_watch import WATCHED_KEY, scan_watched
+from tuxshelf.ui.discovery_dialog import DiscoveryDialog
+from tuxshelf.ui.discovery_watch import DiscoveryWatcher
+from tuxshelf.ui.main_window import MainWindow
 
 
 def watch(service, root):
@@ -25,7 +25,7 @@ def poll(qapp, watcher):
 
 
 def test_stable_files_cached_but_changes_need_another_poll(tmp_path, monkeypatch):
-    import appforge.core.discovery as discovery
+    import tuxshelf.core.discovery as discovery
     app = program(tmp_path / 'nested' / 'app')
     original = discovery.inspect_file
     inspected = []
@@ -161,9 +161,9 @@ def test_controller_async_import_ignore_removal_and_no_repeat_count(qapp, servic
 
 
 def test_busy_reconfiguration_discards_stale_result_and_stop_cancels(qapp, service, tmp_path, monkeypatch):
-    import appforge.ui.discovery_watch as module
-    from appforge.core.discovery import ScanResult
-    from appforge.core.discovery_watch import WatchState
+    import tuxshelf.ui.discovery_watch as module
+    from tuxshelf.core.discovery import ScanResult
+    from tuxshelf.core.discovery_watch import WatchState
     watch(service, tmp_path)
     started = threading.Event()
     cancels = []
@@ -238,7 +238,7 @@ def test_timer_detects_new_arrivals_without_manual_scan(qapp, service, tmp_path)
 
 
 def test_unchanged_non_apps_are_not_reopened(tmp_path, monkeypatch):
-    import appforge.core.discovery as discovery
+    import tuxshelf.core.discovery as discovery
     program(tmp_path / 'notes.txt', b'not an application')
     _, state = scan_watched([str(tmp_path)])
     result, state = scan_watched([str(tmp_path)], previous=state)

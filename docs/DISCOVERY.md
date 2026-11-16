@@ -10,7 +10,7 @@ and import them into your library. It does not download or install applications.
    `/opt`. Use **Add folder…**, **Remove folder**, or **Default folders** as needed.
    Your chosen folders are remembered for later scans. The selected folder uses a
    compact highlight with spacing between entries in both light and dark themes.
-3. Click **Scan folders**. AppForge scans these folders and their subfolders in the
+3. Click **Scan folders**. TuxShelf scans these folders and their subfolders in the
    background, reporting progress. **Cancel scan** stops between file reads and
    keeps results found so far.
 
@@ -41,7 +41,7 @@ watch. Leave other folders unchecked for manual scanning only. Watch choices are
 saved immediately and remembered across restarts. Removing a discovery folder
 also stops watching it. Newly added folders start unchecked.
 
-While AppForge is running, selected folders and their subfolders are checked in
+While TuxShelf is running, selected folders and their subfolders are checked in
 the background about every 10 seconds. A file must remain unchanged between two
 checks before it is offered, so newly completed downloads normally appear within
 about 20 seconds (large folders or slow metadata reads can take longer). Existing
@@ -56,7 +56,7 @@ Registered and ignored files are excluded; the count updates as files are import
 ignored or removed. The count remains available if you close the preview without
 importing. Use the preview's normal ignore/reset controls for unwanted files.
 
-Watching continues when AppForge is hidden in the tray, and stops when you quit.
+Watching continues when TuxShelf is hidden in the tray, and stops when you quit.
 It is disabled by default. Missing or temporarily inaccessible folders are retried
 on later checks; use **Scan folders** to see detailed filesystem errors. Files are
 never executed by watching, and the normal import checks still reject files that
@@ -95,7 +95,7 @@ Searching also works when reviewing apps found by folder watching.
   already imported remain in your library.
 
 Import keeps application files at their original locations. Before each import,
-AppForge checks for changed or missing files, executable permissions where needed,
+TuxShelf checks for changed or missing files, executable permissions where needed,
 and duplicate library entries. Errors are displayed; other applications can still
 be processed. If a file changed, scan again before retrying it.
 
@@ -107,13 +107,13 @@ visible but cannot be imported, and the ignore list survives restarts.
 
 ## Scan limitations
 
-- Folder watching runs only while AppForge is running and only for checked
+- Folder watching runs only while TuxShelf is running and only for checked
   discovery folders. It polls periodically rather than reacting instantly.
 - Files that are still changing are deferred; a paused download that appears stable
   between checks may be offered. Import rechecks that the file still matches the preview.
 - Symlinked files and folders, including symlinked roots or ancestor folders, are
   skipped. Select the actual folder path instead of a symlink.
-- AppForge-managed hidden backup folders are excluded from discovery.
+- TuxShelf-managed hidden backup folders are excluded from discovery.
 - Inaccessible or changing files can produce errors; review them before retrying.
 - Cancellation and closing during a scan wait for the current metadata read to
   finish, which may take time for large files.

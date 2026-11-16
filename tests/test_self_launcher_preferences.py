@@ -4,10 +4,10 @@ from PySide6.QtWidgets import QMessageBox
 
 from test_gui import qapp  # noqa: F401
 from test_tray import window  # noqa: F401
-from appforge.core.desktop import selflauncher
-from appforge.core.paths import applications_dir
-from appforge.core.settings import AppSettings
-from appforge.ui.settings_dialog import SettingsDialog
+from tuxshelf.core.desktop import selflauncher
+from tuxshelf.core.paths import applications_dir
+from tuxshelf.core.settings import AppSettings
+from tuxshelf.ui.settings_dialog import SettingsDialog
 
 
 def entry():
@@ -19,8 +19,8 @@ def test_create_refresh_remove_and_source_command(service, monkeypatch):
     selflauncher.set_enabled(True)
     dest = entry()
     text = dest.read_text()
-    assert 'StartupWMClass=appforge' in text
-    assert '-m appforge' in text and 'PYTHONPATH=' in text
+    assert 'StartupWMClass=tuxshelf' in text
+    assert '-m tuxshelf' in text and 'PYTHONPATH=' in text
     assert selflauncher.launcher_installed()
     before = dest.stat().st_mtime_ns
     selflauncher.set_enabled(True)
@@ -31,12 +31,12 @@ def test_create_refresh_remove_and_source_command(service, monkeypatch):
 
 
 def test_appimage_command_and_refresh_after_move(service, tmp_path, monkeypatch):
-    appimage = tmp_path / 'AppForge one.AppImage'
+    appimage = tmp_path / 'TuxShelf one.AppImage'
     appimage.write_bytes(b'appimage')
     monkeypatch.setenv('APPIMAGE', str(appimage))
     selflauncher.set_enabled(True)
     assert f'Exec="{appimage}" %F' in entry().read_text()
-    moved = appimage.rename(tmp_path / 'AppForge two.AppImage')
+    moved = appimage.rename(tmp_path / 'TuxShelf two.AppImage')
     monkeypatch.setenv('APPIMAGE', str(moved))
     selflauncher.set_enabled(True)
     assert str(moved) in entry().read_text()
@@ -54,7 +54,7 @@ def test_protect_unmanaged_paths(service, tmp_path, kind):
         dest.mkdir()
     else:
         if kind == 'symlink':
-            target.write_text('X-AppForge-Self=true\n')
+            target.write_text('X-TuxShelf-Self=true\n')
         dest.symlink_to(target)
     with pytest.raises(selflauncher.SelfLauncherError):
         selflauncher.set_enabled(True)
@@ -65,7 +65,7 @@ def test_protect_unmanaged_paths(service, tmp_path, kind):
         with pytest.raises(selflauncher.SelfLauncherError):
             selflauncher.set_enabled(False)
     if target.exists():
-        assert target.read_text() == 'X-AppForge-Self=true\n'
+        assert target.read_text() == 'X-TuxShelf-Self=true\n'
     assert dest.exists() or dest.is_symlink()
 
 
@@ -77,7 +77,7 @@ def test_atomic_write_error_preserves_existing(service, monkeypatch):
     with pytest.raises(selflauncher.SelfLauncherError, match='read only'):
         selflauncher.set_enabled(True)
     assert entry().read_bytes() == original
-    assert list(entry().parent.glob('.appforge-*.tmp')) == []
+    assert list(entry().parent.glob('.tuxshelf-*.tmp')) == []
 
 
 @pytest.mark.parametrize('yes', [True, False])
@@ -89,7 +89,7 @@ def test_first_start_choice_once_and_before_notes(qapp, window, yes):
     qapp.processEvents()
     box = window._launcher_prompt
     assert box is not None and box.isVisible()
-    assert window._appforge_notes is None
+    assert window._tuxshelf_notes is None
     window._show_startup_dialogs()
     assert window._launcher_prompt is box
     box.button(QMessageBox.Yes if yes else QMessageBox.No).click()
@@ -97,7 +97,7 @@ def test_first_start_choice_once_and_before_notes(qapp, window, yes):
     assert window.settings.self_launcher_prompted
     assert window.settings.self_launcher_enabled == yes
     assert selflauncher.launcher_installed() == yes
-    assert window._appforge_notes.isVisible()
+    assert window._tuxshelf_notes.isVisible()
     window.hide()
     window.show()
     qapp.processEvents()
@@ -177,26 +177,26 @@ def test_prompt_creation_failure_is_reported_and_retryable(qapp, window, monkeyp
     assert messages == ['Permission denied']
     assert not window.settings.self_launcher_prompted
     assert not window.settings.self_launcher_enabled
-    assert window._appforge_notes is None
+    assert window._tuxshelf_notes is None
 
 
-def test_utility_category_for_all_appforge_entries(service):
+def test_utility_category_for_all_tuxshelf_entries(service):
     from pathlib import Path
-    from appforge.core import selfintegration
+    from tuxshelf.core import selfintegration
     selflauncher.set_enabled(True)
     assert 'Categories=Utility;' in entry().read_text().splitlines()
     assert 'Categories=Utility;' in selfintegration.render_self_entry(['/test'], 'icon').splitlines()
-    packaged = Path(__file__).resolve().parents[1] / 'packaging/appforge.desktop'
+    packaged = Path(__file__).resolve().parents[1] / 'packaging/tuxshelf.desktop'
     assert [line for line in packaged.read_text().splitlines() if line.startswith('Categories=')] == ['Categories=Utility;']
 
 
 def test_unchanged_appimage_does_not_write_or_prompt(qapp, window, tmp_path, monkeypatch):
-    image = tmp_path / 'AppForge.AppImage'
+    image = tmp_path / 'TuxShelf.AppImage'
     image.write_bytes(b'appimage')
     monkeypatch.setenv('APPIMAGE', str(image))
     selflauncher.set_enabled(True)
     before = entry().stat()
-    icon = entry().parent.parent / 'appforge.png'
+    icon = entry().parent.parent / 'tuxshelf.png'
     icon_before = icon.stat().st_mtime_ns
     window._refresh_self_launcher()
     assert selflauncher.moved_appimage() is None
@@ -211,7 +211,7 @@ def test_unchanged_appimage_does_not_write_or_prompt(qapp, window, tmp_path, mon
 @pytest.mark.parametrize('yes', [True, False])
 @pytest.mark.parametrize('move', ['folder', 'rename'])
 def test_moved_appimage_requires_consent(qapp, window, tmp_path, monkeypatch, yes, move):
-    image = tmp_path / 'AppForge old.AppImage'
+    image = tmp_path / 'TuxShelf old.AppImage'
     image.write_bytes(b'appimage')
     monkeypatch.setenv('APPIMAGE', str(image))
     selflauncher.set_enabled(True)
@@ -219,7 +219,7 @@ def test_moved_appimage_requires_consent(qapp, window, tmp_path, monkeypatch, ye
     old_stat = entry().stat()
     directory = tmp_path / 'New folder' if move == 'folder' else tmp_path
     directory.mkdir(exist_ok=True)
-    moved = image.rename(directory / ('AppForge old.AppImage' if move == 'folder' else 'Renamed.AppImage'))
+    moved = image.rename(directory / ('TuxShelf old.AppImage' if move == 'folder' else 'Renamed.AppImage'))
     monkeypatch.setenv('APPIMAGE', str(moved))
     window._refresh_self_launcher()
     assert entry().read_bytes() == original
@@ -232,7 +232,7 @@ def test_moved_appimage_requires_consent(qapp, window, tmp_path, monkeypatch, ye
     assert 'moved' in prompt.windowTitle()
     assert str(image) in prompt.informativeText()
     assert str(moved) in prompt.informativeText()
-    assert window._appforge_notes is None
+    assert window._tuxshelf_notes is None
     prompt.button(QMessageBox.Yes if yes else QMessageBox.No).click()
     qapp.processEvents()
     assert window._launcher_prompt is None
@@ -296,7 +296,7 @@ def test_disabled_shortcut_does_not_offer_move_repair(qapp, window, tmp_path, mo
 
 
 def test_existing_same_location_shortcut_migrates_to_utility_without_prompt(qapp, window, tmp_path, monkeypatch):
-    image = tmp_path / 'AppForge.AppImage'
+    image = tmp_path / 'TuxShelf.AppImage'
     image.write_bytes(b'appimage')
     monkeypatch.setenv('APPIMAGE', str(image))
     selflauncher.set_enabled(True)
