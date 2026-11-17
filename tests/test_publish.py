@@ -310,7 +310,7 @@ def test_confirmed_release_uploads_only_asset_to_exact_commit(publisher, monkeyp
     monkeypatch.setattr(publisher, 'remote_release', lambda tag: False)
     def run(args, **kwargs):
         calls.append(args)
-        data = {'url': 'https://github.com/Thilen03/AppForge/releases/tag/v0.10.0',
+        data = {'url': 'https://github.com/Thilen03/TuxShelf/releases/tag/v0.10.0',
                 'tagName': 'v0.10.0',
                 'body': (publisher.root / 'releases/RELEASE_NOTES_v0.10.0.md').read_text(), 'assets': [{'name': asset.name,
                     'size': asset.stat().st_size, 'digest': 'sha256:' + pub.sha256(asset)}]}
@@ -342,7 +342,12 @@ def test_no_release_when_confirmation_declined(publisher, monkeypatch):
     assert calls == [['gh', 'auth', 'status']]
 
 
-def test_readonly_metadata_is_reported_without_write_probe(publisher, monkeypatch):
+@pytest.mark.parametrize('url', [
+    'https://github.com/Thilen03/TuxShelf.git',
+    'git@github.com:Thilen03/TuxShelf.git',
+    'https://github.com/Thilen03/AppForge.git',
+])
+def test_repository_identity_checks_renamed_remote(publisher, monkeypatch, url):
     def git(*args):
         if args == ('rev-parse', '--show-toplevel'):
             return str(publisher.root)
@@ -352,10 +357,11 @@ def test_readonly_metadata_is_reported_without_write_probe(publisher, monkeypatc
             return 'origin/main'
         if args == ('rev-parse', '--absolute-git-dir'):
             return str(publisher.root / '.git')
-        return next(iter(pub.URLS))
+        return url
     monkeypatch.setattr(publisher, 'git', git)
     monkeypatch.setattr(pub.os, 'access', lambda *args: False)
-    with pytest.raises(pub.Stop, match='read-only'):
+    expected = 'Unexpected or multiple origin URLs' if 'AppForge' in url else 'read-only'
+    with pytest.raises(pub.Stop, match=expected):
         publisher.identity()
 
 

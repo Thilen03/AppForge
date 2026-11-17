@@ -24,6 +24,7 @@ from ..core.models import AppEntry
 from ..core.launch_options import LAUNCH_KEYS
 from .launch_options_dialog import LaunchOptionsDialog
 from .icons import app_pixmap, placeholder_pixmap
+from .icon_url_dialog import choose_icon_url
 from .popups import RoundedComboBox
 
 FILE_FILTER = "AppImage (*.AppImage *.appimage);;All files (*)"   # programs and scripts: pick "All files"
@@ -190,6 +191,9 @@ class AddApplicationDialog(QDialog):
         self.icon_reset_btn.clicked.connect(self._reset_icon_choice)
         self.icon_reset_btn.hide()
         icon_col.addWidget(self.icon_btn)
+        self.icon_url_btn = QPushButton("Image link…")
+        self.icon_url_btn.clicked.connect(self._choose_icon_url)
+        icon_col.addWidget(self.icon_url_btn)
         icon_col.addWidget(self.icon_reset_btn)
         icon_col.addStretch(1)
         d.addLayout(icon_col)
@@ -344,6 +348,7 @@ class AddApplicationDialog(QDialog):
                                    "You can enter a repository URL manually for this file.")
         self.name_edit.setEnabled(True)
         self.icon_btn.setEnabled(True)
+        self.icon_url_btn.setEnabled(True)
         if not self._name_touched or not self.name_edit.text():
             self.name_edit.setText(md.name_suggestion)
         fmt = get_format(md.format_id)
@@ -377,6 +382,17 @@ class AddApplicationDialog(QDialog):
         self._show_file_msg("" if self.metadata else self.file_msg.text())
         self._render_icon()
 
+    def _choose_icon_url(self):
+        try:
+            path = choose_icon_url(self)
+        except OSError as exc:
+            self._show_file_msg(f"Could not save the downloaded image: {exc}")
+            return
+        if path:
+            self._custom_icon = path
+            self._show_file_msg("")
+            self._render_icon()
+
     def _reset_icon_choice(self):
         self._custom_icon = None
         self._render_icon()
@@ -399,6 +415,7 @@ class AddApplicationDialog(QDialog):
     def _reset_details(self):
         self.icon_lbl.setPixmap(placeholder_pixmap("?", 80, self.devicePixelRatioF()))
         self.icon_btn.setEnabled(False)
+        self.icon_url_btn.setEnabled(False)
         self.icon_reset_btn.hide()
         self.name_edit.setEnabled(False)
         self.name_edit.clear()
@@ -533,6 +550,9 @@ class EditApplicationDialog(QDialog):
         self.icon_reset_btn.clicked.connect(self._reset_icon_choice)
         self.icon_reset_btn.setVisible(bool(entry.metadata.get("custom_icon")))
         icon_btns.addWidget(self.icon_btn)
+        self.icon_url_btn = QPushButton("Image link…")
+        self.icon_url_btn.clicked.connect(self._choose_icon_url)
+        icon_btns.addWidget(self.icon_url_btn)
         icon_btns.addWidget(self.icon_reset_btn)
         head.addLayout(icon_btns)
         lay.addLayout(head)
@@ -638,6 +658,18 @@ class EditApplicationDialog(QDialog):
         self._new_icon, self._reset_icon = path, False
         self.icon_lbl.setPixmap(app_pixmap(path, self.name_edit.text(), 56, self.devicePixelRatioF()))
         self.icon_reset_btn.show()
+
+    def _choose_icon_url(self):
+        try:
+            path = choose_icon_url(self)
+        except OSError as exc:
+            self.error_lbl.setText(f"Could not save the downloaded image: {exc}")
+            return
+        if path:
+            self.error_lbl.clear()
+            self._new_icon, self._reset_icon = path, False
+            self.icon_lbl.setPixmap(app_pixmap(path, self.name_edit.text(), 56, self.devicePixelRatioF()))
+            self.icon_reset_btn.show()
 
     def _reset_icon_choice(self):
         self._new_icon, self._reset_icon = None, True

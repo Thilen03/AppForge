@@ -122,6 +122,17 @@ def _rel(tag, **kw):
 
 
 class SelfUpdateTests(unittest.TestCase):
+    def test_checks_renamed_github_repository(self):
+        calls = []
+
+        class Client:
+            def releases(self, owner, name):
+                calls.append((owner, name))
+                return []
+
+        self.assertIsNone(selfupdate.check_self_update(Client(), current="0.6.6"))
+        self.assertEqual(calls, [("Thilen03", "TuxShelf")])
+
     def test_newer_release_carries_the_appimage_asset(self):
         up = selfupdate.check_self_update(_Client([_rel("v0.5.4"), _rel("v0.5.3")]), current="0.5.3")
         self.assertEqual(up.version, "0.5.4")

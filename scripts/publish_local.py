@@ -13,7 +13,7 @@ import re
 import subprocess
 import sys
 
-REPO = 'Thilen03/AppForge'
+REPO = 'Thilen03/TuxShelf'
 URLS = {f'https://github.com/{REPO}.git', f'git@github.com:{REPO}.git'}
 DIRECTORIES = {'src', 'docs', 'packaging', 'scripts', 'tests', 'releases'}
 FILES = {'.gitignore', 'README.md', 'pyproject.toml', 'requirements.txt',

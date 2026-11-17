@@ -2,9 +2,17 @@
 
 Run these commands in a Linux terminal from `/home/thilen/tuxshelf/`.
 The source package, working directory and new assets use TuxShelf. The configured
-GitHub remote remains `https://github.com/Thilen03/AppForge.git`. The publisher checks
+GitHub remote is `https://github.com/Thilen03/TuxShelf.git`. The publisher checks
 that existing remote and selects only `TuxShelf-<version>-x86_64.AppImage`; it never
 renames or uploads an older binary to make it match the new branding.
+
+For a checkout created before the GitHub repository rename, update its remote
+once in your Linux terminal before publishing:
+
+```bash
+git remote set-url origin https://github.com/Thilen03/TuxShelf.git
+git remote -v
+```
 
 Python 3.10+ and Git are required; releases additionally require authenticated `gh`.
 The ChatGPT source-folder sandbox may allow source edits while protecting `.git`;

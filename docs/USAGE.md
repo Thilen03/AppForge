@@ -352,6 +352,22 @@ approval of the move/repair prompt. Existing locks are shared with earlier
 versions when opening the same legacy installation; close the earlier version
 before starting the renamed AppImage.
 
-The project working directory and GitHub repository address remain unchanged.
-Renaming the hosted repository is a separate operation; release links, self-update
-requests and publishing checks continue using its existing address.
+The GitHub repository is now [Thilen03/TuxShelf](https://github.com/Thilen03/TuxShelf).
+Release links, self-update requests and publishing checks use this address.
+Source checkouts with the earlier remote need the one-time remote update in the
+[publishing guide](PUBLISHING.md).
+
+## Custom application icons
+
+When adding or editing an application, choose **Change icon…** for an image on
+your computer, or **Image link…** for a direct HTTP/HTTPS image URL. Paste the
+link and click **Download** to preview it. Links to web pages are not image links.
+Downloads can be cancelled; a failed download leaves your previous icon choice
+unchanged. Images must be readable, at most 10 MB and no more than 16 million
+pixels. Downloaded images are converted to PNG; the converted file must also fit
+the 10 MB limit.
+
+Save the application to keep its icon in TuxShelf's managed icon cache. The image
+remains available offline and is preserved when application metadata is refreshed.
+Choose **Use default** (or **Use default icon** when editing) to restore the
+application's embedded icon, or a placeholder when no embedded icon is available.

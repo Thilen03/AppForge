@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img alt="version" src="https://img.shields.io/badge/version-0.6.6-2B63D9">
+  <img alt="version" src="https://img.shields.io/badge/version-0.6.7-2B63D9">
   <img alt="platform" src="https://img.shields.io/badge/platform-Linux-informational">
   <img alt="python" src="https://img.shields.io/badge/python-3.10%2B-blue">
   <img alt="Qt" src="https://img.shields.io/badge/Qt-6%20(PySide6)-41cd52">
@@ -26,19 +26,20 @@ shortcuts, check for updates and restore previous versions. It supports AppImage
 standalone ELF binaries and `#!` scripts. Existing local files stay where they are;
 TuxShelf reads their metadata without running them.
 
-## What's new in 0.6.6
+## What's new in 0.6.7
 
-- **A new name: TuxShelf.** Updated application windows, settings, notifications,
-  menu entries and documentation, along with the `tuxshelf` command and AppImage
-  filenames for new builds.
-- **Continuity for existing users.** Existing libraries, settings, icons and
-  backup records remain available. Earlier library exports can still be imported,
-  and managed shortcuts keep working with the renamed application.
-- **A cleaner title bar.** The main window shows `TuxShelf 0.6.6` without repeating
-  the application name.
+- **Custom icons from image links.** Paste a direct HTTP/HTTPS image URL when
+  adding or editing an application. TuxShelf downloads and previews the image,
+  then keeps the saved icon available offline in its managed cache.
+- Downloads run in the background and can be cancelled. Invalid images and
+  oversized downloads leave your existing icon unchanged.
+- Release links, self-updates and publishing checks use the renamed TuxShelf
+  GitHub repository.
+- AppImage builds use the build environment's Python directly, avoiding broken
+  launcher paths after the project folder is renamed.
 
-See the [full 0.6.6 release notes](releases/RELEASE_NOTES_v0.6.6.md) and
-[upgrade guidance](docs/USAGE.md#upgrading-from-an-earlier-name).
+See the [full 0.6.7 release notes](releases/RELEASE_NOTES_v0.6.7.md) and
+[custom icon guide](docs/USAGE.md#custom-application-icons).
 
 ## Features
 
@@ -66,13 +67,12 @@ See the [full 0.6.6 release notes](releases/RELEASE_NOTES_v0.6.6.md) and
 
 ## Install
 
-The application is now named **TuxShelf**. The GitHub repository still uses its
-original address; the release and clone links below point to that existing
-repository. Older releases retain their original filenames. See the
+The application and GitHub repository are now named **TuxShelf**. Older releases
+retain their original filenames. See the
 [upgrade notes](docs/USAGE.md#upgrading-from-an-earlier-name) for data compatibility.
 
 Download `TuxShelf-<version>-x86_64.AppImage` from
-[GitHub Releases](https://github.com/Thilen03/AppForge/releases), then:
+[GitHub Releases](https://github.com/Thilen03/TuxShelf/releases), then:
 
 ```bash
 chmod +x TuxShelf-*-x86_64.AppImage
@@ -94,6 +94,10 @@ are bundled. If FUSE is unavailable, launch with `--appimage-extract-and-run`; s
    If the selected file already exists, TuxShelf checks it and continues to the Add
    form automatically, including after cancellation or restarting TuxShelf.
 3. Review the name, icon, category and optional **Add to the application menu** choice.
+   Use **Change icon…** for a local image or **Image link…** to download a custom icon
+   from a direct HTTP/HTTPS image URL (up to 10 MB and 16 million pixels). Both options
+   are also available when editing an app. Saved icons stay in TuxShelf’s icon cache;
+   **Use default** restores the original icon or a placeholder.
    Local AppImages may suggest an update-source repository; review, change or clear it.
 4. Launch from the card; its arrow selects or edits launch profiles.
    Use **Update** or **Update All** when updates are available;
@@ -132,8 +136,9 @@ AppImage or raw executable; archives and packages are not unpacked.
 ## Privacy and limitations
 
 No telemetry. Network access is limited to release APIs and download/checksum URLs
-for chosen sources, plus TuxShelf's own releases. Files are inspected without execution;
-checksums are verified where published, but GPG/minisign signatures are not.
+for chosen sources, TuxShelf's own releases, and custom image links you choose.
+Files are inspected without execution; checksums are verified where published,
+but GPG/minisign signatures are not.
 
 An optional GitHub token is sent only to `api.github.com`. A token saved in Settings
 is stored **unencrypted** in the local library database (mode 0600); `GITHUB_TOKEN`
@@ -153,7 +158,7 @@ Built with Python 3.10+, PySide6 (Qt 6) and SQLite.
 <summary>Run from source, build and test</summary>
 
 ```bash
-git clone https://github.com/Thilen03/AppForge.git TuxShelf
+git clone https://github.com/Thilen03/TuxShelf.git TuxShelf
 cd TuxShelf
 python -m venv .venv
 source .venv/bin/activate
@@ -166,6 +171,8 @@ On Arch/CachyOS, Qt may also need `xcb-util-cursor`.
 Build the AppImage with `./scripts/build_appimage.sh`. It uses PyInstaller and
 appimagetool, requires `squashfs-tools` and `curl`, and writes
 `dist/TuxShelf-<version>-x86_64.AppImage`.
+The build invokes pip and PyInstaller through the build environment’s Python, so
+old launcher paths left by renaming the project folder do not break the build.
 
 ```bash
 PYTHONPATH=src QT_QPA_PLATFORM=offscreen python -m pytest -q -ra

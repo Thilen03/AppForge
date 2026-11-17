@@ -1027,3 +1027,85 @@ files, including the earlier backup, were hash-checked unchanged. No provenance
 record or test evidence was manufactured. SOURCE is ready for the user to build
 and test; release publication is not ready or approved. Git metadata remains
 read-only here and no Git metadata changes or publication were attempted.
+
+
+## 0.6.7 custom icon URL plan and implementation
+
+User requested direct image links alongside local custom icon selection and
+confirmed version 0.6.7 (previous active version 0.6.6). No roadmap.md is present.
+Reuse Add/Edit custom-icon persistence and the existing HTTPS certificate helper.
+Add core/icon_download.py for bounded, cancellable HTTP(S) downloads and
+ui/icon_url_dialog.py for worker signals, progress, decoding and temporary PNG
+previews. Wire both forms in ui/dialogs.py; update README, USAGE, active versions,
+public/bundled notes and focused tests. Existing icon files, metadata/default
+reset behavior and desktop integration use the existing service; no database or
+dependency changes. Preserve unrelated user modifications. Git remains read-only.
+
+Implemented download/retry/cancel, 10 MB transfer and converted-file bounds,
+16-million-pixel decoding limit and rejection of unreadable content. No user token
+is attached; network errors avoid echoing URL query secrets. Tests cover invalid
+schemes/credentials, unknown-length oversized downloads, declared length, empty
+responses, network errors, progress, worker retry/cancellation, Add/Edit storage,
+metadata refresh and default reset in both themes. Existing dist files are not
+built or modified; manual AppImage testing remains the user's next step.
+
+Validation: full regression using the existing local fixture runtime and build
+dependencies completed with 929 passed, 12 restricted TCP/Unix socket skips and
+one existing Qt deprecation warning. After the final version/docs and cancellation
+test edits, 40 focused icon/source/compatibility/bundled-notes checks passed.
+Offscreen startup selftest and git diff --check passed. The URL dialog was visually
+reviewed in light and dark themes. Live internet image retrieval was not exercised
+in this network-restricted environment; transfers used controlled response data.
+SOURCE 0.6.7 is ready for user build/manual testing of
+TuxShelf-0.6.7-x86_64.AppImage. No build, staging, commit, push or upload was run.
+
+## 0.6.7 renamed-folder build launcher fix
+
+Inspected build_appimage.sh after the user reported pip's interpreter still
+pointing to /home/thilen/appforge/.venv-build/bin/python3. The environment's
+current Python runs and imports pip/PyInstaller, but its console scripts retain
+old absolute shebangs. Plan and fix: use bin/python3 -m pip and -m PyInstaller
+in the existing build script, preserving the environment, packaging flow and
+all existing artifacts. Updated build guidance and the ongoing 0.6.7 public/
+bundled notes. Added a simulated build test with broken old console launchers
+and a path containing spaces; it checks both pip calls and reaches PyInstaller
+through the correct interpreter, then stops before any bundling. Eight focused
+build/notes checks, Bash syntax and diff whitespace checks passed. The current
+build interpreter also successfully imported both modules. No dependency install,
+real build, dist mutation or Git metadata mutation was performed. The user should
+rerun ./scripts/build_appimage.sh; a complete build remains unverified here.
+
+## Confirmed 0.6.7 release preparation
+
+User requested preparation of 0.6.7. Compared working changes with HEAD 4b69f27
+(Release 0.6.6); local tags still end at v0.5.4. The active project/package
+versions and README already identified 0.6.7. No roadmap.md is present.
+Preserved existing source/test changes and prior release notes. Finalized public
+and bundled notes for custom image URLs, bounded/cancellable downloads, the
+renamed-folder build launcher fix and the renamed GitHub repository. Corrected
+outdated repository wording in README and USAGE. No publication date was added.
+
+Repository root is /home/thilen/tuxshelf, branch main, upstream origin/main.
+Local origin still points to https://github.com/Thilen03/AppForge.git, so
+publication is blocked pending the user's terminal remote update to
+https://github.com/Thilen03/TuxShelf.git. Git metadata is read-only here; no
+staging, commit, fetch, push, tag or upload was attempted.
+
+The initially present dist/TuxShelf-0.6.7-x86_64.AppImage was only read, never
+executed or modified by preparation commands. Its initial and intermediate SHA-256 was
+e91044642c5dd1c47f9b7122de0d285db8373318c94e1e77b6171ece483ad87a.
+Its bundled notes differ from the finalized notes, so the user must rebuild from
+the prepared source and manually test the matching binary before publication.
+No provenance or manual-test approval is inferred from its presence.
+At the final check dist/ was empty and the asset was no longer available;
+its final hash therefore could not be verified. No command to remove it was
+issued. A new matching build and manual test are required.
+
+Validation for this preparation: 104 focused checks passed, one restricted Unix
+socket skip. Full regression with existing build dependencies on PYTHONPATH and
+a local fixture runtime copied from appimagetool: 931 passed, 12 restricted
+TCP/Unix socket skips, one Qt drag-event deprecation warning (121.84 seconds).
+Offscreen source startup selftest, build/publish shell syntax, version/note
+consistency and diff whitespace checks passed. Live internet image retrieval
+was not exercised; URL tests use controlled responses. SOURCE 0.6.7 is ready
+for the user to build and manually test; publication remains blocked as above.

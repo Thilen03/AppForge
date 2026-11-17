@@ -11,12 +11,14 @@ OUT="$ROOT/dist/TuxShelf-${VERSION}-${ARCH}.AppImage"
 
 echo "==> Python build environment"
 [ -d "$VENV" ] || python3 -m venv "$VENV"
-"$VENV/bin/pip" install -q --upgrade pip
-"$VENV/bin/pip" install -q -r requirements-build.txt
+# Console-script shebangs retain absolute paths after a checkout is renamed.
+# Invoke modules through this environment's interpreter instead.
+"$VENV/bin/python3" -m pip install -q --upgrade pip
+"$VENV/bin/python3" -m pip install -q -r requirements-build.txt
 
 echo "==> PyInstaller bundle"
 rm -rf "$BUILD/dist" "$BUILD/work"
-"$VENV/bin/pyinstaller" --noconfirm --clean --distpath "$BUILD/dist" --workpath "$BUILD/work" packaging/tuxshelf.spec
+"$VENV/bin/python3" -m PyInstaller --noconfirm --clean --distpath "$BUILD/dist" --workpath "$BUILD/work" packaging/tuxshelf.spec
 
 echo "==> Assemble AppDir"
 APPDIR="$BUILD/AppDir"
